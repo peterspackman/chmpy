@@ -26,8 +26,24 @@ class PromoleculeDensity:
         }
 
     def rho(self, positions):
+        if not isinstance(positions, np.ndarray):
+            positions = np.asarray(positions)
         r = cdist(self.positions, positions)
         density = np.zeros(positions.shape[0], dtype=np.float64)
         for i, n in enumerate(self.elements):
             density[:] += self.interpolators[n](r[i, :])
         return density
+
+
+    @property
+    def centroid(self):
+        return np.mean(self.positions, axis=0)
+
+    @property
+    def natoms(self):
+        return len(self.elements)
+
+    def __repr__(self):
+        return "<PromoleculeDensity: {} atoms, centre={}>".format(
+                self.natoms, tuple(self.centroid)
+        )
