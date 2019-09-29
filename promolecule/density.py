@@ -7,6 +7,9 @@ import numpy as np
 
 _DATA_DIR = dirname(__file__)
 _INTERPOLATOR_DATA = np.load(join(_DATA_DIR, "thakkar_interp.npz"))
+_DOMAIN = _INTERPOLATOR_DATA.f.domain
+_RHO = _INTERPOLATOR_DATA.f.rho
+_GRAD_RHO = _INTERPOLATOR_DATA.f.grad_rho
 
 class PromoleculeDensity:
     def __init__(self, mol):
@@ -19,8 +22,8 @@ class PromoleculeDensity:
 
         self.rho_interpolators = {
             el_number: interp1d(
-                _INTERPOLATOR_DATA["domain"],
-                _INTERPOLATOR_DATA["rho"][el_number - 1, :],
+                _DOMAIN,
+                _RHO[el_number - 1, :],
                 assume_sorted=True,
                 fill_value=0.0
             )
@@ -28,8 +31,8 @@ class PromoleculeDensity:
         }
         self.grad_rho_interpolators = {
             el_number: interp1d(
-                _INTERPOLATOR_DATA["domain"],
-                _INTERPOLATOR_DATA["grad_rho"][el_number - 1, :],
+                _DOMAIN,
+                _GRAD_RHO[el_number - 1, :],
                 assume_sorted=True,
                 fill_value=0.0
             )
