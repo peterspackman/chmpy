@@ -1,11 +1,12 @@
 import numpy as np
+from collections import namedtuple
 
-def promolecular_isosurface(promol, isovalue=0.005, sep=0.2, aabb=None):
-    if aabb is None:
-        aabb = promol.aabb()
+IsosurfaceMesh = namedtuple("IsosurfaceMesh", "vertices faces normals vertex_prop")
+
+def promolecular_isosurface(promol, isovalue=0.005, sep=0.2, orientation="xyz"):
     #from mcubes import marching_cubes
     from skimage.measure import marching_cubes_lewiner as marching_cubes
-    l, u = aabb
+    l, u = promol.aabb()
     x,y,z = np.meshgrid(
         np.arange(l[0], u[0], sep),
         np.arange(l[1], u[1], sep),
@@ -18,4 +19,7 @@ def promolecular_isosurface(promol, isovalue=0.005, sep=0.2, aabb=None):
         d, isovalue, gradient_direction="ascent"
     )
     verts = verts * sep + pts[0, :]
-    return verts, faces, normals
+    props = {}
+    if orientation == "xyz":
+        verts = np.dot(verts, np.linalg.inv(promol.principal_axes.T)) + promol.centroid
+    return IsosurfaceMesh(verts, faces, normals, props)
