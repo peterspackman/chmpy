@@ -118,20 +118,24 @@ def cov_radii(atomic_numbers):
         raise ValueError("All elements must be atomic numbers between [1,103]")
     return np.array([_ELEMENT_DATA[i - 1][2] for i in atomic_numbers])
 
+
 def vdw_radii(atomic_numbers):
     if np.any(atomic_numbers < 1) or np.any(atomic_numbers > 103):
         raise ValueError("All elements must be atomic numbers between [1,103]")
     return np.array([_ELEMENT_DATA[i - 1][3] for i in atomic_numbers])
+
 
 def element_names(atomic_numbers):
     if np.any(atomic_numbers < 1) or np.any(atomic_numbers > 103):
         raise ValueError("All elements must be atomic numbers between [1,103]")
     return [_ELEMENT_DATA[i - 1][0] for i in atomic_numbers]
 
+
 def element_symbols(atomic_numbers):
     if np.any(atomic_numbers < 1) or np.any(atomic_numbers > 103):
         raise ValueError("All elements must be atomic numbers between [1,103]")
     return [_ELEMENT_DATA[i - 1][1] for i in atomic_numbers]
+
 
 def atomic_number(el):
     symbol = el.strip().capitalize()
