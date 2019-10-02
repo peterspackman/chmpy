@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.interpolate import interp1d
 from scipy.spatial.distance import cdist
+from scipy.spatial import cKDTree as KDTree
 from os.path import join, dirname
 from .element_data import vdw_radii
 from .interp import Interpolator1D
@@ -84,11 +85,19 @@ class PromoleculeDensity:
             self.natoms, tuple(self.centroid)
         )
 
+    def d_norm(self, positions, frame="xyz"):
+        pos = self.aa_positions if frame == "molecule" else self.positions
+        tree = KDTree(pos)
+        dists, idxs = tree.query(positions)
+        vdw = self.vdw_radii[idxs]
+        return dists, (dists - vdw) / vdw
+
     @classmethod
     def from_xyz_file(cls, filename):
         from .xyz_file import parse_xyz_file
 
         return cls(parse_xyz_file(filename))
+
 
 
 class StockholderWeight:
@@ -111,6 +120,11 @@ class StockholderWeight:
         rho_a = self.dens_a.rho(positions, frame=frame, return_grad=False)
         rho_b = self.dens_b.rho(positions, frame=frame, return_grad=False)
         return rho_a / (rho_a + rho_b)
+
+    def d_norm(self, positions, frame="xyz"):
+        d_a, d_norm_a = self.dens_a.d_norm(positions, frame=frame)
+        d_b, d_norm_b = self.dens_b.d_norm(positions, frame=frame)
+        return d_a, d_b, d_norm_a, d_norm_b
 
     @classmethod
     def from_xyz_files(cls, f1, f2):

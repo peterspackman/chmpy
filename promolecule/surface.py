@@ -25,7 +25,7 @@ def promolecular_isosurface(promol, isovalue=0.005, sep=0.2, orientation="xyz"):
     return IsosurfaceMesh(verts, faces, normals, props)
 
 
-def stockholder_weight_isosurface(s, isovalue=0.5, sep=0.2):
+def stockholder_weight_isosurface(s, isovalue=0.5, sep=0.2, props=True):
     # from mcubes import marching_cubes
     from skimage.measure import marching_cubes_lewiner as marching_cubes
 
@@ -42,5 +42,12 @@ def stockholder_weight_isosurface(s, isovalue=0.5, sep=0.2):
         weights, isovalue, gradient_direction="ascent"
     )
     verts = verts * sep + pts[0, :]
-    props = {}
-    return IsosurfaceMesh(verts, faces, normals, props)
+    vertex_props = {}
+    if props:
+        d_i, d_e, d_norm_i, d_norm_e = s.d_norm(verts)
+        vertex_props["d_i"] = d_i
+        vertex_props["d_e"] = d_e
+        vertex_props["d_norm_i"] = d_norm_i
+        vertex_props["d_norm_e"] = d_norm_e
+        vertex_props["d_norm"] = d_norm_i + d_norm_e
+    return IsosurfaceMesh(verts, faces, normals, vertex_props)
