@@ -36,9 +36,8 @@ def stockholder_weight_isosurface(s, isovalue=0.5, sep=0.2):
         np.arange(l[2], u[2], sep),
     )
     shape = x.shape
-    pts = np.vstack((x.flatten(), y.flatten(), z.flatten())).T
+    pts = np.c_[x.ravel(), y.ravel(), z.ravel()]
     weights = s.weight(pts).reshape(shape)
-    print(np.min(weights), np.max(weights))
     verts, faces, normals, _ = marching_cubes(
         weights, isovalue, gradient_direction="ascent"
     )

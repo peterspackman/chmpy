@@ -3,6 +3,7 @@ from scipy.interpolate import interp1d
 from scipy.spatial.distance import cdist
 from os.path import join, dirname
 from .element_data import vdw_radii
+from .interp import Interpolator1D
 import numpy as np
 
 _DATA_DIR = dirname(__file__)
@@ -22,20 +23,18 @@ class PromoleculeDensity:
             raise ValueError("All elements must be atomic numbers between [1,103]")
 
         self.rho_interpolators = {
-            el_number: interp1d(
+            el_number: Interpolator1D(
                 _DOMAIN,
                 _RHO[el_number - 1, :],
-                assume_sorted=True,
-                fill_value="extrapolate",
+                assume_sorted=True
             )
             for el_number in np.unique(self.elements)
         }
         self.grad_rho_interpolators = {
-            el_number: interp1d(
+            el_number: Interpolator1D(
                 _DOMAIN,
                 _GRAD_RHO[el_number - 1, :],
                 assume_sorted=True,
-                fill_value="extrapolate",
             )
             for el_number in np.unique(self.elements)
         }

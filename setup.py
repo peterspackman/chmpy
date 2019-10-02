@@ -1,4 +1,14 @@
-from setuptools import setup
+import setuptools
+from numpy.distutils.core import setup, Extension as NumpyExt
+from numpy import get_include
+
+ext_modules = [
+    NumpyExt(
+        "promolecule.interp",
+        sources=["promolecule/interp.f90"],
+        language="f90",
+    ),
+] 
 
 setup(
     name="promolecule",
@@ -25,6 +35,7 @@ setup(
     package_data={
         "promolecule": ["*.npz"],
     },
+    ext_modules=ext_modules,
     install_requires=[
         "numpy",
         "scipy",
