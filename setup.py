@@ -4,9 +4,9 @@ from numpy import get_include
 
 ext_modules = [
     NumpyExt(
-        "promolecule.interp",
-        sources=["promolecule/interp.f90"],
-        language="f90",
+        "promolecule.linterp",
+        sources=["promolecule/linterp.c"],
+        language="c",
     ),
 ] 
 

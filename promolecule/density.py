@@ -4,7 +4,7 @@ from scipy.spatial.distance import cdist
 from scipy.spatial import cKDTree as KDTree
 from os.path import join, dirname
 from .element_data import vdw_radii
-from .interp import Interpolator1D
+from .interp import InterpolatorLog1D
 import numpy as np
 
 _DATA_DIR = dirname(__file__)
@@ -24,18 +24,16 @@ class PromoleculeDensity:
             raise ValueError("All elements must be atomic numbers between [1,103]")
 
         self.rho_interpolators = {
-            el_number: Interpolator1D(
+            el_number: InterpolatorLog1D(
                 _DOMAIN,
                 _RHO[el_number - 1, :],
-                assume_sorted=True
             )
             for el_number in np.unique(self.elements)
         }
         self.grad_rho_interpolators = {
-            el_number: Interpolator1D(
+            el_number: InterpolatorLog1D(
                 _DOMAIN,
                 _GRAD_RHO[el_number - 1, :],
-                assume_sorted=True,
             )
             for el_number in np.unique(self.elements)
         }
@@ -48,16 +46,15 @@ class PromoleculeDensity:
     def rho(self, positions, frame="xyz", return_grad=False):
         if not isinstance(positions, np.ndarray):
             positions = np.asarray(positions)
-        if frame == "molecule":
-            r = cdist(self.aa_positions, positions)
-        else:
-            r = cdist(self.positions, positions)
+        pos = self.aa_positions if frame == "molecule" else self.positions
         rho = np.zeros(positions.shape[0], dtype=np.float32)
         if return_grad:
             grad_rho = np.zeros(positions.shape[0], dtype=np.float32)
         for el in np.unique(self.elements):
             idxs = np.where(self.elements == el)[0]
-            rho[:] += np.sum(self.rho_interpolators[el](r[idxs, :]), axis=0)
+            r = cdist(pos[idxs, :], positions)
+            d = self.rho_interpolators[el](r)
+            rho += np.sum(d, axis=0)
             if return_grad:
                 grad_rho[:] += self.grad_rho_interpolators[n](r[i, :])
 
@@ -135,7 +132,7 @@ class StockholderWeight:
             PromoleculeDensity(parse_xyz_file(f2)),
         )
 
-    def bb(self, vdw_buffer=2.0):
+    def bb(self, vdw_buffer=5.0):
         extra = self.dens_a.vdw_radii[:, np.newaxis] + vdw_buffer
         return (
             np.min(self.dens_a.positions - extra, axis=0),
