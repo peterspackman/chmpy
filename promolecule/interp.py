@@ -7,6 +7,6 @@ class InterpolatorLog1D:
         self.ys = ys
 
     def __call__(self, pts):
-        q = pts.ravel()
+        q = np.array(pts.ravel(), dtype=np.float32)
         results = log_interp(q, self.xs, self.ys)
         return results.reshape(pts.shape)
