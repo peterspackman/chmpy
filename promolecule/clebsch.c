@@ -124,7 +124,6 @@ double clebsch(int j1, int m1, int j2, int m2, int j, int m)
    
        for (k = mink; k <= maxk; k++)
        {
-           printf("Factorial loop\n");
            tmp =  (factorial[j1nm1 - k] * factorial[jnj2pm1 + k] * factorial[j2pm2 - k]
                    * factorial[jnj1nm2 + k] * factorial[k] * factorial[j1pj2nj - k]);
            res = res + iphase/tmp;
