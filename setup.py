@@ -8,6 +8,12 @@ ext_modules = [
         sources=["promolecule/linterp.c"],
         language="c",
     ),
+    NumpyExt(
+        "promolecule.clebsch",
+        sources=["promolecule/clebsch.c"],
+        language="c",
+    ),
+
 ] 
 
 setup(
