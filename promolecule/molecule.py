@@ -136,6 +136,19 @@ class Molecule:
         extension = os.path.splitext(filename)[-1].lower()
         return extension_map[extension](filename, **kwargs)
 
+    def save(self, filename, header=True):
+        from pathlib import Path
+        if header:
+            lines = [
+                f"{len(self)}",
+                self.properties.get("comment", self.molecular_formula),
+            ]
+        else:
+            lines = []
+        for el, (x, y, z) in zip(self.elements, self.positions):
+            lines.append(f"{el} {x: 20.12f} {y: 20.12f} {z: 20.12f}")
+        Path(filename).write_text("\n".join(lines))
+
     @property
     def bbox_corners(self):
         b_min = np.min(self.positions, axis=0)

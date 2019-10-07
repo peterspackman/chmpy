@@ -411,6 +411,57 @@ class Crystal:
         result["uc_atom"] = np.tile(np.arange(slab["n_uc"]), slab["n_cells"])[idxs]
         return result
 
+    def atomic_surroundings(self, radius=5.0):
+        cart_asym = self.to_cartesian(self.asymmetric_unit.positions)
+        hklmax = np.array([-np.inf, -np.inf, -np.inf])
+        hklmin = np.array([np.inf, np.inf, np.inf])
+        frac_radius = radius / np.array(self.unit_cell.lengths)
+        for pos in self.asymmetric_unit.positions:
+            hklmax = np.maximum(hklmax, np.ceil(frac_radius + pos))
+            hklmin = np.minimum(hklmin, np.floor(pos - frac_radius))
+        hmax, kmax, lmax = hklmax.astype(int)
+        hmin, kmin, lmin = hklmin.astype(int)
+        slab = self.slab(bounds=((hmin, kmin, lmin), (hmax, kmax, lmax)))
+        tree = KDTree(slab["cart_pos"])
+        results = []
+        for i, (n, pos) in enumerate(zip(self.asymmetric_unit.elements, cart_asym)):
+            idxs = tree.query_ball_point(pos, radius)
+            positions = slab["cart_pos"][idxs]
+            elements = slab["element"][idxs]
+            d = np.linalg.norm(positions - pos, axis=1)
+            keep = np.where(d > 1e-3)[0]
+            results.append((
+                n.atomic_number, pos, elements[keep], positions[keep]
+            ))
+        return results 
+
+    def stockholder_weight_surfaces(self):
+        from .density import StockholderWeight
+        from .surface import stockholder_weight_isosurface
+        import trimesh
+
+        i = 0
+        for n, pos, neighbour_els, neighbour_pos in self.atomic_surroundings():
+            s = StockholderWeight.from_arrays([n], [pos], neighbour_els, neighbour_pos)
+            iso = stockholder_weight_isosurface(s, sep=0.2)
+            mesh = trimesh.Trimesh(vertices=iso.vertices, faces=iso.faces, normals=iso.normals)
+            with open(f"/windows/ACETAC01_hs_{i}.ply", "wb") as f:
+                mesh.export(f, "ply")
+            i += 1
+
+    def atomic_shape_descriptors(self, l_max=5):
+        descriptors = []
+        from .sht import SHT
+        from .shape_descriptors import stockholder_weight_descriptor
+        sph = SHT(l_max=l_max)
+        for n, pos, neighbour_els, neighbour_pos in self.atomic_surroundings():
+            descriptors.append(
+                stockholder_weight_descriptor(sph, [n], [pos], neighbour_els, neighbour_pos)
+            )
+        mol = Molecule.from_arrays(self.asymmetric_unit.atomic_numbers, self.to_cartesian(self.asymmetric_unit.positions))
+        mol.save("/windows/acetic_asym.xyz")
+        return descriptors
+
     @property
     def site_labels(self):
         "array of labels for sites in the asymmetric_unit"

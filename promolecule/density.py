@@ -46,13 +46,13 @@ class PromoleculeDensity:
     def rho(self, positions, frame="xyz", return_grad=False):
         if not isinstance(positions, np.ndarray):
             positions = np.asarray(positions)
-        pos = self.aa_positions if frame == "molecule" else self.positions
+        pos = self.positions
         rho = np.zeros(positions.shape[0], dtype=np.float32)
         if return_grad:
             grad_rho = np.zeros(positions.shape[0], dtype=np.float32)
         for el in np.unique(self.elements):
             idxs = np.where(self.elements == el)[0]
-            r = cdist(pos[idxs, :], positions)
+            r = cdist(pos[idxs, :], positions) / 0.5291772108 # bohr_per_angstrom
             d = self.rho_interpolators[el](r)
             rho += np.sum(d, axis=0)
             if return_grad:
@@ -130,6 +130,13 @@ class StockholderWeight:
         return cls(
             PromoleculeDensity(parse_xyz_file(f1)),
             PromoleculeDensity(parse_xyz_file(f2)),
+        )
+
+    @classmethod
+    def from_arrays(cls, n1, p1, n2, p2, unit="angstrom"):
+        return cls(
+            PromoleculeDensity((n1, p1)),
+            PromoleculeDensity((n2, p2)),
         )
 
     def bb(self, vdw_buffer=5.0):

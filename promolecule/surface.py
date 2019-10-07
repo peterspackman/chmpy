@@ -30,16 +30,10 @@ def stockholder_weight_isosurface(s, isovalue=0.5, sep=0.2, props=True):
     from skimage.measure import marching_cubes_lewiner as marching_cubes
 
     l, u = s.bb()
-    N = ((u - l) / sep).astype(int)
-    N[0] = min(N[0], 70)
-    N[1] = min(N[1], 70)
-    N[2] = min(N[2], 70)
-    spacing = (u - l) / N
-    print(spacing)
     x, y, z = np.meshgrid(
-        np.linspace(l[0], u[0], N[0]),
-        np.linspace(l[1], u[1], N[1]),
-        np.linspace(l[2], u[2], N[2]),
+        np.arange(l[0], u[0], sep),
+        np.arange(l[1], u[1], sep),
+        np.arange(l[2], u[2], sep),
     )
     shape = x.shape
     pts = np.c_[x.ravel(), y.ravel(), z.ravel()]
@@ -47,15 +41,15 @@ def stockholder_weight_isosurface(s, isovalue=0.5, sep=0.2, props=True):
     t1 = time.time()
     weights = s.weight(pts).reshape(shape)
     t2 = time.time()
-    print("Weights took", t2 - t1)
+#    print("Weights took", t2 - t1)
     t1 = time.time()
     verts, faces, normals, _ = marching_cubes(
-        weights, isovalue, spacing=spacing, gradient_direction="ascent"
+        weights, isovalue, spacing=(sep,sep,sep), gradient_direction="ascent"
     )
     t2 = time.time()
-    print("Marching cubes took", t2 - t1)
+#    print("Marching cubes took", t2 - t1)
     verts = verts + l
-    print(np.mean(verts, axis=0), np.mean(pts, axis=0))
+#    print(np.mean(verts, axis=0), np.mean(pts, axis=0))
     vertex_props = {}
     t1 = time.time()
     if props:
@@ -66,5 +60,5 @@ def stockholder_weight_isosurface(s, isovalue=0.5, sep=0.2, props=True):
         vertex_props["d_norm_e"] = d_norm_e
         vertex_props["d_norm"] = d_norm_i + d_norm_e
     t2 = time.time()
-    print("Properties took", t2 - t1)
+#    print("Properties took", t2 - t1)
     return IsosurfaceMesh(verts, faces, normals, vertex_props)
