@@ -166,8 +166,10 @@ clebsch_gordan(PyObject* self, PyObject* args)
 
 
 static PyMethodDef clebsch_methods[] = {
-    {"clebsch_gordan", clebsch_gordan, METH_VARARGS,
-        "Clebsch-Gordan coefficient for given args"
+    {"clebsch_gordan_2", clebsch_gordan, METH_VARARGS,
+        "Clebsch-Gordan coefficient for given "
+        "(l1, m1, l2, m2 | l, m) where the integers "
+        "provided are the numerator i.e. l1 = 1 means 1/2"
     },
     {NULL, NULL, 0, NULL}
 };
