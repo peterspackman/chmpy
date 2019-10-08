@@ -37,7 +37,7 @@ void linterp_log(struct linterp *interp, float x[restrict], float y[restrict], i
             j++;
             if (interp->x[j] >= xval) break;
         }
-        float slope = (interp->y[j] - interp->y[j-1]) / (interp->x[j] - interp->x[j-1]);
+        const float slope = (interp->y[j] - interp->y[j-1]) / (interp->x[j] - interp->x[j-1]);
         y[i] = interp->y[j-1] + (xval - interp->x[j-1]) * slope;
     }
 }

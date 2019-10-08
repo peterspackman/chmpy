@@ -1,5 +1,6 @@
 from .density import StockholderWeight
 from .util import spherical_to_cartesian
+from scipy.optimize import minimize_scalar
 import numpy as np
 
 
@@ -40,9 +41,9 @@ def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
     isovalue = kwargs.get("isovalue", 0.5)
     s = StockholderWeight.from_arrays(n_i, p_i, n_e, p_e)
     g = sht.grid
-    l, u = 0.2, 3.2
+    l, u = 0.2, 5.0
     n = 100
-    rvals = np.linspace(l, u, n)
+    rvals = np.logspace(-2, 3, n, base=np.e)
     sep = (l - u) / n
     pts = np.vstack([
         np.c_[np.ones(len(g)) * r, g[:, 1], g[:, 0]]
@@ -52,12 +53,34 @@ def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
 
     r = np.empty(len(g))
     for i in range(len(g)):
-        idx = n - np.searchsorted(f[::-1, i], 0.5, side='left')
-        x2 = f[idx - 1, i]
-        x1 = f[idx, i]
+        idx = n - (np.searchsorted(f[::-1, i], 0.5, side='left') + 1)
+        x2 = f[idx, i]
+        x1 = f[idx - 1, i]
         y2 = rvals[idx]
         y1 = rvals[idx - 1]
         grad = (y2 - y1)/(x2 - x1)
         r[i] = y1 + grad * (0.5 - x1)
-    print(r)
+    print(np.min(r), np.max(r))
+    return make_invariants(sht.analyse(r))
+
+
+
+def stockholder_weight_descriptor_slow(sht, n_i, p_i, n_e, p_e, **kwargs):
+    isovalue = kwargs.get("isovalue", 0.5)
+    s = StockholderWeight.from_arrays(n_i, p_i, n_e, p_e)
+    g = sht.grid
+
+    r = np.empty(len(g))
+    for i, (phi, theta) in enumerate(g):
+        rtp = np.array([[1.0, theta, phi]])
+        v = spherical_to_cartesian(rtp)
+        def f(r):
+            rtp = np.array([[r, theta, phi]])
+            xyz = p_i + r * v
+            return abs(s.weight(xyz)[0] - 0.5)
+
+        result = minimize_scalar(f, bounds=np.array([0.2, 4.0]), method='bounded', options=dict(xatol=1e-3))
+        r[i] = abs(result.x)
+
+    print(np.min(r), np.max(r))
     return make_invariants(sht.analyse(r))

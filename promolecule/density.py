@@ -56,11 +56,23 @@ class PromoleculeDensity:
             d = self.rho_interpolators[el](r)
             rho += np.sum(d, axis=0)
             if return_grad:
-                grad_rho[:] += self.grad_rho_interpolators[n](r[i, :])
-
+                dg = self.grad_rho_interpolators[el](r)
+                grad_rho += np.sum(dg, axis=0)
         if return_grad:
             return rho, grad_rho
         return rho
+
+    def grad_rho(self, positions, frame="xyz"):
+        if not isinstance(positions, np.ndarray):
+            positions = np.asarray(positions)
+        pos = self.positions
+        grad_rho = np.zeros(positions.shape[0], dtype=np.float32)
+        for el in np.unique(self.elements):
+            idxs = np.where(self.elements == el)[0]
+            r = cdist(pos[idxs, :], positions) / 0.5291772108 # bohr_per_angstrom
+            d = self.grad_rho_interpolators[el](r)
+            grad_rho += np.sum(d, axis=0)
+        return grad_rho
 
     @property
     def centroid(self):
@@ -113,10 +125,15 @@ class StockholderWeight:
     def vdw_radii(self):
         return np.r_[self.dens_a.vdw_radii, self.dens_b.vdw_radii]
 
-    def weight(self, positions, frame="xyz"):
-        rho_a = self.dens_a.rho(positions, frame=frame, return_grad=False)
-        rho_b = self.dens_b.rho(positions, frame=frame, return_grad=False)
+    def weight(self, positions, frame="xyz", return_grad=False):
+        rho_a = self.dens_a.rho(positions, frame=frame, return_grad=return_grad)
+        rho_b = self.dens_b.rho(positions, frame=frame, return_grad=return_grad)
         return rho_a / (rho_a + rho_b)
+
+    def grad_weight(self, positions, frame="xyz"):
+        d_a, dd_a = self.dens_a.rho(positions, frame=frame, return_grad=True)
+        d_b, dd_b = self.dens_b.rho(positions, frame=frame, return_grad=True)
+        return (dd_a * (d_a + d_b) - d_a * (dd_a + dd_b)) / ((d_a + d_b)**2)
 
     def d_norm(self, positions, frame="xyz"):
         d_a, d_norm_a = self.dens_a.d_norm(positions, frame=frame)

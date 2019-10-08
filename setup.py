@@ -1,6 +1,8 @@
 import setuptools
+from setuptools.extension import Extension as Ext
 from numpy.distutils.core import setup, Extension as NumpyExt
 from numpy import get_include
+from Cython.Build import cythonize
 
 ext_modules = [
     NumpyExt(
@@ -15,6 +17,17 @@ ext_modules = [
     ),
 
 ] 
+
+ext_modules_cython = cythonize([
+    Ext(
+        "promolecule._density",
+        sources=["promolecule/_density.pyx"],
+        language="cpp",
+        include_dirs=[get_include()]
+    ),
+])
+
+ext_modules += ext_modules_cython
 
 setup(
     name="promolecule",

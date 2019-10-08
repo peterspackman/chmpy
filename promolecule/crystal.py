@@ -411,7 +411,7 @@ class Crystal:
         result["uc_atom"] = np.tile(np.arange(slab["n_uc"]), slab["n_cells"])[idxs]
         return result
 
-    def atomic_surroundings(self, radius=5.0):
+    def atomic_surroundings(self, radius=8.0):
         cart_asym = self.to_cartesian(self.asymmetric_unit.positions)
         hklmax = np.array([-np.inf, -np.inf, -np.inf])
         hklmin = np.array([np.inf, np.inf, np.inf])
