@@ -11,7 +11,7 @@ def cartesian_product(*arrays):
     return arr.reshape(-1, la)
 
 
-def spherical_to_cartesian(rtp):
+def spherical_to_cartesian(rtp, dtype=np.float64):
     """
     Given an N by 3 array of (r, theta, phi) spherical coordinates
     return an N by 3 array of Cartesian(x, y, z) coordinates.
@@ -19,7 +19,7 @@ def spherical_to_cartesian(rtp):
     Arguments:
     rtp -- set of r, theta, phi coordinates
     """
-    xyz = np.zeros(rtp.shape)
+    xyz = np.zeros(rtp.shape, dtype=dtype)
 
     xyz[:, 0] = rtp[:, 0] * np.sin(rtp[:, 1]) * np.cos(rtp[:, 2])
     xyz[:, 1] = rtp[:, 0] * np.sin(rtp[:, 1]) * np.sin(rtp[:, 2])

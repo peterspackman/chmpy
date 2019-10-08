@@ -455,11 +455,13 @@ class Crystal:
         from .shape_descriptors import stockholder_weight_descriptor
         sph = SHT(l_max=l_max)
         for n, pos, neighbour_els, neighbour_pos in self.atomic_surroundings():
+            ubound = Element[n].vdw_radius * 2
             descriptors.append(
-                stockholder_weight_descriptor(sph, [n], [pos], neighbour_els, neighbour_pos)
+                stockholder_weight_descriptor(
+                    sph, [n], [pos], neighbour_els, neighbour_pos,
+                    bounds=(0.2, ubound)
+                )
             )
-        mol = Molecule.from_arrays(self.asymmetric_unit.atomic_numbers, self.to_cartesian(self.asymmetric_unit.positions))
-        mol.save("/windows/acetic_asym.xyz")
         return descriptors
 
     @property

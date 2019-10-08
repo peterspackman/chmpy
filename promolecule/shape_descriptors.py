@@ -1,6 +1,7 @@
 from .density import StockholderWeight
 from .util import spherical_to_cartesian
 from scipy.optimize import minimize_scalar
+from ._density import sphere_stockholder_radii
 import numpy as np
 
 
@@ -36,33 +37,17 @@ def make_invariants(coefficients, kind='real'):
         return invariants
 
 
-
 def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
     isovalue = kwargs.get("isovalue", 0.5)
+    r_min, r_max = kwargs.get("bounds", (0.1, 5.0))
     s = StockholderWeight.from_arrays(n_i, p_i, n_e, p_e)
-    g = sht.grid
-    l, u = 0.2, 5.0
-    n = 100
-    rvals = np.logspace(-2, 3, n, base=np.e)
-    sep = (l - u) / n
-    pts = np.vstack([
-        np.c_[np.ones(len(g)) * r, g[:, 1], g[:, 0]]
-        for r in rvals
-    ])
-    f = s.weight(spherical_to_cartesian(pts) + p_i[0]).reshape((n, -1))
-
-    r = np.empty(len(g))
-    for i in range(len(g)):
-        idx = n - (np.searchsorted(f[::-1, i], 0.5, side='left') + 1)
-        x2 = f[idx, i]
-        x1 = f[idx - 1, i]
-        y2 = rvals[idx]
-        y1 = rvals[idx - 1]
-        grad = (y2 - y1)/(x2 - x1)
-        r[i] = y1 + grad * (0.5 - x1)
+    g = np.empty(sht.grid.shape, dtype=np.float32)
+    g[:, :] = sht.grid[:, :]
+    n = 40
+    o = np.array(p_i[0], dtype=np.float32)
+    r = sphere_stockholder_radii(s.s, o, g, r_min, r_max, 1e-5, 30)
     print(np.min(r), np.max(r))
     return make_invariants(sht.analyse(r))
-
 
 
 def stockholder_weight_descriptor_slow(sht, n_i, p_i, n_e, p_e, **kwargs):
@@ -70,17 +55,16 @@ def stockholder_weight_descriptor_slow(sht, n_i, p_i, n_e, p_e, **kwargs):
     s = StockholderWeight.from_arrays(n_i, p_i, n_e, p_e)
     g = sht.grid
 
-    r = np.empty(len(g))
+    r = np.empty(len(g), dtype=np.float32)
     for i, (phi, theta) in enumerate(g):
-        rtp = np.array([[1.0, theta, phi]])
-        v = spherical_to_cartesian(rtp)
+        rtp = np.array([[1.0, theta, phi]], dtype=np.float32)
+        v = spherical_to_cartesian(rtp, dtype=np.float32)
         def f(r):
-            rtp = np.array([[r, theta, phi]])
-            xyz = p_i + r * v
-            return abs(s.weight(xyz)[0] - 0.5)
+            xyz = np.array(p_i + r * v, dtype=np.float32)
+            return abs(s.weights(xyz)[0] - 0.5)
 
-        result = minimize_scalar(f, bounds=np.array([0.2, 4.0]), method='bounded', options=dict(xatol=1e-3))
+        result = minimize_scalar(f, bounds=np.array([0.2, 4.0], dtype=np.float32), method='bounded', options=dict(xatol=1e-3))
         r[i] = abs(result.x)
 
     print(np.min(r), np.max(r))
-    return make_invariants(sht.analyse(r))
+    return make_invariants(sht.analyse(np.array(r, dtype=np.float64)))
