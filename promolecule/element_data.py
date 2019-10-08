@@ -116,13 +116,13 @@ _EL_FROM_SYM = {
 def cov_radii(atomic_numbers):
     if np.any(atomic_numbers < 1) or np.any(atomic_numbers > 103):
         raise ValueError("All elements must be atomic numbers between [1,103]")
-    return np.array([_ELEMENT_DATA[i - 1][2] for i in atomic_numbers])
+    return np.array([_ELEMENT_DATA[i - 1][2] for i in atomic_numbers], dtype=np.float32)
 
 
 def vdw_radii(atomic_numbers):
     if np.any(atomic_numbers < 1) or np.any(atomic_numbers > 103):
         raise ValueError("All elements must be atomic numbers between [1,103]")
-    return np.array([_ELEMENT_DATA[i - 1][3] for i in atomic_numbers])
+    return np.array([_ELEMENT_DATA[i - 1][3] for i in atomic_numbers], dtype=np.float32)
 
 
 def element_names(atomic_numbers):

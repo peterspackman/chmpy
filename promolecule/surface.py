@@ -31,25 +31,25 @@ def stockholder_weight_isosurface(s, isovalue=0.5, sep=0.2, props=True):
 
     l, u = s.bb()
     x, y, z = np.meshgrid(
-        np.arange(l[0], u[0], sep),
-        np.arange(l[1], u[1], sep),
-        np.arange(l[2], u[2], sep),
+        np.arange(l[0], u[0], sep, dtype=np.float32),
+        np.arange(l[1], u[1], sep, dtype=np.float32),
+        np.arange(l[2], u[2], sep, dtype=np.float32),
     )
     shape = x.shape
     pts = np.c_[x.ravel(), y.ravel(), z.ravel()]
     import time
     t1 = time.time()
-    weights = s.weight(pts).reshape(shape)
+    weights = s.weights(pts).reshape(shape)
     t2 = time.time()
-#    print("Weights took", t2 - t1)
+    print(f"Weights took {t2-t1:.3f}s, {len(pts)} pts")
     t1 = time.time()
     verts, faces, normals, _ = marching_cubes(
         weights, isovalue, spacing=(sep,sep,sep), gradient_direction="ascent"
     )
     t2 = time.time()
-#    print("Marching cubes took", t2 - t1)
+    print("Marching cubes took", t2 - t1)
     verts = verts + l
-#    print(np.mean(verts, axis=0), np.mean(pts, axis=0))
+    print(np.mean(verts, axis=0), np.mean(pts, axis=0))
     vertex_props = {}
     t1 = time.time()
     if props:
@@ -60,5 +60,5 @@ def stockholder_weight_isosurface(s, isovalue=0.5, sep=0.2, props=True):
         vertex_props["d_norm_e"] = d_norm_e
         vertex_props["d_norm"] = d_norm_i + d_norm_e
     t2 = time.time()
-#    print("Properties took", t2 - t1)
+    print("Properties took", t2 - t1)
     return IsosurfaceMesh(verts, faces, normals, vertex_props)
