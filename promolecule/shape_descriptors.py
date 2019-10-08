@@ -39,14 +39,13 @@ def make_invariants(coefficients, kind='real'):
 
 def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
     isovalue = kwargs.get("isovalue", 0.5)
-    r_min, r_max = kwargs.get("bounds", (0.1, 5.0))
+    r_min, r_max = kwargs.get("bounds", (0.1, 20.0))
     s = StockholderWeight.from_arrays(n_i, p_i, n_e, p_e)
     g = np.empty(sht.grid.shape, dtype=np.float32)
     g[:, :] = sht.grid[:, :]
     n = 40
     o = np.array(p_i[0], dtype=np.float32)
     r = sphere_stockholder_radii(s.s, o, g, r_min, r_max, 1e-5, 30)
-    print(np.min(r), np.max(r))
     return make_invariants(sht.analyse(r))
 
 

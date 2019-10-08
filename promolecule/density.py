@@ -22,7 +22,10 @@ class PromoleculeDensity:
         self.positions = np.asarray(pos, dtype=np.float32)
         if np.any(self.elements < 1) or np.any(self.elements > 103):
             raise ValueError("All elements must be atomic numbers between [1,103]")
-        self.dens = cPromol(self.positions, self.elements)
+        self.rho_data = np.empty((self.elements.shape[0], _DOMAIN.shape[0]), dtype=np.float32)
+        for i, el in enumerate(self.elements):
+            self.rho_data[i, :] = _RHO[el-1, :]
+        self.dens = cPromol(self.positions, _DOMAIN, self.rho_data)
         self.principal_axes, _, _ = np.linalg.svd((self.positions - self.centroid).T)
         self.vdw_radii = vdw_radii(self.elements)
 
