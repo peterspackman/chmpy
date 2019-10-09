@@ -73,8 +73,8 @@ cdef class StockholderWeight:
         self.dens_b = dens_b
 
     cpdef weights(self, float[:, ::1] positions):
-        rho_a = self.dens_a.rho(positions)
-        rho_b = self.dens_b.rho(positions)
+        cdef float rho_a = self.dens_a.rho(positions)
+        cdef float rho_b = self.dens_b.rho(positions)
         return rho_a / (rho_b + rho_a)
     
     @cython.boundscheck(False)
@@ -180,52 +180,64 @@ cdef float brents(StockholderWeight stock, const float origin[3],
                    const float direction[3],
                    const float lower, const float upper,
                    const float tol, const int max_iter) nogil:
-    cdef float a = lower
-    cdef float b = upper
-    cdef float v[3]
-    fvmul(origin, a, direction, v)
-    cdef float fa = stock.one_weight(v) - 0.5
-    fvmul(origin, b, direction, v)
-    cdef float fb = stock.one_weight(v) - 0.5
-    cdef np.npy_bool mflag = False
-    cdef float s = 0.0, d = 0.0, c = a, fc = fa
+    cdef float xpre, xcur, xblk, fpre, fcur, fblk, spre, scur, sbis, stry, dpre, dblk
+    cdef float delta, xtol = 1e-5
     cdef int i
+    cdef float v[3]
+    xpre = lower
+    xcur = upper
+    xblk = 0.0; fblk = 0.0
+    spre = 0.0; scur = 0.0
+    fvmul(origin, xpre, direction, v)
+    fpre = stock.one_weight(v) - 0.5
+    fvmul(origin, xcur, direction, v)
+    fcur = stock.one_weight(v) - 0.5
+    if (fpre * fcur > 0):
+        return -1.0
+    if fpre == 0:
+        return xpre
+    if fcur == 0:
+        return xcur
+
     for i in range(max_iter):
-        if fabs(b - a) < tol:
-            return s
-        if ((fa != fc) and (fb != fc)):
-            s = (
-                (a * fb * fc / ((fa - fb) * (fa - fc)) ) +
-                (b * fa * fc / ((fb - fa) * (fb - fc)) ) +
-                (c * fa * fb / ((fc - fa) * (fc - fb)) )
-            )
+        if (fpre * fcur) < 0:
+            xblk = xpre
+            fblk = fpre
+            scur = xcur - xpre
+            spre = scur
+        if fabs(fblk) < fabs(fcur):
+            xpre = xcur; xcur = xblk; xblk = xpre
+            fpre = fcur; fcur = fblk; fblk = fpre
+        delta = (xtol + tol * fabs(xcur))/2
+        sbis = (xblk - xcur)/2
+        if (fcur == 0) or (fabs(sbis) < delta):
+            return xcur
+
+        if (fabs(spre) > delta) and (fabs(fcur) < fabs(fpre)):
+            if xpre == xblk:
+                stry = -fcur*(xcur - xpre)/(fcur - fpre)
+            else:
+                dpre = (fpre - fcur) / (xpre - xcur)
+                dblk = (fblk - fcur) / (xblk - xcur)
+                stry = -fcur*(fblk * dblk - fpre*dpre)/(dblk*dpre*(fblk - fpre))
+
+            if (2 * fabs(stry) < min(fabs(spre), 3*fabs(sbis) - delta)):
+                spre = scur; scur = stry
+            else:
+                spre = sbis; scur = sbis
         else:
-            s = b - fb * (b - a) / (fb - fa)
-        
-        if (((s < (3 * a + b) * 0.25) or (s > b)) or
-                (mflag and (fabs(s-b) >= (fabs(b-c) * 0.5))) or
-                ((not mflag) and (fabs(s-b) >= (fabs(c -d) * 0.5))) or
-                (mflag and (fabs(b-c) < tol)) or
-                ((not mflag) and (fabs(c- d) < tol))):
-            s = (a + b) * 0.5
-            mflag = True
+            spre = sbis; scur = sbis
+
+        xpre = xcur; fpre = fcur
+        if (fabs(scur) > delta):
+            xcur += scur
         else:
-            mflag = False
-        fvmul(origin, s, direction, v)
-        fs = stock.one_weight(v) - 0.5
-        d = c
-        c = b
-        fc = fb
-        if (fa * fs < 0):
-            b = s
-            fb = fs
-        else:
-            a = s
-            fa = fs
-        if fabs(fa) < fabs(fb):
-            a, b = b, a
-            fa, fb = fb, fa
-    return upper
+            xcur += (delta if (sbis > 0) else -delta)
+
+        fvmul(origin, xcur, direction, v)
+        fcur = stock.one_weight(v) - 0.5
+
+    return xcur
 
 
 @cython.boundscheck(False)
