@@ -26,19 +26,19 @@ cdef class PromoleculeDensity:
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    cpdef rho(self, float[:, ::1] positions):
+    cpdef rho(self, const float[:, ::1] pts):
         cdef int i, j
         cdef float diff
         cdef float[::1] pos
-        cdef np.ndarray[np.float32_t, ndim=1] r = np.empty(positions.shape[0], dtype=np.float32)
-        cdef np.ndarray[np.float32_t, ndim=1] rho = np.zeros(positions.shape[0], dtype=np.float32)
+        cdef np.ndarray[np.float32_t, ndim=1] r = np.empty(pts.shape[0], dtype=np.float32)
+        cdef np.ndarray[np.float32_t, ndim=1] rho = np.zeros(pts.shape[0], dtype=np.float32)
         cdef float[::1] rho_view = rho
         for i in range(self.positions.shape[0]):
             pos = self.positions[i]
-            for j in range(positions.shape[0]):
+            for j in range(pts.shape[0]):
                 r[j] = 0.0
                 for col in range(3):
-                    diff = positions[j, col] - pos[col]
+                    diff = pts[j, col] - pos[col]
                     r[j] += diff*diff
                 r[j] = sqrt(r[j]) / 0.5291772108 # bohr_per_angstrom
             log_interp_f(r, self.domain, self.rho_data[i], rho_view)
@@ -46,7 +46,7 @@ cdef class PromoleculeDensity:
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    cdef float one_rho(self, float position[3]) nogil:
+    cdef float one_rho(self, const float position[3]) nogil:
         cdef int i
         cdef float diff, r
         cdef const float[::1] pos
@@ -72,14 +72,19 @@ cdef class StockholderWeight:
         self.dens_a = dens_a
         self.dens_b = dens_b
 
-    cpdef weights(self, float[:, ::1] positions):
+    cpdef weights(self, const float[:, ::1] positions):
+        cdef np.ndarray[np.float32_t, ndim=1] rho = np.empty(
+                positions.shape[0], dtype=np.float32
+        )
         rho_a = self.dens_a.rho(positions)
+        print(rho_a)
         rho_b = self.dens_b.rho(positions)
-        return rho_a / (rho_b + rho_a)
+        print(rho_b)
+        return rho_a / (rho_a + rho_b)
     
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    cdef float one_weight(self, float position[3]) nogil:
+    cdef float one_weight(self, const float position[3]) nogil:
         cdef float rho_a = self.dens_a.one_rho(position)
         cdef float rho_b = self.dens_b.one_rho(position)
         return rho_a / (rho_b + rho_a)
@@ -123,7 +128,7 @@ cdef void log_interp_f(const float[::1] x, const float[::1] xi,
     cdef int ni = xi.shape[0]
     cdef float lbound = log(xi[0]), ubound = log(xi[ni - 1])
     cdef float lrange = ubound - lbound
-    cdef float lfill = yi[0], rfill = yi[ni - 1]
+    cdef float lfill = yi[0], rfill = 0.0
     cdef int i, j
     for i in range(x.shape[0]):
         xval = x[i]

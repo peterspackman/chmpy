@@ -435,7 +435,7 @@ class Crystal:
             ))
         return results 
 
-    def molecule_surroundings(self, radius=12.0):
+    def molecule_surroundings(self, radius=6.0):
         results = []
         for mol in self.symmetry_unique_molecules():
             hklmax = np.array([-np.inf, -np.inf, -np.inf])
@@ -464,23 +464,37 @@ class Crystal:
             ))
         return results 
 
-    def stockholder_weight_surfaces(self, kind="mol", **kwargs):
+    def promolecule_density_isosurfaces(self, **kwargs):
+        from .density import PromoleculeDensity
+        from .surface import promolecule_density_isosurface
+        import trimesh
+        isovalue = kwargs.get("isovalue", 0.002)
+        sep = kwargs.get("separation", 0.2)
+        meshes = []
+        for mol in self.symmetry_unique_molecules():
+            pro = PromoleculeDensity((mol.atomic_numbers, mol.positions))
+            iso = promolecule_density_isosurface(pro, sep=sep, isovalue=isovalue)
+            mesh = trimesh.Trimesh(vertices=iso.vertices, faces=iso.faces, normals=iso.normals)
+            meshes.append(mesh)
+        return meshes
+
+
+    def stockholder_weight_isosurfaces(self, kind="mol", **kwargs):
         from .density import StockholderWeight
         from .surface import stockholder_weight_isosurface
         import trimesh
 
         sep = kwargs.get("separation", 0.2)
-        i = 0
+        radius = kwargs.get("radius", 12.0)
         meshes = []
         if kind == "atom":
-            for n, pos, neighbour_els, neighbour_pos in self.atomic_surroundings():
+            for n, pos, neighbour_els, neighbour_pos in self.atomic_surroundings(radius=radius):
                 s = StockholderWeight.from_arrays([n], [pos], neighbour_els, neighbour_pos)
                 iso = stockholder_weight_isosurface(s, sep=sep)
                 mesh = trimesh.Trimesh(vertices=iso.vertices, faces=iso.faces, normals=iso.normals)
                 meshes.append(mesh)
-                i += 1
         else:
-            for mol, n_e, n_p in self.molecule_surroundings():
+            for mol, n_e, n_p in self.molecule_surroundings(radius=radius):
                 s = StockholderWeight.from_arrays(
                         mol.atomic_numbers, mol.positions,
                         n_e, n_p
@@ -488,7 +502,6 @@ class Crystal:
                 iso = stockholder_weight_isosurface(s, sep=sep)
                 mesh = trimesh.Trimesh(vertices=iso.vertices, faces=iso.faces, normals=iso.normals)
                 meshes.append(mesh)
-                i += 1
         return meshes
 
     def molecular_shape_descriptors(self, l_max=5):

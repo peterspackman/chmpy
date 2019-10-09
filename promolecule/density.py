@@ -41,7 +41,7 @@ class PromoleculeDensity:
     def natoms(self):
         return len(self.elements)
 
-    def aabb(self, vdw_buffer=2.0):
+    def bb(self, vdw_buffer=2.5):
         extra = self.vdw_radii[:, np.newaxis] + vdw_buffer
         return (
             np.min(self.positions - extra, axis=0),
@@ -53,7 +53,8 @@ class PromoleculeDensity:
             self.natoms, tuple(self.centroid)
         )
 
-    def d_norm(self, positions, frame="xyz"):
+    def d_norm(self, positions):
+        return np.zeros(positions.shape[0]), np.zeros(positions.shape[0])
         pos = self.positions
         tree = KDTree(pos)
         dists, idxs = tree.query(positions)
@@ -85,7 +86,13 @@ class StockholderWeight:
         return np.r_[self.dens_a.vdw_radii, self.dens_b.vdw_radii]
 
     def weights(self, positions):
-        return self.s.weights(positions)
+        rho_a = self.dens_a.dens.rho(positions)
+        rho_b = self.dens_b.dens.rho(positions)
+        mask = (rho_a != 0)
+        weights = np.empty(rho_a.shape, dtype=np.float32)
+        weights[mask] = rho_a[mask] / (rho_a[mask] + rho_b[mask])
+        weights[~mask] = 0.0
+        return weights
 
     def d_norm(self, positions):
         d_a, d_norm_a = self.dens_a.d_norm(positions)
@@ -108,8 +115,9 @@ class StockholderWeight:
             PromoleculeDensity((n2, p2)),
         )
 
-    def bb(self, vdw_buffer=5.0):
+    def bb(self, vdw_buffer=3.8):
         extra = self.dens_a.vdw_radii[:, np.newaxis] + vdw_buffer
+        print(self.dens_a.positions)
         return (
             np.min(self.dens_a.positions - extra, axis=0),
             np.max(self.dens_a.positions + extra, axis=0),
