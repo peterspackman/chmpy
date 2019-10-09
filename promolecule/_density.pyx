@@ -73,8 +73,8 @@ cdef class StockholderWeight:
         self.dens_b = dens_b
 
     cpdef weights(self, float[:, ::1] positions):
-        cdef float rho_a = self.dens_a.rho(positions)
-        cdef float rho_b = self.dens_b.rho(positions)
+        rho_a = self.dens_a.rho(positions)
+        rho_b = self.dens_b.rho(positions)
         return rho_a / (rho_b + rho_a)
     
     @cython.boundscheck(False)

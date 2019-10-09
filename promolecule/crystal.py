@@ -464,17 +464,32 @@ class Crystal:
             ))
         return results 
 
-    def stockholder_weight_surfaces(self):
+    def stockholder_weight_surfaces(self, kind="mol", **kwargs):
         from .density import StockholderWeight
         from .surface import stockholder_weight_isosurface
         import trimesh
 
+        sep = kwargs.get("separation", 0.2)
         i = 0
-        for n, pos, neighbour_els, neighbour_pos in self.atomic_surroundings():
-            s = StockholderWeight.from_arrays([n], [pos], neighbour_els, neighbour_pos)
-            iso = stockholder_weight_isosurface(s, sep=0.2)
-            mesh = trimesh.Trimesh(vertices=iso.vertices, faces=iso.faces, normals=iso.normals)
-            i += 1
+        meshes = []
+        if kind == "atom":
+            for n, pos, neighbour_els, neighbour_pos in self.atomic_surroundings():
+                s = StockholderWeight.from_arrays([n], [pos], neighbour_els, neighbour_pos)
+                iso = stockholder_weight_isosurface(s, sep=sep)
+                mesh = trimesh.Trimesh(vertices=iso.vertices, faces=iso.faces, normals=iso.normals)
+                meshes.append(mesh)
+                i += 1
+        else:
+            for mol, n_e, n_p in self.molecule_surroundings():
+                s = StockholderWeight.from_arrays(
+                        mol.atomic_numbers, mol.positions,
+                        n_e, n_p
+                )
+                iso = stockholder_weight_isosurface(s, sep=sep)
+                mesh = trimesh.Trimesh(vertices=iso.vertices, faces=iso.faces, normals=iso.normals)
+                meshes.append(mesh)
+                i += 1
+        return meshes
 
     def molecular_shape_descriptors(self, l_max=5):
         descriptors = []

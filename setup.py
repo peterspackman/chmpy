@@ -58,6 +58,8 @@ setup(
     install_requires=[
         "numpy",
         "scipy",
+        "trimesh",
+        "shtns",
     ],
     zip_safe=True,
 )
