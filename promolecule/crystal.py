@@ -430,10 +430,8 @@ class Crystal:
             elements = slab["element"][idxs]
             d = np.linalg.norm(positions - pos, axis=1)
             keep = np.where(d > 1e-3)[0]
-            results.append((
-                n.atomic_number, pos, elements[keep], positions[keep]
-            ))
-        return results 
+            results.append((n.atomic_number, pos, elements[keep], positions[keep]))
+        return results
 
     def molecule_surroundings(self, radius=6.0):
         results = []
@@ -459,25 +457,25 @@ class Crystal:
                 if d < 1e-3:
                     this_mol.append(nn)
                     keep[this_mol] = False
-            results.append((
-                mol, elements[keep], positions[keep]
-            ))
-        return results 
+            results.append((mol, elements[keep], positions[keep]))
+        return results
 
     def promolecule_density_isosurfaces(self, **kwargs):
         from .density import PromoleculeDensity
         from .surface import promolecule_density_isosurface
         import trimesh
+
         isovalue = kwargs.get("isovalue", 0.002)
         sep = kwargs.get("separation", 0.2)
         meshes = []
         for mol in self.symmetry_unique_molecules():
             pro = PromoleculeDensity((mol.atomic_numbers, mol.positions))
             iso = promolecule_density_isosurface(pro, sep=sep, isovalue=isovalue)
-            mesh = trimesh.Trimesh(vertices=iso.vertices, faces=iso.faces, normals=iso.normals)
+            mesh = trimesh.Trimesh(
+                vertices=iso.vertices, faces=iso.faces, normals=iso.normals
+            )
             meshes.append(mesh)
         return meshes
-
 
     def stockholder_weight_isosurfaces(self, kind="mol", **kwargs):
         from .density import StockholderWeight
@@ -488,19 +486,26 @@ class Crystal:
         radius = kwargs.get("radius", 12.0)
         meshes = []
         if kind == "atom":
-            for n, pos, neighbour_els, neighbour_pos in self.atomic_surroundings(radius=radius):
-                s = StockholderWeight.from_arrays([n], [pos], neighbour_els, neighbour_pos)
+            for n, pos, neighbour_els, neighbour_pos in self.atomic_surroundings(
+                radius=radius
+            ):
+                s = StockholderWeight.from_arrays(
+                    [n], [pos], neighbour_els, neighbour_pos
+                )
                 iso = stockholder_weight_isosurface(s, sep=sep)
-                mesh = trimesh.Trimesh(vertices=iso.vertices, faces=iso.faces, normals=iso.normals)
+                mesh = trimesh.Trimesh(
+                    vertices=iso.vertices, faces=iso.faces, normals=iso.normals
+                )
                 meshes.append(mesh)
         else:
             for mol, n_e, n_p in self.molecule_surroundings(radius=radius):
                 s = StockholderWeight.from_arrays(
-                        mol.atomic_numbers, mol.positions,
-                        n_e, n_p
+                    mol.atomic_numbers, mol.positions, n_e, n_p
                 )
                 iso = stockholder_weight_isosurface(s, sep=sep)
-                mesh = trimesh.Trimesh(vertices=iso.vertices, faces=iso.faces, normals=iso.normals)
+                mesh = trimesh.Trimesh(
+                    vertices=iso.vertices, faces=iso.faces, normals=iso.normals
+                )
                 meshes.append(mesh)
         return meshes
 
@@ -508,16 +513,21 @@ class Crystal:
         descriptors = []
         from .sht import SHT
         from .shape_descriptors import stockholder_weight_descriptor
+
         sph = SHT(l_max=l_max)
         for mol, neighbour_els, neighbour_pos in self.molecule_surroundings():
             c = np.array(mol.centroid, dtype=np.float32)
             dists = np.linalg.norm(mol.positions - c, axis=1)
-            bounds = np.min(dists)/2, np.max(dists) + 10.0
+            bounds = np.min(dists) / 2, np.max(dists) + 10.0
             descriptors.append(
                 stockholder_weight_descriptor(
-                    sph, mol.atomic_numbers, mol.positions, neighbour_els, neighbour_pos,
+                    sph,
+                    mol.atomic_numbers,
+                    mol.positions,
+                    neighbour_els,
+                    neighbour_pos,
                     origin=c,
-                    bounds=bounds
+                    bounds=bounds,
                 )
             )
         return descriptors
@@ -526,13 +536,13 @@ class Crystal:
         descriptors = []
         from .sht import SHT
         from .shape_descriptors import stockholder_weight_descriptor
+
         sph = SHT(l_max=l_max)
         for n, pos, neighbour_els, neighbour_pos in self.atomic_surroundings():
             ubound = Element[n].vdw_radius * 3
             descriptors.append(
                 stockholder_weight_descriptor(
-                    sph, [n], [pos], neighbour_els, neighbour_pos,
-                    bounds=(0.2, ubound)
+                    sph, [n], [pos], neighbour_els, neighbour_pos, bounds=(0.2, ubound)
                 )
             )
         return descriptors
@@ -557,9 +567,7 @@ class Crystal:
     @classmethod
     def load(cls, filename):
         """Load a crystal structure from file (.res, .cif)"""
-        extension_map = {
-            ".cif": cls.from_cif_file,
-        }
+        extension_map = {".cif": cls.from_cif_file}
         extension = os.path.splitext(filename)[-1].lower()
         return extension_map[extension](filename)
 
@@ -600,9 +608,7 @@ class Crystal:
         if data_block_name is not None:
             return cls.from_cif_data(cif.data[data_block_name])
 
-        crystals = {
-            name: cls.from_cif_data(data) for name, data in cif.data.items()
-        }
+        crystals = {name: cls.from_cif_data(data) for name, data in cif.data.items()}
         keys = list(crystals.keys())
         if len(keys) == 1:
             return crystals[keys[0]]

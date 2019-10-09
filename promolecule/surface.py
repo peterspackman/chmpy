@@ -7,11 +7,10 @@ IsosurfaceMesh = namedtuple("IsosurfaceMesh", "vertices faces normals vertex_pro
 LOG = logging.getLogger(__name__)
 
 
-def promolecule_density_isosurface(promol, isovalue=0.005, sep=0.2):
-    # from mcubes import marching_cubes
+def promolecule_density_isosurface(promol, isovalue=0.002, sep=0.2):
     from skimage.measure import marching_cubes_lewiner as marching_cubes
-    t1 = time.time()
 
+    t1 = time.time()
     l, u = promol.bb()
     x, y, z = np.meshgrid(
         np.arange(l[0], u[0], sep),
@@ -21,19 +20,20 @@ def promolecule_density_isosurface(promol, isovalue=0.005, sep=0.2):
     shape = x.shape
     pts = np.c_[x.ravel(), y.ravel(), z.ravel()]
     d = promol.rho(pts).reshape(shape)
-    verts, faces, normals, _ = marching_cubes(d, isovalue, gradient_direction="ascent")
-    verts = verts * sep + pts[0, :]
+    verts, faces, normals, _ = marching_cubes(
+        d, isovalue, spacing=(sep, sep, sep), gradient_direction="ascent"
+    )
+    verts = verts + l
     props = {}
     t2 = time.time()
-    LOG.info("PromoleculeDensity isosurface took %.3fms", 1000*(t2 - t1))
+    LOG.info("promolecule surface took %.3fs, %d pts", t2 - t1, len(pts))
     return IsosurfaceMesh(verts, faces, normals, props)
 
 
 def stockholder_weight_isosurface(s, isovalue=0.5, sep=0.2, props=True):
-    # from mcubes import marching_cubes
     from skimage.measure import marching_cubes_lewiner as marching_cubes
-    t1 = time.time()
 
+    t1 = time.time()
     l, u = s.bb()
     x, y, z = np.meshgrid(
         np.arange(l[0], u[0], sep, dtype=np.float32),
@@ -45,7 +45,7 @@ def stockholder_weight_isosurface(s, isovalue=0.5, sep=0.2, props=True):
     pts = np.array(pts, dtype=np.float32)
     weights = s.weights(pts).reshape(shape)
     verts, faces, normals, _ = marching_cubes(
-        weights, isovalue, spacing=(sep,sep,sep), gradient_direction="ascent"
+        weights, isovalue, spacing=(sep, sep, sep), gradient_direction="ascent"
     )
     verts = verts + l
     vertex_props = {}
@@ -57,5 +57,5 @@ def stockholder_weight_isosurface(s, isovalue=0.5, sep=0.2, props=True):
         vertex_props["d_norm_e"] = d_norm_e
         vertex_props["d_norm"] = d_norm_i + d_norm_e
     t2 = time.time()
-    LOG.info("StockholderWeight isosurface took %.3fs, %d pts", t2 - t1, len(pts))
+    LOG.info("stockholder weight surface took %.3fs, %d pts", t2 - t1, len(pts))
     return IsosurfaceMesh(verts, faces, normals, vertex_props)

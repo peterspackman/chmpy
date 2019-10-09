@@ -22,9 +22,11 @@ class PromoleculeDensity:
         self.positions = np.asarray(pos, dtype=np.float32)
         if np.any(self.elements < 1) or np.any(self.elements > 103):
             raise ValueError("All elements must be atomic numbers between [1,103]")
-        self.rho_data = np.empty((self.elements.shape[0], _DOMAIN.shape[0]), dtype=np.float32)
+        self.rho_data = np.empty(
+            (self.elements.shape[0], _DOMAIN.shape[0]), dtype=np.float32
+        )
         for i, el in enumerate(self.elements):
-            self.rho_data[i, :] = _RHO[el-1, :]
+            self.rho_data[i, :] = _RHO[el - 1, :]
         self.dens = cPromol(self.positions, _DOMAIN, self.rho_data)
         self.principal_axes, _, _ = np.linalg.svd((self.positions - self.centroid).T)
         self.vdw_radii = vdw_radii(self.elements)
@@ -64,8 +66,8 @@ class PromoleculeDensity:
     @classmethod
     def from_xyz_file(cls, filename):
         from .xyz_file import parse_xyz_file
-        return cls(parse_xyz_file(filename))
 
+        return cls(parse_xyz_file(filename))
 
 
 class StockholderWeight:
@@ -86,9 +88,10 @@ class StockholderWeight:
         return np.r_[self.dens_a.vdw_radii, self.dens_b.vdw_radii]
 
     def weights(self, positions):
+        return self.s.weights(positions)
         rho_a = self.dens_a.dens.rho(positions)
         rho_b = self.dens_b.dens.rho(positions)
-        mask = (rho_a != 0)
+        mask = rho_a != 0
         weights = np.empty(rho_a.shape, dtype=np.float32)
         weights[mask] = rho_a[mask] / (rho_a[mask] + rho_b[mask])
         weights[~mask] = 0.0
@@ -110,14 +113,10 @@ class StockholderWeight:
 
     @classmethod
     def from_arrays(cls, n1, p1, n2, p2, unit="angstrom"):
-        return cls(
-            PromoleculeDensity((n1, p1)),
-            PromoleculeDensity((n2, p2)),
-        )
+        return cls(PromoleculeDensity((n1, p1)), PromoleculeDensity((n2, p2)))
 
-    def bb(self, vdw_buffer=3.8):
+    def bb(self, vdw_buffer=2.5):
         extra = self.dens_a.vdw_radii[:, np.newaxis] + vdw_buffer
-        print(self.dens_a.positions)
         return (
             np.min(self.dens_a.positions - extra, axis=0),
             np.max(self.dens_a.positions + extra, axis=0),

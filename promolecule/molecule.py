@@ -17,14 +17,7 @@ class Molecule:
     labels: np.ndarray
     properties: dict
 
-    def __init__(
-        self,
-        elements,
-        positions,
-        bonds=None,
-        labels=None,
-        **kwargs,
-    ):
+    def __init__(self, elements, positions, bonds=None, labels=None, **kwargs):
         self.positions = positions
         self.elements = elements
         self.properties = {}
@@ -78,7 +71,6 @@ class Molecule:
             labels.append("{}{}".format(el.symbol, counts[el]))
         self.labels = np.asarray(labels)
 
-
     def distance_to(self, other, method="centroid"):
         method = method.lower()
         if method == "centroid":
@@ -130,14 +122,13 @@ class Molecule:
 
     @classmethod
     def load(cls, filename, **kwargs):
-        extension_map = {
-            ".xyz": cls.from_xyz_file,
-        }
+        extension_map = {".xyz": cls.from_xyz_file}
         extension = os.path.splitext(filename)[-1].lower()
         return extension_map[extension](filename, **kwargs)
 
     def save(self, filename, header=True):
         from pathlib import Path
+
         if header:
             lines = [
                 f"{len(self)}",

@@ -1,6 +1,7 @@
 import numpy as np
 from .linterp import log_interp
 
+
 class InterpolatorLog1D:
     def __init__(self, xs, ys):
         self.xs = xs

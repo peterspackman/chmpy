@@ -6,6 +6,7 @@ def save_mesh(mesh, filename):
     with open(filename, "wb") as f:
         mesh.export(f, ext)
 
+
 def cartesian_product(*arrays):
     arrays = [np.asarray(a) for a in arrays]
     la = len(arrays)

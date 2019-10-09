@@ -1,3 +1,4 @@
+# cython: language_level=3, boundscheck=False, wraparound=False
 cimport cython
 cimport numpy as np
 import numpy as np
@@ -24,8 +25,6 @@ cdef class PromoleculeDensity:
         self.domain = domain
         self.rho_data = rho_data
 
-    @cython.boundscheck(False)
-    @cython.wraparound(False)
     cpdef rho(self, const float[:, ::1] pts):
         cdef int i, j
         cdef float diff
@@ -47,8 +46,6 @@ cdef class PromoleculeDensity:
             rho += tmp
         return rho
 
-    @cython.boundscheck(False)
-    @cython.wraparound(False)
     cdef float one_rho(self, const float position[3]) nogil:
         cdef int i
         cdef float diff, r
@@ -83,16 +80,12 @@ cdef class StockholderWeight:
         rho_b = self.dens_b.rho(positions)
         return rho_a / (rho_a + rho_b)
     
-    @cython.boundscheck(False)
-    @cython.wraparound(False)
     cdef float one_weight(self, const float position[3]) nogil:
         cdef float rho_a = self.dens_a.one_rho(position)
         cdef float rho_b = self.dens_b.one_rho(position)
         return rho_a / (rho_b + rho_a)
 
 
-@cython.boundscheck(False)
-@cython.wraparound(False)
 cdef void log_interp_d(const double[::1] x, const double[::1] xi,
                        const double[::1] yi, double[::1] y) nogil:
     cdef double xval, lxval, guess
@@ -120,8 +113,6 @@ cdef void log_interp_d(const double[::1] x, const double[::1] xi,
         slope = (yi[j] - yi[j-1]) / (xi[j] - xi[j-1])
         y[i] += yi[j-1] + (xval - xi[j-1]) * slope
 
-@cython.boundscheck(False)
-@cython.wraparound(False)
 cdef void log_interp_f(const float[::1] x, const float[::1] xi,
                        const float[::1] yi, float[::1] y) nogil:
     cdef float xval, lxval, guess
@@ -150,8 +141,6 @@ cdef void log_interp_f(const float[::1] x, const float[::1] xi,
         slope = (yi[j] - yi[j-1]) / (xi[j] - xi[j-1])
         y[i] += yi[j-1] + (xval - xi[j-1]) * slope
 
-@cython.boundscheck(False)
-@cython.wraparound(False)
 cdef inline float log_interp_f_one(const float x, const float[::1] xi, const float[::1] yi) nogil:
     cdef float xval, lxval, guess
     cdef float slope
@@ -173,15 +162,11 @@ cdef inline float log_interp_f_one(const float x, const float[::1] xi, const flo
     slope = (yi[j] - yi[j-1]) / (xi[j] - xi[j-1])
     return yi[j-1] + (x - xi[j-1]) * slope
 
-@cython.boundscheck(False)
-@cython.wraparound(False)
 cdef inline void fvmul(const float o[3], const float a, const float v[3], float dest[3]) nogil:
     dest[0] = o[0] + v[0] * a
     dest[1] = o[1] + v[1] * a
     dest[2] = o[2] + v[2] * a
 
-@cython.boundscheck(False)
-@cython.wraparound(False)
 cdef float brents(StockholderWeight stock, const float origin[3],
                    const float direction[3],
                    const float lower, const float upper,
@@ -246,8 +231,6 @@ cdef float brents(StockholderWeight stock, const float origin[3],
     return xcur
 
 
-@cython.boundscheck(False)
-@cython.wraparound(False)
 cpdef sphere_stockholder_radii(
         StockholderWeight s, const float[::1] origin, const float[:, ::1] grid,
         const float l, const float u, const float tol, const int max_iter):

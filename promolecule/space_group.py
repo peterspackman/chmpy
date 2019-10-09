@@ -281,6 +281,7 @@ class SpaceGroup:
     the international tables number from 1-230, and the international
     tables symbol.
     """
+
     def __init__(self, international_tables_number, choice=""):
         if international_tables_number < 1 or international_tables_number > 230:
             raise ValueError("Space group number must be between [1, 230]")
@@ -446,7 +447,7 @@ class SpaceGroup:
         return subgroups
 
     @classmethod
-    def from_symmetry_operations( cls, symops, expand_latt=None):
+    def from_symmetry_operations(cls, symops, expand_latt=None):
         """Find a matching spacegroup for a given set of symmetry
         operations, optionally treating them as a reduced set of
         symmetry operations and expanding them based on the lattice

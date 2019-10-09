@@ -5,33 +5,35 @@ from ._density import sphere_stockholder_radii
 import numpy as np
 
 
-def make_invariants(coefficients, kind='real'):
+def make_invariants(coefficients, kind="real"):
     """Construct the 'N' type invariants from sht coefficients.
     If coefficients is of length n, the size of the result will be sqrt(n)
 
     Arguments:
     coefficients -- the set of spherical harmonic coefficients
     """
-    if kind == 'complex':
+    if kind == "complex":
         size = int(np.sqrt(len(coefficients)))
         invariants = np.empty(shape=(size), dtype=np.float64)
         for i in range(0, size):
-            lower, upper = i**2, (i+1)**2
-            invariants[i] = np.sum(coefficients[lower:upper+1] *
-                                   np.conj(coefficients[lower:upper+1])).real
+            lower, upper = i ** 2, (i + 1) ** 2
+            invariants[i] = np.sum(
+                coefficients[lower : upper + 1]
+                * np.conj(coefficients[lower : upper + 1])
+            ).real
         return invariants
     else:
         # n = (l_max +2)(l_max+1)/2
         n = len(coefficients)
-        size = int((-3 + np.sqrt(8*n + 1))//2) + 1
+        size = int((-3 + np.sqrt(8 * n + 1)) // 2) + 1
         lower = 0
         invariants = np.empty(shape=(size), dtype=np.float64)
         for i in range(0, size):
             x = i + 1
             upper = lower + x
             invariants[i] = np.sum(
-                coefficients[lower:upper+1] *
-                np.conj(coefficients[lower:upper+1])
+                coefficients[lower : upper + 1]
+                * np.conj(coefficients[lower : upper + 1])
             ).real
             lower += x
         return invariants
@@ -57,11 +59,17 @@ def stockholder_weight_descriptor_slow(sht, n_i, p_i, n_e, p_e, **kwargs):
     for i, (phi, theta) in enumerate(g):
         rtp = np.array([[1.0, theta, phi]], dtype=np.float32)
         v = spherical_to_cartesian(rtp, dtype=np.float32)
+
         def f(r):
             xyz = np.array(p_i + r * v, dtype=np.float32)
             return abs(s.weights(xyz)[0] - 0.5)
 
-        result = minimize_scalar(f, bounds=np.array([0.2, 4.0], dtype=np.float32), method='bounded', options=dict(xatol=1e-3))
+        result = minimize_scalar(
+            f,
+            bounds=np.array([0.2, 4.0], dtype=np.float32),
+            method="bounded",
+            options=dict(xatol=1e-3),
+        )
         r[i] = abs(result.x)
 
     print(np.min(r), np.max(r))
