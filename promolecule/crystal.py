@@ -451,12 +451,14 @@ class Crystal:
             positions = slab["cart_pos"]
             tree = KDTree(positions)
             keep = np.zeros(positions.shape[0], dtype=bool)
+            this_mol = []
             for i, (n, pos) in enumerate(zip(mol.elements, mol.positions)):
                 idxs = tree.query_ball_point(pos, radius)
-                nn, d = tree.query(pos)
+                d, nn = tree.query(pos)
                 keep[idxs] = True
                 if d < 1e-3:
-                    keep[idxs] = False
+                    this_mol.append(nn)
+                    keep[this_mol] = False
             results.append((
                 mol, elements[keep], positions[keep]
             ))
