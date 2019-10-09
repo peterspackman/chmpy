@@ -23,7 +23,7 @@ ext_modules_cython = cythonize([
         "promolecule._density",
         sources=["promolecule/_density.pyx"],
         language="cpp",
-        include_dirs=[get_include()]
+        include_dirs=[get_include()],
     ),
 ])
 

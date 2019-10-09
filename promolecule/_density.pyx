@@ -32,16 +32,19 @@ cdef class PromoleculeDensity:
         cdef float[::1] pos
         cdef np.ndarray[np.float32_t, ndim=1] r = np.empty(pts.shape[0], dtype=np.float32)
         cdef np.ndarray[np.float32_t, ndim=1] rho = np.zeros(pts.shape[0], dtype=np.float32)
+        cdef np.ndarray[np.float32_t, ndim=1] tmp = np.empty(pts.shape[0], dtype=np.float32)
         cdef float[::1] rho_view = rho
         for i in range(self.positions.shape[0]):
             pos = self.positions[i]
             for j in range(pts.shape[0]):
                 r[j] = 0.0
+                tmp[j] = 0.0
                 for col in range(3):
                     diff = pts[j, col] - pos[col]
                     r[j] += diff*diff
                 r[j] = sqrt(r[j]) / 0.5291772108 # bohr_per_angstrom
-            log_interp_f(r, self.domain, self.rho_data[i], rho_view)
+            log_interp_f(r, self.domain, self.rho_data[i], tmp)
+            rho += tmp
         return rho
 
     @cython.boundscheck(False)
@@ -77,9 +80,7 @@ cdef class StockholderWeight:
                 positions.shape[0], dtype=np.float32
         )
         rho_a = self.dens_a.rho(positions)
-        print(rho_a)
         rho_b = self.dens_b.rho(positions)
-        print(rho_b)
         return rho_a / (rho_a + rho_b)
     
     @cython.boundscheck(False)
