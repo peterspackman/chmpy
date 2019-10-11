@@ -463,16 +463,22 @@ class Crystal:
     def promolecule_density_isosurfaces(self, **kwargs):
         from .density import PromoleculeDensity
         from .surface import promolecule_density_isosurface
+        from matplotlib.cm import get_cmap
         import trimesh
 
         isovalue = kwargs.get("isovalue", 0.002)
         sep = kwargs.get("separation", 0.2)
+        vertex_color = kwargs.get("color", "d_norm")
         meshes = []
+        colormap = get_cmap(kwargs.get("colormap", "bwr_r"))
         for mol in self.symmetry_unique_molecules():
             pro = PromoleculeDensity((mol.atomic_numbers, mol.positions))
             iso = promolecule_density_isosurface(pro, sep=sep, isovalue=isovalue)
+            prop = iso.vertex_prop[vertex_color]
+            color = colormap(prop)
             mesh = trimesh.Trimesh(
-                vertices=iso.vertices, faces=iso.faces, normals=iso.normals
+                vertices=iso.vertices, faces=iso.faces, normals=iso.normals,
+                vertex_colors=color
             )
             meshes.append(mesh)
         return meshes
@@ -480,11 +486,15 @@ class Crystal:
     def stockholder_weight_isosurfaces(self, kind="mol", **kwargs):
         from .density import StockholderWeight
         from .surface import stockholder_weight_isosurface
+        from matplotlib.cm import get_cmap
         import trimesh
 
         sep = kwargs.get("separation", 0.2)
         radius = kwargs.get("radius", 12.0)
+        vertex_color = kwargs.get("color", "d_norm")
         meshes = []
+        colormap = get_cmap(kwargs.get("colormap", "bwr_r"))
+        isos = []
         if kind == "atom":
             for n, pos, neighbour_els, neighbour_pos in self.atomic_surroundings(
                 radius=radius
@@ -493,20 +503,22 @@ class Crystal:
                     [n], [pos], neighbour_els, neighbour_pos
                 )
                 iso = stockholder_weight_isosurface(s, sep=sep)
-                mesh = trimesh.Trimesh(
-                    vertices=iso.vertices, faces=iso.faces, normals=iso.normals
-                )
-                meshes.append(mesh)
+                isos.append(iso)
         else:
             for mol, n_e, n_p in self.molecule_surroundings(radius=radius):
                 s = StockholderWeight.from_arrays(
                     mol.atomic_numbers, mol.positions, n_e, n_p
                 )
                 iso = stockholder_weight_isosurface(s, sep=sep)
-                mesh = trimesh.Trimesh(
-                    vertices=iso.vertices, faces=iso.faces, normals=iso.normals
-                )
-                meshes.append(mesh)
+                isos.append(iso)
+        for iso in isos:
+            prop = iso.vertex_prop[vertex_color]
+            color = colormap(np.clip(prop, -0.7, 1.1))
+            mesh = trimesh.Trimesh(
+                vertices=iso.vertices, faces=iso.faces, normals=iso.normals,
+                vertex_colors=color
+            )
+            meshes.append(mesh)
         return meshes
 
     def molecular_shape_descriptors(self, l_max=5):
@@ -538,7 +550,7 @@ class Crystal:
         from .shape_descriptors import stockholder_weight_descriptor
 
         sph = SHT(l_max=l_max)
-        for n, pos, neighbour_els, neighbour_pos in self.atomic_surroundings():
+        for n, pos, neighbour_els, neighbour_pos in self.atomic_surroundings(radius=3.8):
             ubound = Element[n].vdw_radius * 3
             descriptors.append(
                 stockholder_weight_descriptor(
@@ -563,6 +575,14 @@ class Crystal:
         return "<Crystal {} {}>".format(
             self.asymmetric_unit.formula, self.space_group.symbol
         )
+
+    @property
+    def density(self):
+        if "density" in self.properties:
+            return self.properties["density"]
+        uc_mass = sum(Element[x].mass for x in self.unit_cell_atoms()["element"])
+        uc_vol = self.unit_cell.volume()
+        return uc_mass / uc_vol / 0.6022
 
     @classmethod
     def load(cls, filename):

@@ -5,7 +5,7 @@ from ._density import sphere_stockholder_radii
 import numpy as np
 
 
-def make_invariants(coefficients, kind="real"):
+def make_N_invariants(coefficients, kind="real"):
     """Construct the 'N' type invariants from sht coefficients.
     If coefficients is of length n, the size of the result will be sqrt(n)
 
@@ -21,7 +21,7 @@ def make_invariants(coefficients, kind="real"):
                 coefficients[lower : upper + 1]
                 * np.conj(coefficients[lower : upper + 1])
             ).real
-        return invariants
+        return np.sqrt(invariants)
     else:
         # n = (l_max +2)(l_max+1)/2
         n = len(coefficients)
@@ -36,7 +36,18 @@ def make_invariants(coefficients, kind="real"):
                 * np.conj(coefficients[lower : upper + 1])
             ).real
             lower += x
-        return invariants
+        return np.sqrt(invariants)
+
+
+def make_invariants(coefficients, kinds="N"):
+    invariants = []
+    if "N" in kinds:
+        invariants.append(make_N_invariants(coefficients))
+    if "P" in kinds:
+        pass
+
+    return np.hstack(invariants)
+    
 
 
 def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):

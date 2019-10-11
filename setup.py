@@ -10,21 +10,20 @@ ext_modules = [
         sources=["promolecule/linterp.c"],
         language="c",
     ),
-    NumpyExt(
-        "promolecule.clebsch",
-        sources=["promolecule/clebsch.c"],
-        language="c",
-    ),
-
 ] 
 
 ext_modules_cython = cythonize([
     Ext(
         "promolecule._density",
         sources=["promolecule/_density.pyx"],
-        language="cpp",
         include_dirs=[get_include()],
     ),
+    Ext(
+        "promolecule._invariants",
+        sources=["promolecule/_invariants.pyx"],
+        include_dirs=[get_include()],
+    ),
+
 ])
 
 ext_modules += ext_modules_cython

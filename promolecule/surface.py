@@ -7,7 +7,7 @@ IsosurfaceMesh = namedtuple("IsosurfaceMesh", "vertices faces normals vertex_pro
 LOG = logging.getLogger(__name__)
 
 
-def promolecule_density_isosurface(promol, isovalue=0.002, sep=0.2):
+def promolecule_density_isosurface(promol, isovalue=0.002, sep=0.2, props=True):
     from skimage.measure import marching_cubes_lewiner as marching_cubes
 
     t1 = time.time()
@@ -24,10 +24,15 @@ def promolecule_density_isosurface(promol, isovalue=0.002, sep=0.2):
         d, isovalue, spacing=(sep, sep, sep), gradient_direction="ascent"
     )
     verts = verts + l
-    props = {}
+    vertex_props = {}
+    if props:
+        d_i, d_norm_i = promol.d_norm(verts)
+        vertex_props["d_i"] = d_i
+        vertex_props["d_norm_i"] = d_norm_i
+        vertex_props["d_norm"] = d_norm_i
     t2 = time.time()
     LOG.info("promolecule surface took %.3fs, %d pts", t2 - t1, len(pts))
-    return IsosurfaceMesh(verts, faces, normals, props)
+    return IsosurfaceMesh(verts, faces, normals, vertex_props)
 
 
 def stockholder_weight_isosurface(s, isovalue=0.5, sep=0.2, props=True):

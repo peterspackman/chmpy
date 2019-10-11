@@ -56,7 +56,6 @@ class PromoleculeDensity:
         )
 
     def d_norm(self, positions):
-        return np.zeros(positions.shape[0]), np.zeros(positions.shape[0])
         pos = self.positions
         tree = KDTree(pos)
         dists, idxs = tree.query(positions)
