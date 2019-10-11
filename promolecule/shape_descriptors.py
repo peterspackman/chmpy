@@ -2,6 +2,7 @@ from .density import StockholderWeight
 from .util import spherical_to_cartesian
 from scipy.optimize import minimize_scalar
 from ._density import sphere_stockholder_radii
+from ._invariants import p_invariants_c, p_invariants_r
 import numpy as np
 
 
@@ -39,13 +40,12 @@ def make_N_invariants(coefficients, kind="real"):
         return np.sqrt(invariants)
 
 
-def make_invariants(coefficients, kinds="N"):
+def make_invariants(coefficients, kinds="NP"):
     invariants = []
     if "N" in kinds:
         invariants.append(make_N_invariants(coefficients))
     if "P" in kinds:
-        pass
-
+        invariants.append(p_invariants_r(coefficients))
     return np.hstack(invariants)
     
 

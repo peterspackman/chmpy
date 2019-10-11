@@ -30,7 +30,7 @@ ext_modules += ext_modules_cython
 
 setup(
     name="promolecule",
-    version="0.1a1",
+    version="0.2a1",
     description="Promolecule and Hirshfeld surfaces using python",
     url="https://github.com/peterspackman/promolecule-python",
     keywords=[

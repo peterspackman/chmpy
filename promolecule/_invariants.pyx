@@ -206,7 +206,11 @@ cpdef p_invariants_c(coeffs):
                     even_inv.append(i)
                 else:
                     odd_inv.append(i)
-    return np.hstack([np.real(even_inv), np.imag(odd_inv)])
+    R = np.real(even_inv)
+    R = np.sign(R) * np.power(R, 1.0/3)
+    J = np.imag(odd_inv)
+    J = np.sign(J) * np.power(J, 1.0/3)
+    return np.hstack([R, J])
 
 
 cpdef p_invariants_r(coeffs):
@@ -230,5 +234,8 @@ cpdef p_invariants_r(coeffs):
                     even_inv.append(i)
                 else:
                     odd_inv.append(i)
-    return np.hstack([np.real(even_inv), np.imag(odd_inv)])
-
+    R = np.real(even_inv)
+    R = np.sign(R) * np.cbrt(R)
+    J = np.imag(odd_inv)
+    J = np.sign(J) * np.cbrt(J)
+    return np.hstack([R, J])
