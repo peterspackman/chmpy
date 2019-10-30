@@ -470,7 +470,7 @@ class Crystal:
         sep = kwargs.get("separation", 0.2)
         vertex_color = kwargs.get("color", "d_norm_i")
         meshes = []
-        colormap = get_cmap(kwargs.get("colormap", "viridis"))
+        colormap = get_cmap(kwargs.get("colormap", "viridis_r"))
         for mol in self.symmetry_unique_molecules():
             pro = PromoleculeDensity((mol.atomic_numbers, mol.positions))
             iso = promolecule_density_isosurface(pro, sep=sep, isovalue=isovalue)
@@ -493,7 +493,7 @@ class Crystal:
         radius = kwargs.get("radius", 12.0)
         vertex_color = kwargs.get("color", "d_norm")
         meshes = []
-        colormap = get_cmap(kwargs.get("colormap", "viridis"))
+        colormap = get_cmap(kwargs.get("colormap", "viridis_r"))
         isos = []
         if kind == "atom":
             for n, pos, neighbour_els, neighbour_pos in self.atomic_surroundings(
