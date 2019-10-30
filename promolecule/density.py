@@ -30,6 +30,7 @@ class PromoleculeDensity:
         self.dens = cPromol(self.positions, _DOMAIN, self.rho_data)
         self.principal_axes, _, _ = np.linalg.svd((self.positions - self.centroid).T)
         self.vdw_radii = vdw_radii(self.elements)
+        print(np.unique(self.vdw_radii))
 
     def rho(self, positions):
         positions = np.asarray(positions, dtype=np.float32)
@@ -59,8 +60,12 @@ class PromoleculeDensity:
         pos = self.positions
         tree = KDTree(pos)
         dists, idxs = tree.query(positions)
+        print(np.unique(idxs))
+        print(len(np.unique(idxs)))
+        print(self.elements[idxs])
         vdw = self.vdw_radii[idxs]
-        return dists, (dists - vdw) / vdw
+        d_n = (dists - vdw) / vdw
+        return dists, idxs
 
     @classmethod
     def from_xyz_file(cls, filename):

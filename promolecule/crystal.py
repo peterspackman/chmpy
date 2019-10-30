@@ -468,9 +468,9 @@ class Crystal:
 
         isovalue = kwargs.get("isovalue", 0.002)
         sep = kwargs.get("separation", 0.2)
-        vertex_color = kwargs.get("color", "d_norm")
+        vertex_color = kwargs.get("color", "d_norm_i")
         meshes = []
-        colormap = get_cmap(kwargs.get("colormap", "bwr_r"))
+        colormap = get_cmap(kwargs.get("colormap", "viridis"))
         for mol in self.symmetry_unique_molecules():
             pro = PromoleculeDensity((mol.atomic_numbers, mol.positions))
             iso = promolecule_density_isosurface(pro, sep=sep, isovalue=isovalue)
@@ -493,7 +493,7 @@ class Crystal:
         radius = kwargs.get("radius", 12.0)
         vertex_color = kwargs.get("color", "d_norm")
         meshes = []
-        colormap = get_cmap(kwargs.get("colormap", "bwr_r"))
+        colormap = get_cmap(kwargs.get("colormap", "viridis"))
         isos = []
         if kind == "atom":
             for n, pos, neighbour_els, neighbour_pos in self.atomic_surroundings(
@@ -513,7 +513,7 @@ class Crystal:
                 isos.append(iso)
         for iso in isos:
             prop = iso.vertex_prop[vertex_color]
-            color = colormap(np.clip(prop, -0.7, 1.1))
+            color = colormap(prop)
             mesh = trimesh.Trimesh(
                 vertices=iso.vertices, faces=iso.faces, normals=iso.normals,
                 vertex_colors=color
@@ -542,7 +542,7 @@ class Crystal:
                     bounds=bounds,
                 )
             )
-        return descriptors
+        return np.asarray(descriptors)
 
     def atomic_shape_descriptors(self, l_max=5):
         descriptors = []
@@ -557,7 +557,7 @@ class Crystal:
                     sph, [n], [pos], neighbour_els, neighbour_pos, bounds=(0.2, ubound)
                 )
             )
-        return descriptors
+        return np.asarray(descriptors)
 
     @property
     def site_labels(self):
