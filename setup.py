@@ -23,7 +23,11 @@ ext_modules_cython = cythonize([
         sources=["promolecule/_invariants.pyx"],
         include_dirs=[get_include()],
     ),
-
+    Ext(
+        "promolecule.mc._mc_lewiner",
+        sources=["promolecule/mc/_mc_lewiner.pyx"],
+        include_dirs=[get_include()],
+    ),
 ])
 
 ext_modules += ext_modules_cython

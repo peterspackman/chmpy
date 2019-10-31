@@ -168,6 +168,8 @@ class Element(metaclass=_ElementMeta):
         2.15
         """
         symbol = s.strip().capitalize()
+        if symbol == "D":
+            symbol = "H"
         if symbol.isdigit():
             return Element.from_atomic_number(int(symbol))
         if symbol not in _EL_FROM_SYM:

@@ -47,7 +47,6 @@ def make_invariants(coefficients, kinds="NP"):
     if "P" in kinds:
         invariants.append(p_invariants_r(coefficients))
     return np.hstack(invariants)
-    
 
 
 def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):

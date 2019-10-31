@@ -218,7 +218,7 @@ class Crystal:
         if not np.isclose(np.sum(occupation), expected_natoms):
             LOG.warn("invalid total occupation after merging sites")
         if np.any(occupation > 1.0):
-            LOG.warn("Some unit cell site occupations are > 1.0")
+            LOG.debug("Some unit cell site occupations are > 1.0")
         setattr(
             self,
             "_unit_cell_atom_dict",
@@ -477,8 +477,10 @@ class Crystal:
             prop = iso.vertex_prop[vertex_color]
             color = colormap(prop)
             mesh = trimesh.Trimesh(
-                vertices=iso.vertices, faces=iso.faces, normals=iso.normals,
-                vertex_colors=color
+                vertices=iso.vertices,
+                faces=iso.faces,
+                normals=iso.normals,
+                vertex_colors=color,
             )
             meshes.append(mesh)
         return meshes
@@ -515,8 +517,10 @@ class Crystal:
             prop = iso.vertex_prop[vertex_color]
             color = colormap(prop)
             mesh = trimesh.Trimesh(
-                vertices=iso.vertices, faces=iso.faces, normals=iso.normals,
-                vertex_colors=color
+                vertices=iso.vertices,
+                faces=iso.faces,
+                normals=iso.normals,
+                vertex_colors=color,
             )
             meshes.append(mesh)
         return meshes
@@ -550,7 +554,9 @@ class Crystal:
         from .shape_descriptors import stockholder_weight_descriptor
 
         sph = SHT(l_max=l_max)
-        for n, pos, neighbour_els, neighbour_pos in self.atomic_surroundings(radius=3.8):
+        for n, pos, neighbour_els, neighbour_pos in self.atomic_surroundings(
+            radius=3.8
+        ):
             ubound = Element[n].vdw_radius * 3
             descriptors.append(
                 stockholder_weight_descriptor(
@@ -609,13 +615,15 @@ class Crystal:
         lengths = [cif_data[f"cell_length_{x}"] for x in ("a", "b", "c")]
         angles = [cif_data[f"cell_angle_{x}"] for x in ("alpha", "beta", "gamma")]
         unit_cell = UnitCell.from_lengths_and_angles(lengths, angles, unit="degrees")
+        space_group = SpaceGroup(int(cif_data.get("symmetry_Int_Tables_number", 1)))
+
         if "symmetry_equiv_pos_as_xyz" in cif_data:
-            space_group = SpaceGroup.from_symmetry_operations(
-                [
-                    SymmetryOperation.from_string_code(x)
-                    for x in cif_data["symmetry_equiv_pos_as_xyz"]
-                ]
-            )
+            latt = space_group.latt
+            symops = [
+                SymmetryOperation.from_string_code(x)
+                for x in cif_data["symmetry_equiv_pos_as_xyz"]
+            ]
+            space_group = SpaceGroup.from_symmetry_operations(symops)
         elif "symmetry_Int_Tables_number" in cif_data:
             space_group = SpaceGroup(cif_data["symmetry_Int_Tables_number"])
 

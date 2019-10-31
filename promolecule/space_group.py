@@ -5,6 +5,9 @@ import json
 import re
 from fractions import Fraction
 from .util import cartesian_product
+import logging
+
+LOG = logging.getLogger(__name__)
 
 _sgdata = namedtuple(
     "_sgdata",

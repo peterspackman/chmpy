@@ -2,22 +2,20 @@ import numpy as np
 from collections import namedtuple
 import time
 import logging
+from .mc import marching_cubes
 
 IsosurfaceMesh = namedtuple("IsosurfaceMesh", "vertices faces normals vertex_prop")
 LOG = logging.getLogger(__name__)
 
 
 def promolecule_density_isosurface(promol, isovalue=0.002, sep=0.2, props=True):
-    from skimage.measure import marching_cubes_lewiner as marching_cubes
 
     t1 = time.time()
     l, u = promol.bb()
-    x_grid = np.arange(l[0], u[0], sep, dtype=np.float32) 
-    y_grid = np.arange(l[1], u[1], sep, dtype=np.float32) 
-    z_grid = np.arange(l[2], u[2], sep, dtype=np.float32) 
-    x, y, z = np.meshgrid(
-        x_grid, y_grid, z_grid
-    )
+    x_grid = np.arange(l[0], u[0], sep, dtype=np.float32)
+    y_grid = np.arange(l[1], u[1], sep, dtype=np.float32)
+    z_grid = np.arange(l[2], u[2], sep, dtype=np.float32)
+    x, y, z = np.meshgrid(x_grid, y_grid, z_grid)
     separations = np.array((sep, sep, sep))
     shape = x.shape
     pts = np.c_[x.ravel(), y.ravel(), z.ravel()]
@@ -43,16 +41,13 @@ def promolecule_density_isosurface(promol, isovalue=0.002, sep=0.2, props=True):
 
 
 def stockholder_weight_isosurface(s, isovalue=0.5, sep=0.2, props=True):
-    from skimage.measure import marching_cubes_lewiner as marching_cubes
 
     t1 = time.time()
     l, u = s.bb()
-    x_grid = np.arange(l[0], u[0], sep, dtype=np.float32) 
-    y_grid = np.arange(l[1], u[1], sep, dtype=np.float32) 
-    z_grid = np.arange(l[2], u[2], sep, dtype=np.float32) 
-    x, y, z = np.meshgrid(
-        x_grid, y_grid, z_grid
-    )
+    x_grid = np.arange(l[0], u[0], sep, dtype=np.float32)
+    y_grid = np.arange(l[1], u[1], sep, dtype=np.float32)
+    z_grid = np.arange(l[2], u[2], sep, dtype=np.float32)
+    x, y, z = np.meshgrid(x_grid, y_grid, z_grid)
     separations = np.array((sep, sep, sep))
     shape = x.shape
     pts = np.c_[x.ravel(), y.ravel(), z.ravel()]
