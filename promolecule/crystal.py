@@ -433,6 +433,36 @@ class Crystal:
             results.append((n.atomic_number, pos, elements[keep], positions[keep]))
         return results
 
+    def atom_group_surroundings(self, atoms, radius=6.0):
+        results = []
+        hklmax = np.array([-np.inf, -np.inf, -np.inf])
+        hklmin = np.array([np.inf, np.inf, np.inf])
+        frac_radius = radius / np.array(self.unit_cell.lengths)
+        central_positions = self.asymmetric_unit.positions[atoms]
+        central_elements = self.asymmetric_unit.atomic_numbers[atoms]
+        central_cart_positions = self.to_cartesian(central_positions)
+
+        for pos in central_positions:
+            hklmax = np.maximum(hklmax, np.ceil(frac_radius + pos))
+            hklmin = np.minimum(hklmin, np.floor(pos - frac_radius))
+        hmax, kmax, lmax = hklmax.astype(int)
+        hmin, kmin, lmin = hklmin.astype(int)
+        slab = self.slab(bounds=((hmin, kmin, lmin), (hmax, kmax, lmax)))
+        elements = slab["element"]
+        positions = slab["cart_pos"]
+        tree = KDTree(positions)
+        keep = np.zeros(positions.shape[0], dtype=bool)
+
+        this_mol = []
+        for i, (n, pos) in enumerate(zip(central_elements, central_cart_positions)):
+            idxs = tree.query_ball_point(pos, radius)
+            d, nn = tree.query(pos)
+            keep[idxs] = True
+            if d < 1e-3:
+                this_mol.append(nn)
+                keep[this_mol] = False
+        return (central_elements, central_cart_positions), (elements[keep], positions[keep])
+
     def molecule_surroundings(self, radius=6.0):
         results = []
         for mol in self.symmetry_unique_molecules():
@@ -494,6 +524,7 @@ class Crystal:
         sep = kwargs.get("separation", 0.2)
         radius = kwargs.get("radius", 12.0)
         vertex_color = kwargs.get("color", "d_norm")
+        isovalue = kwargs.get("isovalue", 0.5)
         meshes = []
         colormap = get_cmap(kwargs.get("colormap", "viridis_r"))
         isos = []
@@ -504,14 +535,15 @@ class Crystal:
                 s = StockholderWeight.from_arrays(
                     [n], [pos], neighbour_els, neighbour_pos
                 )
-                iso = stockholder_weight_isosurface(s, sep=sep)
+                iso = stockholder_weight_isosurface(s, isovalue=isovalue, sep=sep)
                 isos.append(iso)
         else:
             for mol, n_e, n_p in self.molecule_surroundings(radius=radius):
                 s = StockholderWeight.from_arrays(
                     mol.atomic_numbers, mol.positions, n_e, n_p
                 )
-                iso = stockholder_weight_isosurface(s, sep=sep)
+                iso = stockholder_weight_isosurface(s, isovalue=isovalue, sep=sep)
+                isos.append(iso)
                 isos.append(iso)
         for iso in isos:
             prop = iso.vertex_prop[vertex_color]
@@ -564,6 +596,26 @@ class Crystal:
                 )
             )
         return np.asarray(descriptors)
+
+    def atom_group_shape_descriptors(self, atoms, l_max=5):
+        from .sht import SHT
+        from .shape_descriptors import stockholder_weight_descriptor
+
+        sph = SHT(l_max=l_max)
+        inside, outside = self.atom_group_surroundings(atoms)
+        m = Molecule.from_arrays(*inside)
+        c = np.array(m.centroid, dtype=np.float32)
+        dists = np.linalg.norm(m.positions - c, axis=1)
+        bounds = np.min(dists) / 2, np.max(dists) + 10.0
+        return np.asarray(
+            stockholder_weight_descriptor(
+                    sph,
+                    *inside,
+                    *outside,
+                    origin=c,
+                    bounds=bounds,
+            )
+        )
 
     @property
     def site_labels(self):

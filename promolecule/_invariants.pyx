@@ -196,9 +196,8 @@ cpdef p_invariants_c(coeffs):
             for l in range(l1, l_max+1):
                 if (l1 - l2 > l) or (l1 + l2  < l):
                     continue
-                if (l % 2 == 0) or (l2 != l1):
-                    i = invariant_P_c(coeffs, l, l1, l2)
-                elif (l2 % 2 == 0) or l1 != l:
+                if (((l % 2 == 0) or (l2 != l1)) and
+                        ((l2 % 2 == 0) or (l1 != l))):
                     i = invariant_P_c(coeffs, l, l1, l2)
                 else:
                     continue
@@ -224,9 +223,8 @@ cpdef p_invariants_r(coeffs):
             for l in range(l1, l_max+1):
                 if (l1 - l2 > l) or (l1 + l2  < l):
                     continue
-                if (l % 2 == 0) or (l2 != l1):
-                    i = invariant_P_r(coeffs, l, l1, l2)
-                elif (l2 % 2 == 0) or l1 != l:
+                if (((l % 2 == 0) or (l2 != l1)) and
+                        ((l2 % 2 == 0) or (l1 != l))):
                     i = invariant_P_r(coeffs, l, l1, l2)
                 else:
                     continue

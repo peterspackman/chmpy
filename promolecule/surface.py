@@ -31,7 +31,7 @@ def promolecule_density_isosurface(promol, isovalue=0.002, sep=0.2, props=True):
     LOG.debug("Min (x,y,z): %s", np.min(verts, axis=0))
     vertex_props = {}
     if props:
-        d_i, d_norm_i = promol.d_norm(verts)
+        d_i, d_norm_i, vecs = promol.d_norm(verts)
         vertex_props["d_i"] = d_i
         vertex_props["d_norm_i"] = d_norm_i
         LOG.debug("d_i (min, max): (%.2f, %.2f)", np.min(d_i), np.max(d_i))
@@ -64,13 +64,15 @@ def stockholder_weight_isosurface(s, isovalue=0.5, sep=0.2, props=True):
     LOG.debug("Min (x,y,z): %s", np.min(verts, axis=0))
     vertex_props = {}
     if props:
-        d_i, d_e, d_norm_i, d_norm_e = s.d_norm(verts)
+        d_i, d_e, d_norm_i, d_norm_e, dp, angles = s.d_norm(verts)
         vertex_props["d_i"] = d_i
         vertex_props["d_e"] = d_e
         vertex_props["d_norm_i"] = d_norm_i
         vertex_props["d_norm_e"] = d_norm_e
         d_norm = d_norm_i + d_norm_e
         vertex_props["d_norm"] = d_norm
+        vertex_props["dp"] = dp
+        vertex_props["angle"] = np.abs(angles)
         LOG.debug("d_norm (min, max): (%.2f, %.2f)", np.min(d_norm), np.max(d_norm))
     t2 = time.time()
     LOG.info("stockholder weight surface took %.3fs, %d pts", t2 - t1, len(pts))

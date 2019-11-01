@@ -61,11 +61,15 @@ class PromoleculeDensity:
         # make sure k is enough should be enough for d_norm to be correct
         dists, idxs = tree.query(positions, k=6)
         d_norm = np.empty(dists.shape[0])
+        vecs = np.empty(positions.shape)
         for j, (d, i) in enumerate(zip(dists, idxs)):
+            i = i[i < pos.shape[0]]
             vdw = self.vdw_radii[i]
             d_n = (d - vdw) / vdw
-            d_norm[j] = np.min(d_n)
-        return dists[:, 0], d_norm
+            p = np.argmin(d_n)
+            d_norm[j] = d_n[p]
+            vecs[j] = (pos[p] - positions[j]) / vdw[p]
+        return dists[:, 0], d_norm, vecs
 
     @classmethod
     def from_xyz_file(cls, filename):
@@ -102,9 +106,11 @@ class StockholderWeight:
         return weights
 
     def d_norm(self, positions):
-        d_a, d_norm_a = self.dens_a.d_norm(positions)
-        d_b, d_norm_b = self.dens_b.d_norm(positions)
-        return d_a, d_b, d_norm_a, d_norm_b
+        d_a, d_norm_a, vecs_a = self.dens_a.d_norm(positions)
+        d_b, d_norm_b, vecs_b = self.dens_b.d_norm(positions)
+        dp = np.einsum("ij,ij->i", vecs_a, vecs_b)
+        angles = dp / (np.linalg.norm(vecs_a, axis=1) * np.linalg.norm(vecs_b, axis=1))
+        return d_a, d_b, d_norm_a, d_norm_b, dp, angles
 
     @classmethod
     def from_xyz_files(cls, f1, f2):
