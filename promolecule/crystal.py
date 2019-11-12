@@ -438,9 +438,10 @@ class Crystal:
         hklmax = np.array([-np.inf, -np.inf, -np.inf])
         hklmin = np.array([np.inf, np.inf, np.inf])
         frac_radius = radius / np.array(self.unit_cell.lengths)
-        central_positions = self.asymmetric_unit.positions[atoms]
-        central_elements = self.asymmetric_unit.atomic_numbers[atoms]
-        central_cart_positions = self.to_cartesian(central_positions)
+        mol = self.symmetry_unique_molecules()[0]
+        central_positions = self.to_fractional(mol.positions[atoms])
+        central_elements = mol.atomic_numbers[atoms]
+        central_cart_positions = mol.positions[atoms]
 
         for pos in central_positions:
             hklmax = np.maximum(hklmax, np.ceil(frac_radius + pos))
@@ -675,7 +676,21 @@ class Crystal:
                 SymmetryOperation.from_string_code(x)
                 for x in cif_data["symmetry_equiv_pos_as_xyz"]
             ]
-            space_group = SpaceGroup.from_symmetry_operations(symops)
+            try:
+                new_sg = SpaceGroup.from_symmetry_operations(symops)
+                space_group = new_sg
+            except ValueError as e:
+                space_group.symmetry_operations = symops
+                symbol = cif_data.get(
+                    "symmetry_space_group_name_H-M", space_group.symbol
+                )
+                space_group.symbol = symbol
+                space_group.full_symbol = symbol
+                LOG.warning(
+                    "Initializing non-standard spacegroup setting %s, "
+                    "some SG data may be missing", symbol
+                )
+
         elif "symmetry_Int_Tables_number" in cif_data:
             space_group = SpaceGroup(cif_data["symmetry_Int_Tables_number"])
 
@@ -694,6 +709,15 @@ class Crystal:
             return crystals[keys[0]]
         return crystals
 
+    @classmethod
     def from_cif_string(cls, file_content, **kwargs):
-        cif_data = Cif.from_string(file_content).data
-        return cls.from_cif_data(cif_data, **kwargs)
+        data_block_name = kwargs.get("data_block_name", None)
+        cif = Cif.from_string(file_content)
+        if data_block_name is not None:
+            return cls.from_cif_data(cif.data[data_block_name])
+
+        crystals = {name: cls.from_cif_data(data) for name, data in cif.data.items()}
+        keys = list(crystals.keys())
+        if len(keys) == 1:
+            return crystals[keys[0]]
+        return crystals
