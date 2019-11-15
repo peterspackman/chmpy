@@ -138,6 +138,21 @@ class AsymmetricUnit:
     def __repr__(self):
         return "<{}>".format(self.formula)
 
+    @classmethod
+    def from_records(cls, records):
+        """Initialize an AsymmetricUnit from a dictionary of arrays"""
+        labels = []
+        elements = []
+        positions = []
+        occupation = []
+        for r in records:
+            labels.append(r["label"])
+            elements.append(Element[r["element"]])
+            positions.append(r["position"])
+            occupation.append(r.get("occupation", 1.0))
+        positions = np.asarray(positions)
+        return AsymmetricUnit(elements, positions, labels=labels, occupation=occupation)
+
 
 class Crystal:
     space_group: SpaceGroup
@@ -646,7 +661,7 @@ class Crystal:
     @classmethod
     def load(cls, filename):
         """Load a crystal structure from file (.res, .cif)"""
-        extension_map = {".cif": cls.from_cif_file}
+        extension_map = {".cif": cls.from_cif_file, ".res": cls.from_shelx_file}
         extension = os.path.splitext(filename)[-1].lower()
         return extension_map[extension](filename)
 
@@ -721,3 +736,25 @@ class Crystal:
         if len(keys) == 1:
             return crystals[keys[0]]
         return crystals
+
+    @classmethod
+    def from_shelx_file(cls, filename, **kwargs):
+        """Initialize a crystal structure from a shelx .res file"""
+        p = Path(filename)
+        titl = p.stem
+        return cls.from_shelx_string(p.read_text(), titl=titl, **kwargs)
+
+    @classmethod
+    def from_shelx_string(cls, file_content, **kwargs):
+        """Initialize a crystal structure from a shelx .res string"""
+        from .shelx import parse_shelx_file_content
+        shelx_dict = parse_shelx_file_content(file_content)
+        asymmetric_unit = AsymmetricUnit.from_records(shelx_dict["ATOM"])
+        space_group = SpaceGroup.from_symmetry_operations(
+            shelx_dict["SYMM"], expand_latt=shelx_dict["LATT"]
+        )
+        unit_cell = UnitCell.from_lengths_and_angles(
+            shelx_dict["CELL"]["lengths"], shelx_dict["CELL"]["angles"], unit="degrees"
+        )
+        return cls(unit_cell, space_group, asymmetric_unit, **kwargs)
+
