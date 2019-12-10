@@ -531,13 +531,16 @@ class Crystal:
             meshes.append(mesh)
         return meshes
 
+    def hirshfeld_surfaces(self, **kwargs):
+        return self.stockholder_weight_isosurfaces(**kwargs)
+
     def stockholder_weight_isosurfaces(self, kind="mol", **kwargs):
         from .density import StockholderWeight
         from .surface import stockholder_weight_isosurface
         from matplotlib.cm import get_cmap
         import trimesh
 
-        sep = kwargs.get("separation", 0.2)
+        sep = kwargs.get("separation", kwargs.get("resolution", 0.2))
         radius = kwargs.get("radius", 12.0)
         vertex_color = kwargs.get("color", "d_norm")
         isovalue = kwargs.get("isovalue", 0.5)
@@ -559,7 +562,6 @@ class Crystal:
                     mol.atomic_numbers, mol.positions, n_e, n_p
                 )
                 iso = stockholder_weight_isosurface(s, isovalue=isovalue, sep=sep)
-                isos.append(iso)
                 isos.append(iso)
         for iso in isos:
             prop = iso.vertex_prop[vertex_color]
