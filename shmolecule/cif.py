@@ -9,6 +9,23 @@ QUOTE_REGEX = r"{0}\s+([^{0}]*)\s+{0}"
 
 
 def parse_value(string, with_uncertainty=False):
+    """parse a value from a cif file to its appropriate type
+    e.g. int, float, str etc. Will handle uncertainty values
+    contained in parentheses.
+
+    Parameters
+    ----------
+    string: str
+        the string containing the value to parse
+
+    with_uncertainty: bool, optional
+        return a tuple including uncertainty if a numeric type is expected
+
+    Returns
+    -------
+    value
+        the value coerced into the appropriate type
+    """
     match = NUM_ERR_REGEX.match(string)
     if match and match.span()[1] == len(string):
         number, uncertainty = match.groups()
@@ -23,6 +40,23 @@ def parse_value(string, with_uncertainty=False):
 
 
 def parse_quote(string, delimiter=";"):
+    """extract a value contained within quotes, with an optional change
+    of delimiter
+
+    Parameters
+    ----------
+    string: str
+        the string containing the value to parse
+
+    delimiter: bool, optional
+        the quote delimiter, default ';'
+
+    Returns
+    -------
+    value
+        the string contained inside the quotes
+    """
+
     match = re.match(QUOTE_REGEX.format(delimiter), string)
     if match:
         return match.groups()[0]
@@ -30,16 +64,19 @@ def parse_quote(string, delimiter=";"):
 
 
 def needs_quote(string):
+    "check if a string needs to be quoted (i.e. it has a space or quotation marks in it"
     if not isinstance(string, str):
         return False
     return " " in string and (not ('"' in string or "'" in string))
 
 
 def is_scalar(value):
+    "check if the value is a string or has no __len__ dunder method"
     return isinstance(value, str) or (not hasattr(value, "__len__"))
 
 
 def format_field(x):
+    "format a field to fixed precision if float otherwise as a string"
     if isinstance(x, float):
         return f"{x:20.12f}"
     else:
@@ -47,6 +84,15 @@ def format_field(x):
 
 
 class Cif:
+    """Class to represent data extracted from a CIF 
+    standard file format.
+
+    Parameters
+    ----------
+    cif_data : dict
+        dictionary of CIF keys and values
+    """
+
     def __init__(self, cif_data):
         self.data = cif_data
         self.line_dispatch = {
@@ -57,17 +103,21 @@ class Cif:
         self.content_lines = []
 
     def is_comment_line(self, line):
+        "check if the line is a comment i.e. starts with '#'"
         return line.strip().startswith("#")
 
     def is_data_name_line(self, line):
+        "check if the line is a data_name i.e. starts with a single '_'"
         return line.strip().startswith("_")
 
     def is_empty_line(self, line):
+        "check if the line is empty/blank"
         if line and line.strip():
             return False
         return True
 
     def is_data_line(self, line):
+        "check if the line contains a value for the currentt key"
         if self.is_empty_line(line):
             return False
         if self.is_comment_line(line):
@@ -79,6 +129,7 @@ class Cif:
         return True
 
     def parse_quoted_block(self, delimiter=";"):
+        "parse an entire quoted block, delimited by delimiter"
         l1 = self.content_lines[self.line_index].strip()
         i = self.line_index + 1
         j = i
@@ -92,6 +143,7 @@ class Cif:
         raise ValueError(f"Unmatch quotation on line {self.line_index + 1}")
 
     def parse_data_name(self):
+        "parse a single data name i.e key for the cif_data dictionary"
         tokens = self.content_lines[self.line_index].strip()[1:].split()
         k = tokens[0]
         if len(tokens) == 1:
@@ -106,6 +158,7 @@ class Cif:
         LOG.debug("Parsed data name: %s = %s", k, v)
 
     def parse_loop_block(self):
+        "parse values contained in a _loop block"
         LOG.debug("Parsing loop block")
         self.line_index += 1
         line = self.content_lines[self.line_index]
@@ -134,9 +187,11 @@ class Cif:
         LOG.debug("Parsed loop block")
 
     def parse_comment_line(self):
+        "ignore comment lines"
         self.line_index += 1
 
     def parse_data_block_name(self):
+        "parse a data block name"
         LOG.debug("Parsing data block name")
         line = self.content_lines[self.line_index]
         self.current_data_block_name = line[5:].strip()
@@ -144,6 +199,7 @@ class Cif:
         LOG.debug("Parsed data block name: %s", self.current_data_block_name)
 
     def parse(self, ignore_uncertainty=True):
+        "parse the entire CIF contents"
         if not ignore_uncertainty:
             raise NotImplementedError(
                 "Storing uncertainty information has not been implemented"
@@ -177,22 +233,26 @@ class Cif:
 
     @property
     def current_data_block(self):
+        "return the current data block, adding the key if necessary"
         if self.current_data_block_name not in self.data:
             self.data[self.current_data_block_name] = {}
         return self.data[self.current_data_block_name]
 
     @classmethod
     def from_file(cls, filename):
+        "initialize a :obj:`Cif` from a file path"
         return cls.from_string(Path(filename).read_text())
 
     @classmethod
     def from_string(cls, contents):
+        "initialize a :obj:`Cif` from string contents"
         c = cls({})
         c.content_lines = contents.split("\n")
         c.parse()
         return c
 
     def to_string(self):
+        "represent the data in this :obj`Cif` textually in the CIF format"
         lines = []
         for data_block_name, data_block_data in self.data.items():
             lines.append(f"data_{data_block_name}")
@@ -225,4 +285,5 @@ class Cif:
         return "\n".join(lines)
 
     def to_file(self, filename):
+        "write this :obj:`Cif` to file"
         Path(filename).write_text(self.to_string())

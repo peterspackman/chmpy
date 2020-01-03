@@ -477,7 +477,10 @@ class Crystal:
             if d < 1e-3:
                 this_mol.append(nn)
                 keep[this_mol] = False
-        return (central_elements, central_cart_positions), (elements[keep], positions[keep])
+        return (
+            (central_elements, central_cart_positions),
+            (elements[keep], positions[keep]),
+        )
 
     def molecule_surroundings(self, radius=6.0):
         results = []
@@ -627,11 +630,7 @@ class Crystal:
         bounds = np.min(dists) / 2, np.max(dists) + 10.0
         return np.asarray(
             stockholder_weight_descriptor(
-                    sph,
-                    *inside,
-                    *outside,
-                    origin=c,
-                    bounds=bounds,
+                sph, *inside, *outside, origin=c, bounds=bounds
             )
         )
 
@@ -705,7 +704,8 @@ class Crystal:
                 space_group.full_symbol = symbol
                 LOG.warning(
                     "Initializing non-standard spacegroup setting %s, "
-                    "some SG data may be missing", symbol
+                    "some SG data may be missing",
+                    symbol,
                 )
 
         elif "symmetry_Int_Tables_number" in cif_data:
@@ -750,6 +750,7 @@ class Crystal:
     def from_shelx_string(cls, file_content, **kwargs):
         """Initialize a crystal structure from a shelx .res string"""
         from .shelx import parse_shelx_file_content
+
         shelx_dict = parse_shelx_file_content(file_content)
         asymmetric_unit = AsymmetricUnit.from_records(shelx_dict["ATOM"])
         space_group = SpaceGroup.from_symmetry_operations(
@@ -759,4 +760,3 @@ class Crystal:
             shelx_dict["CELL"]["lengths"], shelx_dict["CELL"]["angles"], unit="degrees"
         )
         return cls(unit_cell, space_group, asymmetric_unit, **kwargs)
-

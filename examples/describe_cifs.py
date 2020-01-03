@@ -8,14 +8,20 @@ import numpy as np
 
 LOG = logging.getLogger("test_describe")
 
+
 def describe(args, l_max=3):
     name, crystal = args
     name = Path(name).stem
-    return name, crystal.asymmetric_unit.atomic_numbers, crystal.atomic_shape_descriptors(l_max=l_max)
+    return (
+        name,
+        crystal.asymmetric_unit.atomic_numbers,
+        crystal.atomic_shape_descriptors(l_max=l_max),
+    )
 
 
 def main():
     import argparse
+
     parser = argparse.ArgumentParser()
     parser.add_argument("directory", help="cif files")
     parser.add_argument("-o", "--output", default="output_{l_max}.npz")
@@ -36,22 +42,19 @@ def main():
     print("Total atoms in all crystals: ", natoms)
     l_max = args.lmax
     with ProcessPoolExecutor(2) as e:
-            descriptors = {}
-            futures = [
-                e.submit(describe, crystal, l_max=l_max)
-                for crystal in crystals
-            ]
-            with tqdm(total=natoms, 
-                      desc=f"l_max={l_max}", unit="atom") as pbar:
-                for f in as_completed(futures):
-                    name, nums, desc = f.result()
-                    descriptors[name + "desc"] = desc
-                    descriptors[name + "element"] = nums
-                    pbar.update(len(nums))
+        descriptors = {}
+        futures = [e.submit(describe, crystal, l_max=l_max) for crystal in crystals]
+        with tqdm(total=natoms, desc=f"l_max={l_max}", unit="atom") as pbar:
+            for f in as_completed(futures):
+                name, nums, desc = f.result()
+                descriptors[name + "desc"] = desc
+                descriptors[name + "element"] = nums
+                pbar.update(len(nums))
 
     output = args.output.format(l_max=l_max)
     print("Saving to ", output)
     np.savez_compressed(output, **descriptors)
+
 
 if __name__ == "__main__":
     main()
