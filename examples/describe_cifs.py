@@ -1,4 +1,4 @@
-from promolecule.crystal import Crystal
+from shmolecule.crystal import Crystal
 from pathlib import Path
 from tqdm import tqdm
 import pickle

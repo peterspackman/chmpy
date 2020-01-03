@@ -6,26 +6,26 @@ from Cython.Build import cythonize
 
 ext_modules = [
     NumpyExt(
-        "promolecule.linterp",
-        sources=["promolecule/linterp.c"],
+        "shmolecule.linterp",
+        sources=["shmolecule/linterp.c"],
         language="c",
     ),
 ] 
 
 ext_modules_cython = cythonize([
     Ext(
-        "promolecule._density",
-        sources=["promolecule/_density.pyx"],
+        "shmolecule._density",
+        sources=["shmolecule/_density.pyx"],
         include_dirs=[get_include()],
     ),
     Ext(
-        "promolecule._invariants",
-        sources=["promolecule/_invariants.pyx"],
+        "shmolecule._invariants",
+        sources=["shmolecule/_invariants.pyx"],
         include_dirs=[get_include()],
     ),
     Ext(
-        "promolecule.mc._mc_lewiner",
-        sources=["promolecule/mc/_mc_lewiner.pyx"],
+        "shmolecule.mc._mc_lewiner",
+        sources=["shmolecule/mc/_mc_lewiner.pyx"],
         include_dirs=[get_include()],
     ),
 ])
@@ -33,10 +33,10 @@ ext_modules_cython = cythonize([
 ext_modules += ext_modules_cython
 
 setup(
-    name="promolecule",
+    name="shmolecule",
     version="0.2a1",
     description="Promolecule and Hirshfeld surfaces using python",
-    url="https://github.com/peterspackman/promolecule-python",
+    url="https://github.com/peterspackman/shmolecule",
     keywords=[
         "chemistry",
         "molecule",
@@ -53,9 +53,9 @@ setup(
         "Topic :: Scientific/Engineering :: Chemistry",
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
-    packages=["promolecule",],
+    packages=["shmolecule",],
     package_data={
-        "promolecule": ["*.npz"],
+        "shmolecule": ["*.npz"],
     },
     ext_modules=ext_modules,
     install_requires=[
