@@ -10,7 +10,6 @@ Welcome to shmolecule's documentation!
    :maxdepth: 2
    :caption: Contents:
 
-   modules
    README
 
 

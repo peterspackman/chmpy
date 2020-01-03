@@ -19,14 +19,6 @@ shmolecule.cif module
    :undoc-members:
    :show-inheritance:
 
-shmolecule.clebsch.cpython\-37m\-x86\_64\-linux\-gnu module
------------------------------------------------------------
-
-.. automodule:: shmolecule.clebsch.cpython-37m-x86_64-linux-gnu
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 shmolecule.crystal module
 -------------------------
 
@@ -67,13 +59,6 @@ shmolecule.interp module
    :undoc-members:
    :show-inheritance:
 
-shmolecule.linterp.cpython\-37m\-x86\_64\-linux\-gnu module
------------------------------------------------------------
-
-.. automodule:: shmolecule.linterp.cpython-37m-x86_64-linux-gnu
-   :members:
-   :undoc-members:
-   :show-inheritance:
 
 shmolecule.molecule module
 --------------------------
