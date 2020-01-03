@@ -17,24 +17,83 @@ LOG = logging.getLogger(__name__)
 
 
 class UnitCell:
+    """Storage class for the lattice vectors of a crystal
+    i.e. its unit cell.
+
+    Create a UnitCell object from a list of lattice vectors or
+    a row major direct matrix. Unless otherwise specified, length
+    units are Angstroms, and angular units are radians.
+
+    Parameters
+    ----------
+    vectors: array_like
+        (3, 3) array of lattice vectors, row major i.e. vectors[0, :] is
+        lattice vector A etc.
+    """
     def __init__(self, vectors):
         self.set_vectors(vectors)
 
     @property
     def lattice(self):
+        "The direct matrix of this unit cell i.e. vectors of the lattice"
         return self.direct
 
     @property
     def reciprocal_lattice(self):
+        "The reciprocal matrix of this unit cell i.e. vectors of the reciprocal lattice"
         return self.inverse.T
 
     def to_cartesian(self, coords):
+        """Transform coordinates from fractional space (a, b, c)
+        to Cartesian space (x, y, z). The x-direction will be aligned
+        along lattice vector A.
+
+        Parameters
+        ----------
+        coords : array_like
+            (N, 3) array of fractional coordinates
+
+        Returns
+        -------
+        :obj:`np.ndarray`
+            (N, 3) array of Cartesian coordinates
+        """
+
         return np.dot(coords, self.direct)
 
     def to_fractional(self, coords):
+        """Transform coordinates from Cartesian space (x, y, z)
+        to fractional space (a, b, c). The x-direction will is assumed
+        be aligned along lattice vector A.
+
+        Parameters
+        ----------
+        coords : array_like
+            (N, 3) array of Cartesian coordinates
+
+        Returns
+        -------
+        :obj:`np.ndarray`
+            (N, 3) array of fractional coordinates
+        """
+
         return np.dot(coords, self.inverse)
 
     def set_lengths_and_angles(self, lengths, angles):
+        """Modify this unit cell by setting the lattice vectors
+        according to lengths a, b, c and angles alpha, beta, gamma of
+        a parallelipiped.
+
+        Parameters
+        ----------
+        lengths : array_like
+            array of (a, b, c), the unit cell side lengths in Angstroms.
+
+        angles : array_like
+            array of (alpha, beta, gamma), the unit cell angles lengths
+            in radians.
+        """
+
         self.lengths = lengths
         self.angles = angles
         a, b, c = self.lengths
@@ -60,13 +119,20 @@ class UnitCell:
         self.inverse = np.array(r)
 
     def set_vectors(self, vectors):
-        """
-        This is performed by setting the lattice parameters
-        based on the provided vectors, as that results in
-        a consistent basis without inverting a matrix, and
-        as the res file/cif output will be relying on these
-        lengths/angles anyway.
+        """Modify this unit cell by setting the lattice vectors
+        according to those provided. This is performed by setting the
+        lattice parameters (lengths and angles) based on the provided vectors,
+        such that it results in a consistent basis without directly
+        matrix inverse (and typically losing precision), and
+        as the SHELX file/CIF output will be relying on these
+        lengths/angles anyway, it is important to have these consistent.
 
+
+        Parameters
+        ----------
+        vectors : array_like
+            (3, 3) array of lattice vectors, row major i.e. vectors[0, :] is
+            lattice vector A etc.
         """
         self.direct = vectors
         params = np.zeros(6)
@@ -83,12 +149,32 @@ class UnitCell:
         self.inverse = np.linalg.inv(self.direct)
 
     def volume(self):
+        """The volume of the unit cell, in cubic Angstroms"""
         a, b, c = self.lengths
         ca, cb, cg = np.cos(self.angles)
         return a * b * c * np.sqrt(1 - ca * ca - cb * cb - cg * cg + 2 * ca * cb * cg)
 
     @classmethod
     def from_lengths_and_angles(cls, lengths, angles, unit="radians"):
+        """Construct a new UnitCell from the provided lengths and angles.
+
+        Parameters
+        ----------
+        lengths : array_like
+            Lattice side lengths (a, b, c) in Angstroms.
+
+        angles : array_like
+            Lattice angles (alpha, beta, gamma) in provided units (default radians)
+
+        unit : str, optional
+            Unit for angles i.e. 'radians' or 'degrees' (default radians).
+
+        Returns
+        -------
+        UnitCell
+            A new unit cell object representing the provided lattice.
+        """
+
         uc = cls(np.eye(3))
         if unit == "radians":
             if np.any(np.abs(angles) > np.pi):
@@ -109,8 +195,23 @@ class UnitCell:
 
 class AsymmetricUnit:
     """Storage class for the coordinates and labels in a crystal
-    asymmetric unit"""
+    asymmetric unit
+    Create an asymmetric unit object from a list of Elements and 
+    an array of fractional coordinates.
 
+    Parameters
+    ----------
+    elements : :obj:`list` of :obj:`Element`
+        N length list of elements associated with the sites in this asymmetric
+        unit
+    positions : array_like
+        (N, 3) array of site positions in fractional coordinates
+    labels : array_like
+        N length array of string labels for each site
+    **kwargs
+        Additional properties (will populate the properties member)
+        to store in this asymmetric unit
+    """
     def __init__(self, elements, positions, labels=None, **kwargs):
         self.elements = elements
         self.atomic_numbers = np.asarray([x.atomic_number for x in elements])
@@ -140,7 +241,14 @@ class AsymmetricUnit:
 
     @classmethod
     def from_records(cls, records):
-        """Initialize an AsymmetricUnit from a dictionary of arrays"""
+        """Initialize an AsymmetricUnit from a list of dictionary like objects
+        
+        Parameters
+        ----------
+        records : iterable
+            An iterable containing dict_like objects with `label`,
+            `element`, `position` and optionally `occupation` stored.
+        """
         labels = []
         elements = []
         positions = []
@@ -155,6 +263,26 @@ class AsymmetricUnit:
 
 
 class Crystal:
+    """Storage class for a crystal structure, consisting of
+    an asymmetric unit, a unit cell and space group information.
+
+    Parameters
+    ----------
+    unit_cell : :obj:`UnitCell`
+        The unit cell for this crystal i.e. the translational symmetry
+        of the crystal structure.
+    space_group : :obj:`SpaceGroup`
+        The space group symmetry of this crystal i.e. the generators
+        for populating the unit cell given the asymmetric unit.
+    asymmetric_unit : :obj:`AsymmetricUnit`
+        The asymmetric unit of this crystal. The sites of this
+        combined with the space group will generate all translationally
+        equivalent positions.
+    **kwargs
+        Optional properties to (will populate the properties member) store
+        about the the crystal structure.
+    """
+
     space_group: SpaceGroup
     unit_cell: UnitCell
     asymmetric_unit: AsymmetricUnit
@@ -169,28 +297,81 @@ class Crystal:
 
     @property
     def site_positions(self):
-        "row major array of asymmetric unit atomic positions"
+        """Row major array of asymmetric unit atomic positions
+
+        Returns
+        -------
+        array_like
+            The positions in fractional coordinates of the asymmetric unit.
+        """
         return self.asymmetric_unit.positions
 
     @property
     def site_atoms(self):
-        "array of asymmetric unit atomic numbers"
+        """Array of asymmetric unit atomic numbers
+
+        Returns
+        -------
+        array_like
+            The atomic numbers of the asymmetric unit.
+        """
         return self.asymmetric_unit.atomic_numbers
 
     @property
     def nsites(self):
+        """The number of sites in the asymmetric unit.
+
+        Returns
+        -------
+        int
+            The number of sites in the asymmetric unit.
+        """
+
         return len(self.site_atoms)
 
     @property
     def symmetry_operations(self):
+        """Symmetry operations that generate this crystal.
+
+        Returns
+        -------
+        :obj:`list` of :obj:`SymmetryOperation`
+            List of SymmetryOperation objects belonging to the space group
+            symmetry of this crystal.
+        """
         return self.space_group.symmetry_operations
 
     def to_cartesian(self, coords):
-        "Conver coordinates (row major) from fractional to cartesian"
+        """Convert coordinates (row major) from fractional to cartesian coordinates.
+
+        Parameters
+        ----------
+        coords : array_like
+            (N, 3) array of positions assumed to be in fractional coordinates
+
+        Returns
+        -------
+        array_like
+            (N, 3) array of positions transformed to cartesian (orthogonal) coordinates
+            by the unit cell of this crystal.
+        """
         return self.unit_cell.to_cartesian(coords)
 
     def to_fractional(self, coords):
-        "Conver coordinates (row major) from cartesian to fractional"
+        """Convert coordinates (row major) from cartesian to fractional coordinates.
+
+        Parameters
+        ----------
+        coords : array_like
+            (N, 3) array of positions assumed to be in cartesian (orthogonal) coordinates
+
+        Returns
+        -------
+        array_like
+            (N, 3) array of positions transformed to fractional coordinates
+            by the unit cell of this crystal.
+        """
+
         return self.unit_cell.to_fractional(coords)
 
     def unit_cell_atoms(self, tolerance=1e-3):
@@ -203,7 +384,40 @@ class Crystal:
         sum their occupation numbers. A warning will be logged if
         any atom site in the unit cell has > 1.0 occupancy after
         this.
+
+        Sets the `_unit_cell_atom_dict` member as this is an expensive
+        operation and is worth caching the result. Subsequent calls
+        to this function will be a no-op.
+
+        Parameters
+        ----------
+        tolerance : float, optional
+            Minimum separation of sites in the unit cell, below which 
+            atoms/sites will be merged and their (partial) occupations
+            added.
+
+        Returns
+        -------
+        dict
+            A dictionary of arrays associated with all sites contained
+            in the unit cell of this crystal, members are:
+
+            asym_atom: corresponding asymmetric unit atom indices for all sites.
+
+            frac_pos: (N, 3) array of fractional positions for all sites.
+
+            cart_pos: (N, 3) array of cartesian positions for all sites.
+
+            element: (N) array of atomic numbers for all sites.
+
+            symop: (N) array of indices corresponding to the generator symmetry
+            operation for each site.
+
+            label: (N) array of string labels corresponding to each site
+            occupation: (N) array of occupation numbers for each site. Will
+            warn if any of these are greater than 1.0
         """
+
         if hasattr(self, "_unit_cell_atom_dict"):
             return getattr(self, "_unit_cell_atom_dict")
         pos = self.site_positions
@@ -250,11 +464,34 @@ class Crystal:
         return self._unit_cell_atom_dict
 
     def unit_cell_connectivity(self, tolerance=0.4, neighbouring_cells=1):
-        """periodic connectiviy for the unit cell, populates _uc_graph
+        """Periodic connectiviy for the unit cell, populates _uc_graph
         with a networkx.Graph object, where nodes are indices into the
         _unit_cell_atom_dict arrays and the edges contain the translation
         (cell) for the image of the corresponding unit cell atom with the
-        higher index to be bonded to the lower"""
+        higher index to be bonded to the lower
+
+        Bonding is determined by interatomic distances being less than the
+        sum of covalent radii for the sites plus the tolerance (provided 
+        as a parameter)
+        
+        Parameters
+        ----------
+        tolerance : float, optional
+            Bonding tolerance (bonded if d < cov_a + cov_b + tolerance)
+        neighbouring_cells : int, optional
+            Number of neighbouring cells in which to look for bonded atoms.
+            We start at the (0, 0, 0) cell, so a value of 1 will look in the
+            (0, 0, 1), (0, 1, 1), (1, 1, 1) i.e. all 26 neighbouring cells.
+            1 is typically sufficient for organic systems.
+
+        Returns
+        -------
+        :obj:`tuple` of (sparse_matrix in dict of keys format, dict)
+            the (i, j) value in this matrix is the bond length from i,j
+            the (i, j) value in the dict is the cell translation on j which
+            bonds these two sites
+        """
+
         if hasattr(self, "_uc_graph"):
             return getattr(self, "_uc_graph")
         slab = self.slab(bounds=((-1, -1, -1), (1, 1, 1)))
@@ -311,7 +548,17 @@ class Crystal:
     def unit_cell_molecules(self):
         """Calculate the molecules for all sites in the unit cell,
         where the number of molecules will be equal to number of
-        symmetry unique molecules times number of symmetry operations."""
+        symmetry unique molecules times number of symmetry operations.
+        
+        Returns
+        -------
+        :obj:`list` of :obj:`Molecule`
+            List of all connected molecules in this crystal, which
+            when translated by the unit cell would produce the full crystal.
+            If the asymmetric is molecular, the list will be of length
+            num_molecules_in_asymmetric_unit * num_symm_operations
+        """
+
         if hasattr(self, "_unit_cell_molecules"):
             return getattr(self, "_unit_cell_molecules")
         uc_graph, edge_cells = self.unit_cell_connectivity()
@@ -362,7 +609,27 @@ class Crystal:
 
     def symmetry_unique_molecules(self, bond_tolerance=0.4):
         """Calculate a list of connected molecules which contain
-        every site in the asymmetric_unit"""
+        every site in the asymmetric_unit
+
+        Populates the _symmetry_unique_molecules member, subsequent
+        calls to this function will be a no-op.
+       
+        Parameters
+        ----------
+        bond_tolerance : float, optional
+            Bonding tolerance (bonded if d < cov_a + cov_b + bond_tolerance)
+
+        Returns
+        -------
+        :obj:`list` of :obj:`Molecule`
+            List of all connected molecules in the asymmetric_unit of this
+            crystal, i.e. the minimum list of connected molecules which contain
+            all sites in the asymmetric unit.
+            If the asymmetric is molecular, the list will be of length
+            num_molecules_in_asymmetric_unit and the total number of atoms
+            will be equal to the number of atoms in the asymmetric_unit
+        """
+
         if hasattr(self, "_symmetry_unique_molecules"):
             return getattr(self, "_symmetry_unique_molecules")
         uc_molecules = self.unit_cell_molecules()
