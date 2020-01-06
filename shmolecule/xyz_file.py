@@ -17,7 +17,7 @@ def parse_xyz_file(filename):
 
     Returns
     -------
-    Tuple
+    tuple of :obj:`np.ndarray`
         array of (N) atomic numbers and (N, 3) Cartesian positions
         read from the given file
     """

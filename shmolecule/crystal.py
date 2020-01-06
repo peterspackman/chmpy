@@ -804,7 +804,7 @@ class Crystal:
 
         Returns
         -------
-        List[Tuple]
+        list of tuple
             A list of tuples of (Molecule, elements, positions)
             where `elements` is an :obj:`np.ndarray` of atomic numbers,
             and `positions` is an :obj:`np.ndarray` of Cartesian atomic positions
@@ -961,9 +961,6 @@ class Crystal:
         """Calculate the molecular shape descriptors[1,2] for all symmetry unique
         molecules in this crystal.
 
-        1. PR Spackman et al. Scientific Reports 6, 22204 (2016)
-        2. PR Spackman et al. Angew. Chem. 58 (47), 16780-16784 (2019)
-
         Parameters
         ----------
         l_max: int, optional
@@ -974,6 +971,12 @@ class Crystal:
         -------
         :obj:`np.ndarray`
             shape description vector
+
+        References
+        ----------
+        [1] PR Spackman et al. Scientific Reports 6, 22204 (2016)
+        [2] PR Spackman et al. Angew. Chem. 58 (47), 16780-16784 (2019)
+
         """
         descriptors = []
         from .sht import SHT
@@ -1001,9 +1004,6 @@ class Crystal:
         """Calculate the shape descriptors[1,2] for all symmetry unique
         atoms in this crystal.
 
-        1. PR Spackman et al. Scientific Reports 6, 22204 (2016)
-        2. PR Spackman et al. Angew. Chem. 58 (47), 16780-16784 (2019)
-
         Parameters
         ----------
         l_max: int, optional
@@ -1014,6 +1014,11 @@ class Crystal:
         -------
         :obj:`np.ndarray`
             shape description vector
+
+        References
+        ----------
+        [1] PR Spackman et al. Scientific Reports 6, 22204 (2016)
+        [2] PR Spackman et al. Angew. Chem. 58 (47), 16780-16784 (2019)
         """
         descriptors = []
         from .sht import SHT
@@ -1035,9 +1040,6 @@ class Crystal:
         """Calculate the shape descriptors[1,2] for the given atomic
         group in this crystal.
 
-        1. PR Spackman et al. Scientific Reports 6, 22204 (2016)
-        2. PR Spackman et al. Angew. Chem. 58 (47), 16780-16784 (2019)
-
         Parameters
         ----------
         l_max: int, optional
@@ -1048,6 +1050,11 @@ class Crystal:
         -------
         :obj:`np.ndarray`
             shape description vector
+
+        References
+        ----------
+        [1] PR Spackman et al. Scientific Reports 6, 22204 (2016)
+        [2] PR Spackman et al. Angew. Chem. 58 (47), 16780-16784 (2019)
         """
         from .sht import SHT
         from .shape_descriptors import stockholder_weight_descriptor
@@ -1100,6 +1107,7 @@ class Crystal:
             the path to the crystal structure file
 
         Returns
+        -------
         :obj:`Crystal`
             the resulting crystal structure
         """

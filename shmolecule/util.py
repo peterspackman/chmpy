@@ -49,11 +49,11 @@ def spherical_to_cartesian(rtp, dtype=np.float64):
     """Given an N by 3 array of (r, theta, phi) spherical coordinates
     return an N by 3 array of Cartesian(x, y, z) coordinates.
 
-    Uses the following convention:
+    Uses the following convention::
 
-    x = r sin(theta) cos(phi)
-    y = r sin(theta) sin(phi)
-    z = r cos(theta)
+        x = r sin(theta) cos(phi)
+        y = r sin(theta) sin(phi)
+        z = r cos(theta)
 
     Parameters
     ----------

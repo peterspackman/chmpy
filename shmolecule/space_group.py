@@ -255,7 +255,19 @@ class SymmetryOperation:
         return SymmetryOperation(self.rotation, self.translation - value)
 
     def apply(self, coordinates):
-        "Apply this symmetry operation to a set of fractional coordinates"
+        """Apply this symmetry operation to a set of fractional coordinates.
+        
+        Parameters
+        ----------
+        coordinates: :obj:`np.ndarray`
+            (N,3) or (N,4) array of fractional coordinates or homogeneous
+            fractional coordinates.
+
+        Returns
+        -------
+        :obj:`np.ndarray`
+            (N, 3) array of ransformed coordinates
+        """
         if coordinates.shape[1] == 4:
             return np.dot(coordinates, self.seitz.T)
         else:
@@ -285,6 +297,20 @@ class SymmetryOperation:
 
     @classmethod
     def from_integer_code(cls, code):
+        """Alternative constructor from an integer-encoded
+        symmetry operation e.g. 16484
+
+        See Also
+        --------
+        encode_symm_int: Encode a symmetry operation as an integer
+        decode_symm_int: Decode a symmetry operation from an integer
+
+        Parameters
+        ----------
+        code: int
+            integer-encoded symmetry operation
+        """
+
         rot, trans = decode_symm_int(code)
         s = SymmetryOperation(rot, trans)
         setattr(s, "_integer_code", code)
@@ -292,22 +318,56 @@ class SymmetryOperation:
 
     @classmethod
     def from_string_code(cls, code):
+        """Alternative constructor from a string encoded
+        symmetry operation e.g. '+x,+y,+z'.
+
+        See Also
+        --------
+        encode_symm_str: Encode a symmetry operation as a string
+        decode_symm_str: Decode a symmetry operation from a string
+
+        Parameters
+        ----------
+        code: str
+            string-encoded symmetry operation
+        """
         rot, trans = decode_symm_str(code)
         s = SymmetryOperation(rot, trans)
         setattr(s, "_string_code", code)
         return s
 
     def is_identity(self):
+        "Returns true if this is the identity symmetry operation '+x,+y,+z'"
         return self.integer_code == 16484
 
     @classmethod
     def identity(cls):
-        "the identity symop i.e. x,y,z"
+        "Alternative constructor for the the identity symop i.e. x,y,z"
         return cls.from_integer_code(16484)
 
 
 def expanded_symmetry_list(reduced_symops, lattice_type):
-    "1=P, 2=I, 3=rhombohedral obverse on hexagonal axes, 4=F, 5=A, 6=B, 7=C."
+    """Create an expanded list of symmetry operations from the minimum
+    specification given a certain lattice type.
+
+    Parameters
+    ----------
+    reduced_symops: List[:obj:`SymmetryOperation`]
+        list of symmetry operations
+    lattice_type: int
+        integer encoded lattice type with SHELX conventions,
+        1: P,
+        2: I,
+        3: rhombohedral obverse on hexagonal axes,
+        4: F,
+        5: A,
+        6: B,
+        7: C
+    Returns
+    -------
+    List[:obj:`SymmetryOperation`]
+        expanded list of symmetry operations given lattice type
+    """
     lattice_type_value = abs(lattice_type)
     translations = LATTICE_TYPE_TRANSLATIONS[lattice_type_value]
 
@@ -332,7 +392,27 @@ def expanded_symmetry_list(reduced_symops, lattice_type):
 
 
 def reduced_symmetry_list(full_symops, lattice_type):
-    "1=P, 2=I, 3=rhombohedral obverse on hexagonal axes, 4=F, 5=A, 6=B, 7=C."
+    """Reduce an expanded list of symmetry operations to the minimum
+    specification given a certain lattice type.
+
+    Parameters
+    ----------
+    full_symops: List[:obj:`SymmetryOperation`]
+        list of symmetry operations
+    lattice_type: int
+        integer encoded lattice type with SHELX conventions,
+        1: P,
+        2: I,
+        3: rhombohedral obverse on hexagonal axes,
+        4: F,
+        5: A,
+        6: B,
+        7: C
+    Returns
+    -------
+    List[:obj:`SymmetryOperation`]
+        minimal list of symmetry operations given lattice type
+    """
     output_symmetry_operations = set(full_symops)
     symop_codes = sorted(x.integer_code for x in full_symops)
 
