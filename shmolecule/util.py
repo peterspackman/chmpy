@@ -9,7 +9,7 @@ def save_mesh(mesh, filename):
 
     Parameters
     ----------
-    mesh: :obj:`Trimesh`
+    mesh: :obj:`trimesh.Trimesh`
         The mesh to save.
     filename: str
         The path to the destination file.

@@ -337,7 +337,7 @@ class Crystal:
 
         Returns
         -------
-        :obj:`list` of :obj:`SymmetryOperation`
+        list of :obj:`SymmetryOperation`
             List of SymmetryOperation objects belonging to the space group
             symmetry of this crystal.
         """
@@ -556,7 +556,7 @@ class Crystal:
         
         Returns
         -------
-        :obj:`list` of :obj:`Molecule`
+        list of :obj:`Molecule`
             List of all connected molecules in this crystal, which
             when translated by the unit cell would produce the full crystal.
             If the asymmetric is molecular, the list will be of length
@@ -625,7 +625,7 @@ class Crystal:
 
         Returns
         -------
-        :obj:`list` of :obj:`Molecule`
+        list of :obj:`Molecule`
             List of all connected molecules in the asymmetric_unit of this
             crystal, i.e. the minimum list of connected molecules which contain
             all sites in the asymmetric unit.
@@ -854,7 +854,7 @@ class Crystal:
 
         Returns
         -------
-        List[Trimesh]
+        list of :obj:`trimesh.Trimesh`
             A list of meshes representing the promolecule density isosurfaces
         """
         from .density import PromoleculeDensity
@@ -914,7 +914,7 @@ class Crystal:
 
         Returns
         -------
-        List[Trimesh]
+        list of :obj:`trimesh.Trimesh`
             A list of meshes representing the stockholder weight isosurfaces
         """
         from .density import StockholderWeight

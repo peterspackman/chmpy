@@ -21,7 +21,7 @@ class Molecule:
 
     Parameters
     ----------
-    elements: List[:obj:`Element`]
+    elements: list of :obj:`Element`
         list of element information for each atom in this molecule
     positions: :obj:`np.ndarray`
         (N, 3) array of Cartesian coordinates for each atom in this molecule (Angstroms)
@@ -152,6 +152,25 @@ class Molecule:
         )
 
     @classmethod
+    def from_xyz_string(cls, contents, **kwargs):
+        """construct a molecule from the provided xmol .xyz file. kwargs
+        will be passed through to the Molecule constructor.
+
+        Parameters
+        ----------
+        contents: str
+            contents of the .xyz file to read
+        """
+        from .xyz_file import parse_xyz_string
+
+        elements, positions = parse_xyz_string(contents)
+        elements = [Element[x] for x in elements]
+        return cls(
+
+            elements, np.asarray(positions), **kwargs
+        )
+
+    @classmethod
     def from_xyz_file(cls, filename, **kwargs):
         """construct a molecule from the provided xmol .xyz file. kwargs
         will be passed through to the Molecule constructor.
@@ -161,17 +180,9 @@ class Molecule:
         filename: str
             path to the .xyz file
         """
-        from .xyz_file import parse_xyz_file
+        from pathlib import Path
+        return cls.from_xyz_string(Path(filename).read_text(), **kwargs)
 
-        xyz_dict = parse_xyz_file(filename)
-        elements = []
-        positions = []
-        for label, position in xyz_dict["atoms"]:
-            elements.append(Element[label])
-            positions.append(position)
-        return cls(
-            elements, np.asarray(positions), comment=xyz_dict["comment"], **kwargs
-        )
 
     @classmethod
     def load(cls, filename, **kwargs):
