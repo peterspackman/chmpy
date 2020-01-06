@@ -974,8 +974,10 @@ class Crystal:
 
         References
         ----------
-        [1] PR Spackman et al. Scientific Reports 6, 22204 (2016)
+        [1] PR Spackman et al. Sci. Rep. 6, 22204 (2016)
+            https://dx.doi.org/10.1038/srep22204
         [2] PR Spackman et al. Angew. Chem. 58 (47), 16780-16784 (2019)
+            https://dx.doi.org/10.1002/anie.201906602
 
         """
         descriptors = []
@@ -1017,8 +1019,10 @@ class Crystal:
 
         References
         ----------
-        [1] PR Spackman et al. Scientific Reports 6, 22204 (2016)
+        [1] PR Spackman et al. Sci. Rep. 6, 22204 (2016)
+            https://dx.doi.org/10.1038/srep22204
         [2] PR Spackman et al. Angew. Chem. 58 (47), 16780-16784 (2019)
+            https://dx.doi.org/10.1002/anie.201906602
         """
         descriptors = []
         from .sht import SHT
@@ -1053,8 +1057,10 @@ class Crystal:
 
         References
         ----------
-        [1] PR Spackman et al. Scientific Reports 6, 22204 (2016)
+        [1] PR Spackman et al. Sci. Rep. 6, 22204 (2016)
+            https://dx.doi.org/10.1038/srep22204
         [2] PR Spackman et al. Angew. Chem. 58 (47), 16780-16784 (2019)
+            https://dx.doi.org/10.1002/anie.201906602
         """
         from .sht import SHT
         from .shape_descriptors import stockholder_weight_descriptor

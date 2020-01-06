@@ -4,7 +4,13 @@ from .util import spherical_to_cartesian
 
 
 class SHT:
-    """Encapsulate logic of spherical harmonic transform implementations"""
+    """Class encapsulating the logic of spherical harmonic transform implementations
+
+    Parameters
+    ----------
+    l_max: int
+        maximum angular momentum for the transform
+    """
 
     _shtns = None
     _l_max = 2
@@ -12,7 +18,6 @@ class SHT:
     _grid_cartesian = None
 
     def __init__(self, l_max):
-        """initialize a spherical harmonic transform object"""
         self._l_max = l_max
         self._shtns = shtns.sht(l_max, l_max)
 
@@ -25,7 +30,7 @@ class SHT:
 
     @property
     def grid(self):
-        """Return the set of angular grid points for this sht"""
+        "The set of angular grid points for this SHT"
         if self._grid is None:
             _, self.nphi = self._shtns.set_grid()
             nphi = self.nphi
@@ -42,6 +47,7 @@ class SHT:
 
     @property
     def grid_cartesian(self):
+        "The set of cartesian grid points for this SHT"
         if self._grid_cartesian is None:
             _, self.nphi = self._shtns.set_grid()
             nphi = self.nphi
@@ -59,8 +65,10 @@ class SHT:
     def analyse(self, values):
         """Perform a spherical harmonic transform given a grid and a set of values
 
-        Arguments:
-        values -- set of complex scalar function values associated with grid points
+        Parameters
+        ----------
+        values: :obj:`np.ndarray`
+            set of scalar function values associated with grid points
         """
         desired_shape = self._shtns.spat_shape[::-1]
         grid = self._grid
@@ -70,21 +78,34 @@ class SHT:
             return self._shtns.analys(values.reshape(desired_shape).transpose())
 
     def synthesis(self, coefficients):
-        """Perform a spherical harmonic transform given a grid and a set of values
+        """Perform an inverse spherical harmonic transform given a set of coefficients
 
-        Arguments:
-        values -- set of complex scalar function values associated with grid points
+        Arguments
+        ----------
+        coefficients: :obj:`np.ndarray`
+            set of spherical harmonic coefficient
         """
         max_coeff = (self.l_max + 1) ** 2
         return self._shtns.synth_cplx(coefficients[:max_coeff]).transpose().flatten()
 
     @property
     def l_max(self):
-        """Maximum angular momenta to evaluate up to"""
+        """Maximum angular momenta used in this SHT"""
         return self._l_max
 
 
 def plot_sphere(name, grid, values):
+    """Plot a function on a spherical surface.
+
+    Parameters
+    ----------
+    name: str
+        used for the title and the output filename
+    grid: array_like
+        theta, phi values from an angular grid on a sphere
+    values: array_like
+        scalar values of the function associated with each grid point
+    """
     from mpl_toolkits.mplot3d import Axes3D
     from matplotlib import cm, colors
     import matplotlib.pyplot as plt

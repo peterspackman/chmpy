@@ -164,11 +164,7 @@ class Molecule:
         from .xyz_file import parse_xyz_string
 
         elements, positions = parse_xyz_string(contents)
-        elements = [Element[x] for x in elements]
-        return cls(
-
-            elements, np.asarray(positions), **kwargs
-        )
+        return cls(elements, np.asarray(positions), **kwargs)
 
     @classmethod
     def from_xyz_file(cls, filename, **kwargs):
@@ -181,8 +177,8 @@ class Molecule:
             path to the .xyz file
         """
         from pathlib import Path
-        return cls.from_xyz_string(Path(filename).read_text(), **kwargs)
 
+        return cls.from_xyz_string(Path(filename).read_text(), **kwargs)
 
     @classmethod
     def load(cls, filename, **kwargs):
@@ -244,7 +240,6 @@ class Molecule:
     def from_arrays(cls, elements, positions, **kwargs):
         """construct a molecule from the provided arrays. kwargs
         will be passed through to the Molecule constructor.
-
 
         Parameters
         ----------

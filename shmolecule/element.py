@@ -2,6 +2,7 @@ import re
 import functools
 from collections import Counter
 import numbers
+import numpy as np
 
 _SYMBOL_REGEX = re.compile("([A-Z]+).*", re.IGNORECASE)
 
@@ -260,3 +261,28 @@ def chemical_formula(elements, subscript=False):
     else:
         blocks = (f"{el}{c}" for el, c in count.items())
     return "".join(blocks)
+
+
+def cov_radii(atomic_numbers):
+    if np.any(atomic_numbers < 1) or np.any(atomic_numbers > 103):
+        raise ValueError("All elements must be atomic numbers between [1,103]")
+    return np.array([_ELEMENT_DATA[i - 1][2] for i in atomic_numbers], dtype=np.float32)
+
+
+def vdw_radii(atomic_numbers):
+    if np.any(atomic_numbers < 1) or np.any(atomic_numbers > 103):
+        raise ValueError("All elements must be atomic numbers between [1,103]")
+    return np.array([_ELEMENT_DATA[i - 1][3] for i in atomic_numbers], dtype=np.float32)
+
+
+def element_names(atomic_numbers):
+    if np.any(atomic_numbers < 1) or np.any(atomic_numbers > 103):
+        raise ValueError("All elements must be atomic numbers between [1,103]")
+    return [_ELEMENT_DATA[i - 1][0] for i in atomic_numbers]
+
+
+def element_symbols(atomic_numbers):
+    if np.any(atomic_numbers < 1) or np.any(atomic_numbers > 103):
+        raise ValueError("All elements must be atomic numbers between [1,103]")
+    return [_ELEMENT_DATA[i - 1][1] for i in atomic_numbers]
+

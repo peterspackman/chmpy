@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 import numpy as np
-from .element_data import atomic_number
+from .element import Element
 
 LOG = logging.getLogger(__name__)
 
@@ -30,12 +30,15 @@ def parse_xyz_string(contents, filename=None):
         if not line.strip():
             break
         tokens = line.strip().split()
-        el = atomic_number(tokens[0])
         xyz = tuple(float(x) for x in tokens[1:4])
         positions.append(xyz)
-        elements.append(el)
-    LOG.debug("Found %d atoms lines in %s", len(elements), "in " + filename if filename else "")
-    return np.asarray(elements), np.asarray(positions)
+        elements.append(Element[tokens[0]])
+    LOG.debug(
+        "Found %d atoms lines in %s",
+        len(elements),
+        "in " + filename if filename else "",
+    )
+    return elements, np.asarray(positions)
 
 
 def parse_xyz_file(filename):

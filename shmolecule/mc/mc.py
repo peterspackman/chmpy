@@ -1,41 +1,40 @@
-"""
-This file is a modification of the original _marching_cubes_lewiner.pyx
-file from the scikit-image project, retrieved from git revision:
+# This file is a modification of the original _marching_cubes_lewiner.pyx
+# file from the scikit-image project, retrieved from git revision:
+#
+# 129af33b9c118dd87efd4a39ce623e70f8188ce8
+#
+# As such the following copyright notice *must* be included here, and
+# we should include the acknowledgement in the LICENSE.txt of this
+# project.
+#
+# Copyright (C) 2019, the scikit-image team
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are
+# met:
+#
+#  1. Redistributions of source code must retain the above copyright
+#     notice, this list of conditions and the following disclaimer.
+#  2. Redistributions in binary form must reproduce the above copyright
+#     notice, this list of conditions and the following disclaimer in
+#     the documentation and/or other materials provided with the
+#     distribution.
+#  3. Neither the name of skimage nor the names of its contributors may be
+#     used to endorse or promote products derived from this software without
+#     specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+# IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+# OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+# IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+# OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+# WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+# OTHERWISE), ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+# ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-129af33b9c118dd87efd4a39ce623e70f8188ce8
-
-As such the following copyright notice *must* be included here, and
-we should include the acknowledgement in the LICENSE.txt of this
-project.
-
-Copyright (C) 2019, the scikit-image team
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are
-met:
-
- 1. Redistributions of source code must retain the above copyright
-    notice, this list of conditions and the following disclaimer.
- 2. Redistributions in binary form must reproduce the above copyright
-    notice, this list of conditions and the following disclaimer in
-    the documentation and/or other materials provided with the
-    distribution.
- 3. Neither the name of skimage nor the names of its contributors may be
-    used to endorse or promote products derived from this software without
-    specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
-IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
-OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
-IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-OTHERWISE), ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
-OF THE POSSIBILITY OF SUCH DAMAGE.
-"""
 import sys
 import base64
 
@@ -64,31 +63,31 @@ def marching_cubes(
 
     Parameters
     ----------
-    volume : (M, N, P) array
+    volume: (M, N, P) array
         Input data volume to find isosurfaces. Will internally be
         converted to float32 if necessary.
-    level : float
+    level: float, optional
         Contour value to search for isosurfaces in `volume`. If not
         given or None, the average of the min and max of vol is used.
-    spacing : length-3 tuple of floats
+    spacing: length-3 tuple of floats, optional
         Voxel spacing in spatial dimensions corresponding to numpy array
         indexing dimensions (M, N, P) as in `volume`.
-    gradient_direction : string
+    gradient_direction: string, optional
         Controls if the mesh was generated from an isosurface with gradient
         descent toward objects of interest (the default), or the opposite,
         considering the *left-hand* rule.
         The two options are:
         * descent : Object was greater than exterior
         * ascent : Exterior was greater than object
-    step_size : int
+    step_size: int, optional
         Step size in voxels. Default 1. Larger steps yield faster but
         coarser results. The result will always be topologically correct
         though.
-    allow_degenerate : bool
+    allow_degenerate: bool, optional
         Whether to allow degenerate (i.e. zero-area) triangles in the
         end-result. Default True. If False, degenerate triangles are
         removed, at the cost of making the algorithm slower.
-    use_classic : bool
+    use_classic: bool, optional
         If given and True, the classic marching cubes by Lorensen (1987)
         is used. This option is included for reference purposes. Note
         that this algorithm has ambiguities and is not guaranteed to
@@ -144,11 +143,11 @@ def marching_cubes(
 
     References
     ----------
-    .. [1] Thomas Lewiner, Helio Lopes, Antonio Wilson Vieira and Geovan
-           Tavares. Efficient implementation of Marching Cubes' cases with
-           topological guarantees. Journal of Graphics Tools 8(2)
-           pp. 1-15 (december 2003).
-           :DOI:`10.1080/10867651.2003.10487582`
+    [1] Thomas Lewiner, Helio Lopes, Antonio Wilson Vieira and Geovan
+        Tavares. Efficient implementation of Marching Cubes' cases with
+        topological guarantees. Journal of Graphics Tools 8(2)
+        pp. 1-15 (Dec 2003).
+        https://dx.doi.org/10.1080/10867651.2003.10487582
 
     See Also
     --------
@@ -182,7 +181,7 @@ def marching_cubes(
     use_classic = bool(use_classic)
 
     # Get LutProvider class (reuse if possible)
-    L = get_lookup_tables()
+    L = _get_lookup_tables()
 
     # Apply algorithm
     func = _mc_lewiner.marching_cubes
@@ -282,7 +281,7 @@ EDGETORELATIVEPOSZ = np.array(
 )
 
 
-def get_lookup_tables():
+def _get_lookup_tables():
     """ Kind of lazy obtaining of the luts.
     """
     if not hasattr(lookup_tables, "THE_LUTS"):
