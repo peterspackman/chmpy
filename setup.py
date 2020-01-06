@@ -48,7 +48,7 @@ setup(
     packages=["shmolecule"],
     package_data={"shmolecule": ["*.npz"]},
     ext_modules=ext_modules,
-    install_requires=["numpy", "scipy", "trimesh", "shtns"],
+    install_requires=["numpy", "scipy", "trimesh"],
     extras_require={
         "sht": ["shtns"],
     },
