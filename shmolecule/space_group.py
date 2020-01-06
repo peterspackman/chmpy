@@ -38,6 +38,28 @@ LATTICE_TYPE_TRANSLATIONS = {
 
 
 def encode_symm_str(rotation, translation):
+    """Encode a rotation matrix (of -1, 0, 1s) and (rational) translation vector
+    into string form e.g. 1/2-x,z-1/3,-y-1/6
+
+    >>> encode_symm_str(((-1, 0, 0), (0, 0, 1), (0, 1, 0)), (0, 0.5, 1/3))
+    '-x,1/2+z,1/3+y'
+    >>> encode_symm_str(((1, 1, 1), (1, 0, 1), (0, 1, 0)), (0, 0.5, 1/3))
+    '+x+y+z,1/2+x+z,1/3+y'
+
+    Parameters
+    ----------
+    rotation: array_like
+        (3,3) matrix of -1, 0, or 1s encoding the rotation component
+        of the symmetry operation
+    translation: array_like
+        (3) vector of rational numbers encoding the translation component
+        of the symmetry operation
+
+    Returns
+    -------
+    str
+        the encoded symmetry operation
+    """
     symbols = "xyz"
     res = []
     for i in (0, 1, 2):
@@ -57,7 +79,26 @@ def encode_symm_str(rotation, translation):
 
 def decode_symm_str(s):
     """Decode a symmetry operation represented in the string
-    form e.g. '1/2 + x, y, -z -0.25' """
+    form e.g. '1/2 + x, y, -z -0.25' into a rotation matrix
+    and translation vector.
+    
+    >>> encode_symm_str(*decode_symm_str("x,y,z"))
+    '+x,+y,+z'
+    >>> encode_symm_str(*decode_symm_str("1/2 - x,y-0.3333333,z"))
+    '1/2-x,2/3+y,+z'
+
+    Parameters
+    ----------
+    s: str
+        the encoded symmetry operation string
+
+    Returns
+    -------
+    :obj:`np.ndarray`
+        (3,3) rotation matrix
+    :obj:`np.ndarray`
+        (3) translation vector
+    """
     rotation = np.zeros((3, 3), dtype=np.float64)
     translation = np.zeros((3,), dtype=np.float64)
     tokens = s.lower().replace(" ", "").split(",")
@@ -91,13 +132,31 @@ def decode_symm_str(s):
 
 
 def decode_symm_int(coded_integer):
-    """A space group operation is compressed using ternary numerical system for
+    """Decode an integer encoded symmetry operation. 
+    
+    A space group operation is compressed using ternary numerical system for
     rotation and duodecimal system for translation. This is achieved because
-    each element of rotation matrix can have only one of {-1,0,1}, and
-    the translation can have one of {0,2,3,4,6,8,9,10} divided by 12.
-    Therefore 3^9 * 12^3 = 34012224 different values can map space
-    group operations. In principle, octal numerical system can be used
-    for translation, but duodecimal system is more convenient."""
+    each element of rotation matrix can have only one of {-1,0,1}, and the
+    translation can have one of {0,2,3,4,6,8,9,10} divided by 12.  Therefore
+    3^9 * 12^3 = 34012224 different values can map space group operations. In
+    principle, octal numerical system can be used for translation, but
+    duodecimal system is more convenient.
+
+    >>> encode_symm_str(*decode_symm_int(16484))
+    '+x,+y,+z'
+
+    Parameters
+    ----------
+    coded_integer: int
+        integer encoding a symmetry operation
+
+    Returns
+    -------
+    :obj:`np.ndarray`
+        (3,3) rotation matrix
+    :obj:`np.ndarray`
+        (3) translation vector
+    """
     r = coded_integer % 19683  # 19683 = 3**9
     shift = 6561  # 6561 = 3**8
     rotation = np.empty((3, 3), dtype=np.float64)
@@ -118,17 +177,34 @@ def decode_symm_int(coded_integer):
 
 
 def encode_symm_int(rotation, translation):
+    """Encode an integer encoded symmetry from a rotation matrix and translation
+    vector.
+    
+    A space group operation is compressed using ternary numerical system for
+    rotation and duodecimal system for translation. This is achieved because
+    each element of rotation matrix can have only one of {-1,0,1}, and the
+    translation can have one of {0,2,3,4,6,8,9,10} divided by 12.  Therefore
+    3^9 * 12^3 = 34012224 different values can map space group operations. In
+    principle, octal numerical system can be used for translation, but
+    duodecimal system is more convenient.
+
+    >>> encode_symm_int(((1, 0, 0), (0, 1, 0), (0, 0, 1)), (0, 0, 0))
+    16484
+    >>> encode_symm_int(((1, 0, 0), (0, 1, 0), (0, 1, 1)), (0, 0.5, 0))
+    1433663
+    """
+
     r = 0
     shift = 1
     # encode rotation component
-    rotation = np.round(rotation).astype(int) + 1
+    rotation = np.round(np.array(rotation)).astype(int) + 1
     for i in (2, 1, 0):
         for j in (2, 1, 0):
             r += rotation[i, j] * shift
             shift *= 3
     t = 0
     shift = 1
-    translation = np.round(translation * 12).astype(int)
+    translation = np.round(np.array(translation) * 12).astype(int)
     for i in (2, 1, 0):
         t += translation[i] * shift
         shift *= 12
@@ -136,6 +212,10 @@ def encode_symm_int(rotation, translation):
 
 
 class SymmetryOperation:
+    """Class to represent a crystallographic symmetry operation,
+    composed of a rotation and a translation.
+    """
+
     def __init__(self, rotation, translation):
         self.rotation = rotation
         self.translation = translation % 1
@@ -159,18 +239,23 @@ class SymmetryOperation:
 
     @property
     def cif_form(self):
+        "Represent this SymmetryOperation in string form e.g. '+x,+y,+z'"
         return str(self)
 
     def inverted(self):
+        "Return a copy of this symmetry operation under inversion"
         return SymmetryOperation(-self.rotation, -self.translation)
 
     def __add__(self, value):
+        "Return a copy of this symmetry operation under additional translation"
         return SymmetryOperation(self.rotation, self.translation + value)
 
     def __sub__(self, value):
+        "Return a copy of this symmetry operation under additional translation"
         return SymmetryOperation(self.rotation, self.translation - value)
 
     def apply(self, coordinates):
+        "Apply this symmetry operation to a set of fractional coordinates"
         if coordinates.shape[1] == 4:
             return np.dot(coordinates, self.seitz.T)
         else:

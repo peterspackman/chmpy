@@ -7,6 +7,20 @@ LOG = logging.getLogger(__name__)
 
 
 def parse_xyz_file(filename):
+    """Convert a provided xmol .xyz file into an array of
+    atomic numbers and cartesian positions
+
+    Parameters
+    ----------
+    filename: str
+        path to the .xyz file to read
+
+    Returns
+    -------
+    Tuple
+        array of (N) atomic numbers and (N, 3) Cartesian positions
+        read from the given file
+    """
     lines = Path(filename).read_text().splitlines()
     natom = int(lines[0].strip())
     LOG.debug("Expecting %d atoms in %s", natom, filename)

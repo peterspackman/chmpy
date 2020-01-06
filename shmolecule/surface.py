@@ -9,7 +9,25 @@ LOG = logging.getLogger(__name__)
 
 
 def promolecule_density_isosurface(promol, isovalue=0.002, sep=0.2, props=True):
+    """Calculate the promolecule density isosurface for a given :obj:`PromoleculeDensity`
+    object.
 
+    Parameters
+    ----------
+
+    isovalue: float, optional
+        level set value for the isosurface (default=0.002) in au.
+    separation: float, optional
+        separation between density grid used in the surface calculation
+        (default 0.2) in Angstroms.
+    props: bool, optional
+        calculate surface properties
+
+    Returns
+    -------
+    :obj:`IsosurfaceMesh`
+        a namedtuple of vertices, faces, face normals and vertex properties
+    """
     t1 = time.time()
     l, u = promol.bb()
     x_grid = np.arange(l[0], u[0], sep, dtype=np.float32)
@@ -41,7 +59,25 @@ def promolecule_density_isosurface(promol, isovalue=0.002, sep=0.2, props=True):
 
 
 def stockholder_weight_isosurface(s, isovalue=0.5, sep=0.2, props=True):
+    """Calculate the promolecule density isosurface for a given :obj:`StockholderWeight`
+    object.
 
+    Parameters
+    ----------
+
+    isovalue: float, optional
+        level set value for the isosurface (default=0.5).
+    separation: float, optional
+        separation between density grid used in the surface calculation
+        (default 0.2) in Angstroms.
+    props: bool, optional
+        calculate surface properties
+
+    Returns
+    -------
+    :obj:`IsosurfaceMesh`
+        a namedtuple of vertices, faces, face normals and vertex properties
+    """
     t1 = time.time()
     l, u = s.bb()
     x_grid = np.arange(l[0], u[0], sep, dtype=np.float32)
