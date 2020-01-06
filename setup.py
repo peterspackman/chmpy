@@ -32,7 +32,7 @@ ext_modules += ext_modules_cython
 
 setup(
     name="shmolecule",
-    version="0.2a1",
+    version="0.3a1",
     description="Promolecule and Hirshfeld surfaces using python",
     url="https://github.com/peterspackman/shmolecule",
     keywords=["chemistry", "molecule", "crystal", "electron density", "isosurface"],
@@ -49,5 +49,8 @@ setup(
     package_data={"shmolecule": ["*.npz"]},
     ext_modules=ext_modules,
     install_requires=["numpy", "scipy", "trimesh", "shtns"],
+    extras_require={
+        "sht": ["shtns"],
+    },
     zip_safe=True,
 )
