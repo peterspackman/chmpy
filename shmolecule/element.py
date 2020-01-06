@@ -285,4 +285,3 @@ def element_symbols(atomic_numbers):
     if np.any(atomic_numbers < 1) or np.any(atomic_numbers > 103):
         raise ValueError("All elements must be atomic numbers between [1,103]")
     return [_ELEMENT_DATA[i - 1][1] for i in atomic_numbers]
-
