@@ -30,6 +30,7 @@ class UnitCell:
         (3, 3) array of lattice vectors, row major i.e. vectors[0, :] is
         lattice vector A etc.
     """
+
     def __init__(self, vectors):
         self.set_vectors(vectors)
 
@@ -212,6 +213,7 @@ class AsymmetricUnit:
         Additional properties (will populate the properties member)
         to store in this asymmetric unit
     """
+
     def __init__(self, elements, positions, labels=None, **kwargs):
         self.elements = elements
         self.atomic_numbers = np.asarray([x.atomic_number for x in elements])
@@ -414,8 +416,10 @@ class Crystal:
             operation for each site.
 
             label: (N) array of string labels corresponding to each site
+
             occupation: (N) array of occupation numbers for each site. Will
             warn if any of these are greater than 1.0
+
         """
 
         if hasattr(self, "_unit_cell_atom_dict"):
@@ -652,9 +656,47 @@ class Crystal:
     def slab(self, bounds=((-1, -1, -1), (1, 1, 1))):
         """Calculate the atoms and associated information
         for a slab consisting of multiple unit cells.
+
+        If unit cell atoms have not been calculated, this calculates 
+        their information and caches it.
+
+        Parameters
+        ----------
+        bounds: tuple, optional
+            Tuple of upper and lower corners (hkl) describing the bounds
+            of the slab.
         
-        If unit cell atoms have not been calculated, this populates
-        their information."""
+        Returns
+        -------
+        dict
+            A dictionary of arrays associated with all sites contained
+            in the unit cell of this crystal, members are:
+
+            asym_atom: corresponding asymmetric unit atom indices for all sites.
+
+            frac_pos: (N, 3) array of fractional positions for all sites.
+
+            cart_pos: (N, 3) array of cartesian positions for all sites.
+
+            element: (N) array of atomic numbers for all sites.
+
+            symop: (N) array of indices corresponding to the generator symmetry
+            operation for each site.
+
+            label: (N) array of string labels corresponding to each site
+            occupation: (N) array of occupation numbers for each site. Will
+            warn if any of these are greater than 1.0
+
+            cell: (N,3) array of cell indices for each site
+
+            n_uc: number of atoms in the unit cell
+
+            n_cells: number of cells in this slab
+
+            occupation: (N) array of occupation numbers for each site. Will
+            warn if any of these are greater than 1.0
+    
+        """
         uc_atoms = self.unit_cell_atoms()
         (hmin, kmin, lmin), (hmax, kmax, lmax) = bounds
         h = np.arange(hmin, hmax + 1)
@@ -750,6 +792,23 @@ class Crystal:
         )
 
     def molecule_surroundings(self, radius=6.0):
+        """Calculate the atomic information for all
+        atoms surrounding each symmetry unique molecule
+        in this crystal within the given radius.
+
+        Parameters
+        ----------
+        radius: float, optional
+            Maximum distance in Angstroms between any atom in the molecule
+            and the resulting neighbouring atoms
+
+        Returns
+        -------
+        List[Tuple]
+            A list of tuples of (Molecule, elements, positions)
+            where `elements` is an :obj:`np.ndarray` of atomic numbers,
+            and `positions` is an :obj:`np.ndarray` of Cartesian atomic positions
+        """
         results = []
         for mol in self.symmetry_unique_molecules():
             hklmax = np.array([-np.inf, -np.inf, -np.inf])
@@ -777,6 +836,27 @@ class Crystal:
         return results
 
     def promolecule_density_isosurfaces(self, **kwargs):
+        """Calculate promolecule electron density isosurfaces
+        for each symmetry unique molecule in this crystal.
+
+        Keyword Args
+        ------------
+        isovalue: float, optional
+            level set value for the isosurface (default=0.002) in au.
+        separation: float, optional
+            separation between density grid used in the surface calculation
+            (default 0.2) in Angstroms.
+        color: str, optional
+            surface property to use for vertex coloring, one of ('d_norm_i',
+            'd_i', 'd_norm_e', 'd_e')
+        colormap: str, optional
+            matplotlib colormap to use for surface coloring (default 'viridis_r')
+
+        Returns
+        -------
+        List[Trimesh]
+            A list of meshes representing the promolecule density isosurfaces
+        """
         from .density import PromoleculeDensity
         from .surface import promolecule_density_isosurface
         from matplotlib.cm import get_cmap
@@ -802,9 +882,41 @@ class Crystal:
         return meshes
 
     def hirshfeld_surfaces(self, **kwargs):
+        "Alias for `self.stockholder_weight_isosurfaces`"
         return self.stockholder_weight_isosurfaces(**kwargs)
 
     def stockholder_weight_isosurfaces(self, kind="mol", **kwargs):
+        """Calculate stockholder weight isosurfaces (i.e. Hirshfeld surfaces)
+        for each symmetry unique molecule or atom in this crystal.
+
+        Parameters
+        ----------
+        kind: str, optional
+            dictates whether we calculate surfaces for each unique molecule
+            or for each unique atom
+
+        Keyword Args
+        ------------
+        isovalue: float, optional
+            level set value for the isosurface (default=0.5). Must be between
+            0 and 1, but values other than 0.5 probably won't make sense anyway.
+        separation: float, optional
+            separation between density grid used in the surface calculation
+            (default 0.2) in Angstroms.
+        radius: float, optional
+            maximum distance for contributing neighbours for the stockholder
+            weight calculation
+        color: str, optional
+            surface property to use for vertex coloring, one of ('d_norm_i',
+            'd_i', 'd_norm_e', 'd_e', 'd_norm')
+        colormap: str, optional
+            matplotlib colormap to use for surface coloring (default 'viridis_r')
+
+        Returns
+        -------
+        List[Trimesh]
+            A list of meshes representing the stockholder weight isosurfaces
+        """
         from .density import StockholderWeight
         from .surface import stockholder_weight_isosurface
         from matplotlib.cm import get_cmap
@@ -846,6 +958,23 @@ class Crystal:
         return meshes
 
     def molecular_shape_descriptors(self, l_max=5):
+        """Calculate the molecular shape descriptors[1,2] for all symmetry unique
+        molecules in this crystal.
+
+        1. PR Spackman et al. Scientific Reports 6, 22204 (2016)
+        2. PR Spackman et al. Angew. Chem. 58 (47), 16780-16784 (2019)
+
+        Parameters
+        ----------
+        l_max: int, optional
+            maximum level of angular momenta to include in the spherical harmonic
+            transform of the molecular shape function.
+
+        Returns
+        -------
+        :obj:`np.ndarray`
+            shape description vector
+        """
         descriptors = []
         from .sht import SHT
         from .shape_descriptors import stockholder_weight_descriptor
@@ -869,6 +998,23 @@ class Crystal:
         return np.asarray(descriptors)
 
     def atomic_shape_descriptors(self, l_max=5):
+        """Calculate the shape descriptors[1,2] for all symmetry unique
+        atoms in this crystal.
+
+        1. PR Spackman et al. Scientific Reports 6, 22204 (2016)
+        2. PR Spackman et al. Angew. Chem. 58 (47), 16780-16784 (2019)
+
+        Parameters
+        ----------
+        l_max: int, optional
+            maximum level of angular momenta to include in the spherical harmonic
+            transform of the shape function.
+
+        Returns
+        -------
+        :obj:`np.ndarray`
+            shape description vector
+        """
         descriptors = []
         from .sht import SHT
         from .shape_descriptors import stockholder_weight_descriptor
@@ -886,6 +1032,23 @@ class Crystal:
         return np.asarray(descriptors)
 
     def atom_group_shape_descriptors(self, atoms, l_max=5):
+        """Calculate the shape descriptors[1,2] for the given atomic
+        group in this crystal.
+
+        1. PR Spackman et al. Scientific Reports 6, 22204 (2016)
+        2. PR Spackman et al. Angew. Chem. 58 (47), 16780-16784 (2019)
+
+        Parameters
+        ----------
+        l_max: int, optional
+            maximum level of angular momenta to include in the spherical harmonic
+            transform of the shape function.
+
+        Returns
+        -------
+        :obj:`np.ndarray`
+            shape description vector
+        """
         from .sht import SHT
         from .shape_descriptors import stockholder_weight_descriptor
 
@@ -920,6 +1083,7 @@ class Crystal:
 
     @property
     def density(self):
+        "Calculated density of this crystal structure in g/cm^3"
         if "density" in self.properties:
             return self.properties["density"]
         uc_mass = sum(Element[x].mass for x in self.unit_cell_atoms()["element"])
@@ -928,7 +1092,17 @@ class Crystal:
 
     @classmethod
     def load(cls, filename):
-        """Load a crystal structure from file (.res, .cif)"""
+        """Load a crystal structure from file (.res, .cif)
+
+        Parameters
+        ----------
+        filename: str
+            the path to the crystal structure file
+
+        Returns
+        :obj:`Crystal`
+            the resulting crystal structure
+        """
         extension_map = {".cif": cls.from_cif_file, ".res": cls.from_shelx_file}
         extension = os.path.splitext(filename)[-1].lower()
         return extension_map[extension](filename)
