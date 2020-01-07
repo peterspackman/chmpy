@@ -11,7 +11,7 @@ struct linterp
     float *y;
 };
 
-void linterp_log(struct linterp *interp, float x[__restrict], float y[__restrict], int npts)
+void linterp_log(struct linterp *interp, float * __restrict x, float * __restrict y, int npts)
 {
     float lbound = logf(interp->x[0]), ubound = logf(interp->x[interp->dim - 1]);
     float range = ubound - lbound;
