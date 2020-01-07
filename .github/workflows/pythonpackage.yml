@@ -13,7 +13,7 @@ jobs:
 
     steps:
     - uses: actions/cache@v1
-    - name: Load cache
+      name: Load cache
       if: startsWith(runner.os, 'Linux')
       with:
         path: ~/.cache/pip
@@ -22,7 +22,7 @@ jobs:
           ${{ runner.os }}-pip-
 
     - uses: actions/cache@v1
-    - name: Load cache
+      name: Load cache
       if: startsWith(runner.os, 'macOS')
       with:
         path: ~/Library/Caches/pip
@@ -31,7 +31,7 @@ jobs:
           ${{ runner.os }}-pip-
 
     - uses: actions/cache@v1
-    - name: Load cache
+      name: Load cache
       if: startsWith(runner.os, 'Windows')
       with:
         path: ~\AppData\Local\pip\Cache
