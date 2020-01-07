@@ -5,7 +5,7 @@ import re
 
 LOG = logging.getLogger(__name__)
 NUM_ERR_REGEX = re.compile(r"([-+]?[0-9]+[.]?[0-9]*)(\(\d+\))?")
-QUOTE_REGEX = r"{0}\s+([^{0}]*)\s+{0}"
+QUOTE_REGEX = r"{0}\s*([^{0}]*)\s*{0}"
 
 
 def parse_value(string, with_uncertainty=False):
@@ -25,6 +25,13 @@ def parse_value(string, with_uncertainty=False):
     -------
     value
         the value coerced into the appropriate type
+
+    >>> parse_value("2.3(1)", with_uncertainty=True)
+    (2.3, 1)
+    >>> parse_value("string")
+    'string'
+    >>> parse_value("3.1415") * 4
+    12.566
     """
     match = NUM_ERR_REGEX.match(string)
     if match and match.span()[1] == len(string):
@@ -36,7 +43,10 @@ def parse_value(string, with_uncertainty=False):
             return number, int(uncertainty.strip("()")) if uncertainty else 0
         return number
     else:
-        return string
+        s = string.strip()
+        if s[0] == s[-1]:
+            return parse_quote(string, delimiter=s[0])
+    return string
 
 
 def parse_quote(string, delimiter=";"):
@@ -55,6 +65,13 @@ def parse_quote(string, delimiter=";"):
     -------
     value
         the string contained inside the quotes
+
+    >>> parse_quote(";quote text;")
+    'quote text'
+    >>> parse_quote(":'quote text':", delimiter="'")
+    ":'quote text':"
+    >>> parse_quote(":'quote text':", delimiter=":")
+    "'quote text'"
     """
 
     match = re.match(QUOTE_REGEX.format(delimiter), string)
@@ -210,22 +227,15 @@ class Cif:
             line = self.content_lines[self.line_index].strip()
             if line:
                 token = line.split()[0]
-                try:
-                    if token in self.line_dispatch:
-                        self.line_dispatch[token]()
-                    elif token.startswith("_"):
-                        self.parse_data_name()
-                    elif token.startswith("data_"):
-                        self.parse_data_block_name()
-                    else:
-                        LOG.debug("Skipping line: %s", line)
-                        self.line_index += 1
-                except Exception as e:
-                    LOG.exception("Error in parser: %s", e)
-                    raise ValueError(
-                        f"Error parsing CIF, line number = "
-                        f"{self.line_index + 1}: {e}"
-                    ) from e
+                if token in self.line_dispatch:
+                    self.line_dispatch[token]()
+                elif token.startswith("_"):
+                    self.parse_data_name()
+                elif token.startswith("data_"):
+                    self.parse_data_block_name()
+                else:
+                    LOG.warn("Skipping unknown line: %s", line)
+                    self.line_index += 1
             else:
                 self.line_index += 1
         self.line_index = 0

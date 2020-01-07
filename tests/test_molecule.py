@@ -9,9 +9,9 @@ _WATER = join(dirname(__file__), "water.xyz")
 class MoleculeTestCase(unittest.TestCase):
     def test_xyz_file_read(self):
         mol = Molecule.load(_WATER)
-        assert len(mol) == 3
-        assert mol.positions.shape == (3, 3)
-        assert mol.molecular_formula == "H2O"
+        self.assertTrue(len(mol) == 3)
+        self.assertTrue(mol.positions.shape == (3, 3))
+        self.assertTrue(mol.molecular_formula == "H2O")
 
     def test_molecule_centroid(self):
         mol = Molecule.load(_WATER)

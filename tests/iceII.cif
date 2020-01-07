@@ -1,3 +1,4 @@
+# ice II cif for testing purposes
 data_iceii
 _audit_creation_method 'testing purposes'
 _cell_length_a 7.78
@@ -6,6 +7,10 @@ _cell_length_c 7.78
 _cell_angle_alpha 113.1
 _cell_angle_beta 113.1
 _cell_angle_gamma 113.1
+_unnecessary_quoted_block
+;
+this is a quoted block
+;
 loop_
 _symmetry_equiv_pos_site_id
 _symmetry_equiv_pos_as_xyz
