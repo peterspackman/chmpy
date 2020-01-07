@@ -3,7 +3,11 @@ from .util import spherical_to_cartesian
 from scipy.optimize import minimize_scalar
 from ._density import sphere_stockholder_radii
 from ._invariants import p_invariants_c, p_invariants_r
+import logging
 import numpy as np
+
+LOG = logging.getLogger(__name__)
+_HAVE_WARNED_ABOUT_LMAX_P = False
 
 
 def make_N_invariants(coefficients, kind="real"):
@@ -40,12 +44,26 @@ def make_N_invariants(coefficients, kind="real"):
         return np.sqrt(invariants)
 
 
-def make_invariants(coefficients, kinds="NP"):
+def make_invariants(l_max, coefficients, kinds="NP"):
+    global _HAVE_WARNED_ABOUT_LMAX_P
     invariants = []
     if "N" in kinds:
         invariants.append(make_N_invariants(coefficients))
     if "P" in kinds:
-        invariants.append(p_invariants_r(coefficients))
+        # Because we only have factorial precision in our
+        # clebsch implementation up to 70! l_max for P type
+        # invariants is restricted to < 23
+        if l_max > 23:
+            if not _HAVE_WARNED_ABOUT_LMAX_P:
+                LOG.warn(
+                    "P type invariants only supported up to l_max = 23: "
+                    "will only using N type invariants beyond that."
+                )
+                _HAVE_WARNED_ABOUT_LMAX_P = True
+            c = coefficients[:(25 * 24)//2]
+            invariants.append(p_invariants_r(c))
+        else:
+            invariants.append(p_invariants_r(coefficients))
     return np.hstack(invariants)
 
 
@@ -57,7 +75,8 @@ def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
     g[:, :] = sht.grid[:, :]
     o = kwargs.get("origin", np.mean(p_i, axis=0, dtype=np.float32))
     r = sphere_stockholder_radii(s.s, o, g, r_min, r_max, 1e-7, 30)
-    return make_invariants(sht.analyse(r))
+    l_max = sht.l_max
+    return make_invariants(l_max, sht.analyse(r))
 
 
 def stockholder_weight_descriptor_slow(sht, n_i, p_i, n_e, p_e, **kwargs):
