@@ -60,7 +60,7 @@ def make_invariants(l_max, coefficients, kinds="NP"):
                     "will only using N type invariants beyond that."
                 )
                 _HAVE_WARNED_ABOUT_LMAX_P = True
-            c = coefficients[:(25 * 24)//2]
+            c = coefficients[: (25 * 24) // 2]
             invariants.append(p_invariants_r(c))
         else:
             invariants.append(p_invariants_r(coefficients))

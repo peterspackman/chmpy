@@ -256,10 +256,13 @@ def chemical_formula(elements, subscript=False):
     if subscript:
         blocks = []
         for el, c in count.items():
-            c = "".join(chr(0x2080 + int(i)) for i in str(c))
+            c = "".join(chr(0x2080 + int(i)) for i in str(c)) if i > 1 else ""
             blocks.append(f"{el}{c}")
     else:
-        blocks = (f"{el}{c}" for el, c in count.items())
+        blocks = []
+        for el, c in count.items():
+            c = c if c > 1 else ""
+            blocks.append(f"{el}{c}")
     return "".join(blocks)
 
 
