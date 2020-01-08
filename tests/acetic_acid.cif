@@ -1,0 +1,31 @@
+data_acetic_acid
+_symmetry_Int_Tables_number      33
+loop_
+_symmetry_equiv_pos_site_id
+_symmetry_equiv_pos_as_xyz
+1 x,y,z
+2 1/2-x,1/2+y,1/2+z
+3 1/2+x,1/2-y,z
+4 -x,-y,1/2+z
+_cell_length_a                   13.31
+_cell_length_b                   4.1
+_cell_length_c                   5.75
+_cell_angle_alpha                90
+_cell_angle_beta                 90
+_cell_angle_gamma                90
+_cell_volume                     314.05
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+C1 C 0.16510  0.28580  0.17090
+C2 C 0.08940  0.37620  0.34810
+H1 H 0.18200  0.05100 -0.11600
+H2 H 0.12800  0.51000  0.49100
+H3 H 0.03300  0.54000  0.27900
+H4 H 0.05300  0.16800  0.42100
+O1 O 0.12870  0.10750  0.00000
+O2 O 0.25290  0.37030  0.17690
+#END

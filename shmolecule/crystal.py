@@ -16,7 +16,6 @@ from .util import cartesian_product
 
 LOG = logging.getLogger(__name__)
 
-
 class UnitCell:
     """Storage class for the lattice vectors of a crystal
     i.e. its unit cell.
@@ -754,7 +753,9 @@ class Crystal:
                 continue
             occupation[i] += occupation[j]
             mask[j] = False
+        LOG.error(len(occupation))
         occupation = occupation[mask]
+        LOG.error(len(occupation))
         if not np.isclose(np.sum(occupation), expected_natoms):
             LOG.warn("invalid total occupation after merging sites")
         if np.any(occupation > 1.0):
@@ -1495,9 +1496,7 @@ class Crystal:
         if data_block_name is not None:
             return cls.from_cif_data(cif.data[data_block_name], titl=data_block_name)
 
-        crystals = {
-            name: cls.from_cif_data(data, titl=name) for name, data in cif.data.items()
-        }
+        crystals = {name: cls.from_cif_data(data, titl=name) for name, data in cif.data.items()}
         keys = list(crystals.keys())
         if len(keys) == 1:
             return crystals[keys[0]]
@@ -1575,3 +1574,5 @@ class Crystal:
         extension_map = {".cif": self.to_cif_file}
         extension = os.path.splitext(filename)[-1].lower()
         return extension_map[extension](filename)
+
+

@@ -11,12 +11,15 @@ from .test_asymmetric_unit import ice_ii_asym
 
 LOG = logging.getLogger(__name__)
 _ICE_II = join(dirname(__file__), "iceII.cif")
+_ACETIC = join(dirname(__file__), "acetic_acid.cif")
 _ICE_II_CELL = UnitCell.rhombohedral(7.78, 113.1, unit="degrees")
 _ICE_II_SG = SpaceGroup(1)
 
 
 class CrystalTestCase(unittest.TestCase):
-    ice_ii = Crystal(_ICE_II_CELL, _ICE_II_SG, ice_ii_asym())
+    def setUp(self):
+        self.ice_ii = Crystal(_ICE_II_CELL, _ICE_II_SG, ice_ii_asym())
+        self.acetic = Crystal.load(_ACETIC)
 
     def test_crystal_load(self):
         c = Crystal.load(_ICE_II)
@@ -54,6 +57,45 @@ class CrystalTestCase(unittest.TestCase):
         np.testing.assert_allclose(
             atoms["frac_pos"], self.ice_ii.asymmetric_unit.positions
         )
+
+    def test_handles_higher_occupation(self):
+        from copy import deepcopy
+
+        asym = deepcopy(ice_ii_asym())
+        natom = len(asym) + 1
+        natom_old = len(asym)
+        asym.positions = np.vstack((asym.positions, asym.positions[0, :]))
+        asym.labels = np.hstack((asym.labels, asym.labels[0] + "X"))
+        asym.atomic_numbers = np.hstack((asym.atomic_numbers, asym.atomic_numbers[0]))
+        asym.elements.append(asym.elements[0])
+        asym.properties["occupation"] = np.ones(natom)
+        asym.properties["occupation"][0] = 0.5
+        asym.properties["occupation"][-1] = 0.5
+        x = Crystal(_ICE_II_CELL, _ICE_II_SG, asym)
+        atoms = x.unit_cell_atoms()
+        # should have merged the sites
+        self.assertEqual(len(atoms["element"]), natom_old)
+
+    def test_cached_calls(self):
+        for c in ("ice_ii", "acetic"):
+            x = getattr(self, c)
+            g1 = x.unit_cell_connectivity()
+            g2 = x.unit_cell_connectivity()
+            self.assertEqual(g1, g2)
+            m1 = x.unit_cell_molecules()
+            m2 = x.unit_cell_molecules()
+            self.assertEqual(m1, m2)
+            m1 = x.symmetry_unique_molecules()
+            m2 = x.symmetry_unique_molecules()
+            self.assertEqual(m1, m2)
+
+    def test_surroundings_functions(self):
+        for c in ("ice_ii", "acetic"):
+            x = getattr(self, c)
+            atoms = x.atoms_in_radius(5.0)
+            atoms = x.atomic_surroundings()
+            atoms = x.atom_group_surroundings([0, 1, 2])
+            surroundings = x.molecule_surroundings()
 
 
 class CifTestCase(unittest.TestCase):
