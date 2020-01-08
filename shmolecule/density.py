@@ -69,6 +69,8 @@ class PromoleculeDensity:
             p = np.argmin(d_n)
             d_norm[j] = d_n[p]
             vecs[j] = (pos[p] - positions[j]) / vdw[p]
+        if dists.ndim == 1:
+            return dists, d_norm, vecs
         return dists[:, 0], d_norm, vecs
 
     @classmethod
@@ -98,14 +100,7 @@ class StockholderWeight:
         return np.r_[self.dens_a.vdw_radii, self.dens_b.vdw_radii]
 
     def weights(self, positions):
-        return self.s.weights(positions)
-        rho_a = self.dens_a.dens.rho(positions)
-        rho_b = self.dens_b.dens.rho(positions)
-        mask = rho_a != 0
-        weights = np.empty(rho_a.shape, dtype=np.float32)
-        weights[mask] = rho_a[mask] / (rho_a[mask] + rho_b[mask])
-        weights[~mask] = 0.0
-        return weights
+        return self.s.weights(positions.astype(np.float32))
 
     def d_norm(self, positions):
         d_a, d_norm_a, vecs_a = self.dens_a.d_norm(positions)
@@ -116,11 +111,8 @@ class StockholderWeight:
 
     @classmethod
     def from_xyz_files(cls, f1, f2):
-        from .xyz_file import parse_xyz_file
-
         return cls(
-            PromoleculeDensity(parse_xyz_file(f1)),
-            PromoleculeDensity(parse_xyz_file(f2)),
+            PromoleculeDensity.from_xyz_file(f1), PromoleculeDensity.from_xyz_file(f2)
         )
 
     @classmethod
