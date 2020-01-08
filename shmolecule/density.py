@@ -59,7 +59,7 @@ class PromoleculeDensity:
         pos = self.positions
         tree = KDTree(pos)
         # make sure k is enough should be enough for d_norm to be correct
-        dists, idxs = tree.query(positions, k=6)
+        dists, idxs = tree.query(positions, k=min(6, self.natoms))
         d_norm = np.empty(dists.shape[0])
         vecs = np.empty(positions.shape)
         for j, (d, i) in enumerate(zip(dists, idxs)):
@@ -75,7 +75,9 @@ class PromoleculeDensity:
     def from_xyz_file(cls, filename):
         from .xyz_file import parse_xyz_file
 
-        return cls(parse_xyz_file(filename))
+        els, pos = parse_xyz_file(filename)
+        els = np.array([x.atomic_number for x in els])
+        return cls((els, pos))
 
 
 class StockholderWeight:
