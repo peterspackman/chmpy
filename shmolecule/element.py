@@ -129,8 +129,10 @@ class _ElementMeta(type):
     def __getitem__(cls, val):
         if isinstance(val, numbers.Integral):
             return cls.from_atomic_number(val)
-        else:
+        elif isinstance(val, str):
             return cls.from_string(val)
+        else:
+            raise ValueError("cannot construct element from provided type")
 
 
 @functools.total_ordering
