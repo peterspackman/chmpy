@@ -1,8 +1,6 @@
-import logging
 import unittest
 import numpy as np
 from os.path import join, dirname
-from tempfile import TemporaryDirectory
 from shmolecule.density import PromoleculeDensity, StockholderWeight
 
 
