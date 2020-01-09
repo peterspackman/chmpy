@@ -29,6 +29,10 @@ class ShapeDescriptorTestCase(unittest.TestCase):
         desc = self.acetic.molecular_shape_descriptors(l_max=3, radius=3.8)
         self.assertEqual(desc.shape, (1, 8))
 
+    def test_atom_group_shape_descriptors(self):
+        desc = self.acetic.atom_group_shape_descriptors([0, 1, 2], l_max=3, radius=3.8)
+        self.assertEqual(desc.shape, (8,))
+
     def test_invariants(self):
         from shmolecule.shape_descriptors import make_N_invariants, make_invariants
 

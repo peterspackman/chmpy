@@ -20,6 +20,9 @@ class SurfaceTestCase(unittest.TestCase):
         surfaces = self.acetic_acid.stockholder_weight_isosurfaces(
             separation=1.0, radius=3.8
         )
+        surfaces = self.acetic_acid.hirshfeld_surfaces(
+            separation=1.0, radius=3.8, kind="atom"
+        )
 
     def test_save(self):
         with TemporaryDirectory() as tmpdirname:

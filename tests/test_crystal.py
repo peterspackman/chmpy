@@ -28,6 +28,7 @@ class CrystalTestCase(unittest.TestCase):
         self.assertTrue(len(c.asymmetric_unit) == len(self.ice_ii.asymmetric_unit))
         self.assertTrue(c.space_group == self.ice_ii.space_group)
         self.assertTrue(len(c.symmetry_operations) == 1)
+        np.testing.assert_equal(c.site_labels, c.asymmetric_unit.labels)
 
         with self.assertRaises(ValueError):
             contents = "LATT 4klj1klj\n"
@@ -36,6 +37,14 @@ class CrystalTestCase(unittest.TestCase):
         from shmolecule.shelx import parse_shelx_file
 
         shelx_data = parse_shelx_file(_ACETIC_RES)
+
+    def test_repr(self):
+        self.assertEqual(repr(self.acetic), "<Crystal C2H4O2 Pna2_1>")
+
+    def test_density(self):
+        self.assertAlmostEqual(self.acetic.density, 1.271208154)
+        self.acetic.properties["density"] = 0.5
+        self.assertAlmostEqual(self.acetic.density, 0.5)
 
     def test_crystal_save(self):
         c = Crystal.load(_ICE_II)
