@@ -38,6 +38,8 @@ class CrystalTestCase(unittest.TestCase):
 
         shelx_data = parse_shelx_file(_ACETIC_RES)
 
+        c = Crystal.from_cif_file(_ACETIC, data_block_name="acetic_acid")
+
     def test_repr(self):
         self.assertEqual(repr(self.acetic), "<Crystal C2H4O2 Pna2_1>")
 
@@ -52,6 +54,12 @@ class CrystalTestCase(unittest.TestCase):
             LOG.debug("created temp directory: %s", tmpdirname)
             c.save(join(tmpdirname, "tmp.cif"))
             c.save(join(tmpdirname, "tmp.res"))
+
+        c = Crystal(_ICE_II_CELL, _ICE_II_SG, ice_ii_asym())
+        c.properties["titl"] = "iceII"
+        s = c.to_cif_string()
+        c2 = Crystal.from_cif_string(s)
+        c2 = Crystal.from_cif_string(s, data_block_name="iceII")
 
     def test_crystal_molecules(self):
         c = Crystal.load(_ICE_II)

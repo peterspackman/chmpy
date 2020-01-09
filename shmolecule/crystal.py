@@ -1433,7 +1433,7 @@ class Crystal:
         return extension_map[extension](filename)
 
     @classmethod
-    def from_cif_data(cls, cif_data):
+    def from_cif_data(cls, cif_data, titl=None):
         """Initialize a crystal structure from a dictionary
         of CIF data"""
         labels = cif_data.get("atom_site_label", None)
@@ -1477,7 +1477,7 @@ class Crystal:
         elif "symmetry_Int_Tables_number" in cif_data:
             space_group = SpaceGroup(cif_data["symmetry_Int_Tables_number"])
 
-        return Crystal(unit_cell, space_group, asym, cif_data=cif_data)
+        return Crystal(unit_cell, space_group, asym, cif_data=cif_data, titl=titl)
 
     @classmethod
     def from_cif_file(cls, filename, data_block_name=None):
