@@ -32,7 +32,7 @@ ext_modules += ext_modules_cython
 
 setup(
     name="shmolecule",
-    version="0.3a1",
+    version="1.0a1",
     description="Promolecule and Hirshfeld surfaces using python",
     url="https://github.com/peterspackman/shmolecule",
     keywords=["chemistry", "molecule", "crystal", "electron density", "isosurface"],

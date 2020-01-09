@@ -1,7 +1,4 @@
-#cython: cdivision=True
-#cython: boundscheck=False
-#cython: nonecheck=False
-#cython: wraparound=False
+# cython: language_level=3, boundscheck=False, wraparound=False, nonecheck=False, cdivision=True
 """
 This file is a modification of the original _marching_cubes_lewiner.pyx
 file from the scikit-image project, retrieved from git revision:
@@ -50,7 +47,8 @@ results, and the algorithms implementation is relatively simple. Most
 of the magic is in the lookup tables, which are provided as open source.
 
 Originally implemented in C++ by Thomas Lewiner in 2002, ported to Cython
-by Almar Klein in 2012. Adapted for scikit-image in 2016.
+by Almar Klein in 2012. Adapted for scikit-image in 2016. Modified for
+inclusion in shmolecule by Peter Spackman in 2020.
 """
 
 # Cython specific imports
@@ -1308,7 +1306,7 @@ cdef int test_face(Cell cell, int face):
         absFace *= -1
 
     # Get values of corners A B C D
-    cdef double A, B, C, D
+    cdef double A = 0, B = 0, C = 0, D = 0
     if absFace == 1:
         A, B, C, D = cell.v0, cell.v4, cell.v5, cell.v1
     elif absFace == 2:
