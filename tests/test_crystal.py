@@ -12,6 +12,7 @@ from .test_asymmetric_unit import ice_ii_asym
 LOG = logging.getLogger(__name__)
 _ICE_II = join(dirname(__file__), "iceII.cif")
 _ACETIC = join(dirname(__file__), "acetic_acid.cif")
+_ACETIC_RES = join(dirname(__file__), "acetic_acid.res")
 _ICE_II_CELL = UnitCell.rhombohedral(7.78, 113.1, unit="degrees")
 _ICE_II_SG = SpaceGroup(1)
 
@@ -20,6 +21,7 @@ class CrystalTestCase(unittest.TestCase):
     def setUp(self):
         self.ice_ii = Crystal(_ICE_II_CELL, _ICE_II_SG, ice_ii_asym())
         self.acetic = Crystal.load(_ACETIC)
+        self.acetic_res = Crystal.load(_ACETIC_RES)
 
     def test_crystal_load(self):
         c = Crystal.load(_ICE_II)
@@ -27,11 +29,20 @@ class CrystalTestCase(unittest.TestCase):
         self.assertTrue(c.space_group == self.ice_ii.space_group)
         self.assertTrue(len(c.symmetry_operations) == 1)
 
+        with self.assertRaises(ValueError):
+            contents = "LATT 4klj1klj\n"
+            c = Crystal.from_shelx_string(contents)
+
+        from shmolecule.shelx import parse_shelx_file
+
+        shelx_data = parse_shelx_file(_ACETIC_RES)
+
     def test_crystal_save(self):
         c = Crystal.load(_ICE_II)
         with TemporaryDirectory() as tmpdirname:
             LOG.debug("created temp directory: %s", tmpdirname)
             c.save(join(tmpdirname, "tmp.cif"))
+            c.save(join(tmpdirname, "tmp.res"))
 
     def test_crystal_molecules(self):
         c = Crystal.load(_ICE_II)

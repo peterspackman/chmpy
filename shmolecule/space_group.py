@@ -269,7 +269,7 @@ class SymmetryOperation:
             (N, 3) array of ransformed coordinates
         """
         if coordinates.shape[1] == 4:
-            return np.dot(coordinates, self.seitz.T)
+            return np.dot(coordinates, self.seitz_matrix.T)
         else:
             return np.dot(coordinates, self.rotation.T) + self.translation
 
@@ -555,7 +555,9 @@ class SpaceGroup:
                 unity = i
                 break
         else:
-            return self.symmetry_operations
+            raise ValueError(
+                "Could not find identity symmetry_operation -- invalide space group"
+            )
         other_symops = (
             self.symmetry_operations[:unity] + self.symmetry_operations[unity + 1 :]
         )
@@ -587,7 +589,7 @@ class SpaceGroup:
         return generator_symop, transformed
 
     def __repr__(self):
-        return "{} {}: {}".format(
+        return "<{} {}: {}>".format(
             self.__class__.__name__, self.international_tables_number, self.symbol
         )
 
@@ -601,18 +603,6 @@ class SpaceGroup:
 
     def reduced_symmetry_operations(self):
         return reduced_symmetry_list(self.symmetry_operations, self.latt)
-
-    def subgroups(self):
-        "This definition of subgroups is probably not correct"
-        symop_ids = set([x.integer_code for x in self.symmetry_operations])
-        subgroups = []
-        for symops in SG_FROM_SYMOPS:
-            if symop_ids.issuperset(symops):
-                sgdata = SG_FROM_SYMOPS[symops]
-                sg = SpaceGroup(sgdata.number, choice=sgdata.choice)
-                if sg != self:
-                    subgroups.append(sg)
-        return subgroups
 
     @classmethod
     def from_symmetry_operations(cls, symops, expand_latt=None):

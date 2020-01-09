@@ -1572,8 +1572,37 @@ class Crystal:
         cif_data = self.to_cif_data(**kwargs)
         return Cif(cif_data).to_string()
 
+    def to_shelx_file(self, filename):
+        """Write this crystal structure as a shelx .res file"""
+        Path(filename).write_text(self.to_shelx_string())
+
+    def to_shelx_string(self, titl=None):
+        """Represent this crystal structure as a shelx .res string"""
+        from shmolecule.shelx import to_res_contents
+
+        sfac = list(np.unique(self.site_atoms))
+        atom_sfac = [sfac.index(x) + 1 for x in self.site_atoms]
+        shelx_data = {
+            "TITL": self.titl if titl is None else titl,
+            "CELL": self.unit_cell.parameters,
+            "SFAC": [Element[x].symbol for x in sfac],
+            "SYMM": [
+                str(s)
+                for s in self.space_group.reduced_symmetry_operations()
+                if not s.is_identity()
+            ],
+            "LATT": self.space_group.latt,
+            "ATOM": [
+                "{:3} {:3} {: 20.12f} {: 20.12f} {: 20.12f}".format(l, s, *pos)
+                for l, s, pos in zip(
+                    self.asymmetric_unit.labels, atom_sfac, self.site_positions
+                )
+            ],
+        }
+        return to_res_contents(shelx_data)
+
     def save(self, filename):
         """Save this crystal structure to file (.cif)"""
-        extension_map = {".cif": self.to_cif_file}
+        extension_map = {".cif": self.to_cif_file, ".res": self.to_shelx_file}
         extension = os.path.splitext(filename)[-1].lower()
         return extension_map[extension](filename)
