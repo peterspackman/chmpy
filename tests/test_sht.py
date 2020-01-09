@@ -51,11 +51,12 @@ class SHTTestCase(unittest.TestCase):
         reconstructed = self.sht.synth_cplx(coeffs)
         np.testing.assert_allclose(vals, reconstructed)
 
-    def plot_test(self):
+    def test_plot(self):
         grid = self.sht.grid_cartesian
         vals = grid[:, 2] ** 2 * np.exp(-np.linalg.norm(grid, axis=1)) * 0.5
         from tempfile import TemporaryDirectory
         from shmolecule.sht import plot_sphere
+        from os.path import join
 
         with TemporaryDirectory() as tmpdirname:
-            plot_sphere(join(tmpdirname, "test.png"), self.sht.grid, vals)
+            plot_sphere(join(tmpdirname, "test.png"), self.sht.mgrid, vals)
