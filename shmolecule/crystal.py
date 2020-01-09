@@ -1266,7 +1266,7 @@ class Crystal:
             meshes.append(mesh)
         return meshes
 
-    def molecular_shape_descriptors(self, l_max=5):
+    def molecular_shape_descriptors(self, l_max=5, radius=6.0):
         """Calculate the molecular shape descriptors[1,2] for all symmetry unique
         molecules in this crystal.
 
@@ -1294,7 +1294,9 @@ class Crystal:
         from .shape_descriptors import stockholder_weight_descriptor
 
         sph = SHT(l_max=l_max)
-        for mol, neighbour_els, neighbour_pos in self.molecule_surroundings():
+        for mol, neighbour_els, neighbour_pos in self.molecule_surroundings(
+            radius=radius
+        ):
             c = np.array(mol.centroid, dtype=np.float32)
             dists = np.linalg.norm(mol.positions - c, axis=1)
             bounds = np.min(dists) / 2, np.max(dists) + 10.0
@@ -1311,7 +1313,7 @@ class Crystal:
             )
         return np.asarray(descriptors)
 
-    def atomic_shape_descriptors(self, l_max=5):
+    def atomic_shape_descriptors(self, l_max=5, radius=3.8):
         """Calculate the shape descriptors[1,2] for all symmetry unique
         atoms in this crystal.
 
@@ -1339,7 +1341,7 @@ class Crystal:
 
         sph = SHT(l_max=l_max)
         for n, pos, neighbour_els, neighbour_pos in self.atomic_surroundings(
-            radius=3.8
+            radius=radius
         ):
             ubound = Element[n].vdw_radius * 3
             descriptors.append(
@@ -1349,7 +1351,7 @@ class Crystal:
             )
         return np.asarray(descriptors)
 
-    def atom_group_shape_descriptors(self, atoms, l_max=5):
+    def atom_group_shape_descriptors(self, atoms, l_max=5, radius=3.8):
         """Calculate the shape descriptors[1,2] for the given atomic
         group in this crystal.
 
@@ -1375,7 +1377,7 @@ class Crystal:
         from .shape_descriptors import stockholder_weight_descriptor
 
         sph = SHT(l_max=l_max)
-        inside, outside = self.atom_group_surroundings(atoms)
+        inside, outside = self.atom_group_surroundings(atoms, radius=radius)
         m = Molecule.from_arrays(*inside)
         c = np.array(m.centroid, dtype=np.float32)
         dists = np.linalg.norm(m.positions - c, axis=1)
