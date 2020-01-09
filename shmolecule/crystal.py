@@ -1172,7 +1172,7 @@ class Crystal:
         import trimesh
 
         isovalue = kwargs.get("isovalue", 0.002)
-        sep = kwargs.get("separation", 0.2)
+        sep = kwargs.get("separation", kwargs.get("resolution", 0.2))
         vertex_color = kwargs.get("color", "d_norm_i")
         meshes = []
         colormap = get_cmap(kwargs.get("colormap", "viridis_r"))
