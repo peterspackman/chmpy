@@ -1,4 +1,3 @@
-import shtns
 import numpy as np
 from .util import spherical_to_cartesian
 
@@ -18,8 +17,11 @@ class SHT:
     _grid_cartesian = None
 
     def __init__(self, l_max):
+        import shtns
+
         self._l_max = l_max
         self._shtns = shtns.sht(l_max, l_max)
+        _, self.nphi = self._shtns.set_grid()
 
     @property
     def mgrid(self):
@@ -32,7 +34,6 @@ class SHT:
     def grid(self):
         "The set of angular grid points for this SHT"
         if self._grid is None:
-            _, self.nphi = self._shtns.set_grid()
             nphi = self.nphi
             self.phi, self.theta = np.meshgrid(
                 np.arccos(self._shtns.cos_theta), np.arange(nphi) * (2 * np.pi / nphi)
@@ -49,7 +50,6 @@ class SHT:
     def grid_cartesian(self):
         "The set of cartesian grid points for this SHT"
         if self._grid_cartesian is None:
-            _, self.nphi = self._shtns.set_grid()
             nphi = self.nphi
             self.phi, self.theta = np.meshgrid(
                 np.arccos(self._shtns.cos_theta), np.arange(nphi) * (2 * np.pi / nphi)
@@ -77,7 +77,7 @@ class SHT:
         else:
             return self._shtns.analys(values.reshape(desired_shape).transpose())
 
-    def synthesis(self, coefficients):
+    def synth_cplx(self, coefficients):
         """Perform an inverse spherical harmonic transform given a set of coefficients
 
         Arguments
@@ -87,6 +87,19 @@ class SHT:
         """
         max_coeff = (self.l_max + 1) ** 2
         return self._shtns.synth_cplx(coefficients[:max_coeff]).transpose().flatten()
+
+    def synth_real(self, coefficients):
+        """Perform an inverse spherical harmonic transform given a set of coefficients
+
+        Arguments
+        ----------
+        coefficients: :obj:`np.ndarray`
+            set of spherical harmonic coefficient
+        """
+
+        max_coeff = (self._l_max + 2) * (self._l_max + 1) // 2
+        print(max_coeff)
+        return self._shtns.synth(coefficients[:max_coeff]).transpose().flatten()
 
     @property
     def l_max(self):
