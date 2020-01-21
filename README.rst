@@ -77,7 +77,7 @@ class:
     
 The resulting surface should look something like this when visualized:
 
-.. image:: https://raw.githubusercontent.com/peterspackman/shmolecule/master/tests/acetic_acid.png
+.. image:: tests/acetic_acid.png
   :height: 200px
 
 
