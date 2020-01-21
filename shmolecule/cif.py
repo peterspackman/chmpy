@@ -234,7 +234,7 @@ class Cif:
                 elif token.startswith("data_"):
                     self.parse_data_block_name()
                 else:
-                    LOG.warn("Skipping unknown line: %s", line)
+                    LOG.debug("Skipping unknown line: %s", line)
                     self.line_index += 1
             else:
                 self.line_index += 1

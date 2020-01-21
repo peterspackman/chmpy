@@ -9,12 +9,14 @@ Installation
 
 Basic installation can be done through the python package manager ``pip``::
 
+    pip install cython numpy
     pip install git+https://github.com/peterspackman/shmolecule.git
 
 If you wish to utilise the spherical harmonic shape descriptors, you will
 need to install the wonderful SHTns library <https://nschaeff.bitbucket.io/shtns/>
 library. Be sure to cite the SHTns library if you use shape descriptors in any
-publication.
+publication. There is no up to date package for shtns in pypi or conda, but on
+unix systems the installation is straightforward.
 
 Features
 ^^^^^^^^

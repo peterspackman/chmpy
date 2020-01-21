@@ -754,9 +754,7 @@ class Crystal:
                 continue
             occupation[i] += occupation[j]
             mask[j] = False
-        LOG.error(len(occupation))
         occupation = occupation[mask]
-        LOG.error(len(occupation))
         if not np.isclose(np.sum(occupation), expected_natoms):
             LOG.warn("invalid total occupation after merging sites")
         if np.any(occupation > 1.0):
@@ -1468,7 +1466,7 @@ class Crystal:
                 )
                 space_group.symbol = symbol
                 space_group.full_symbol = symbol
-                LOG.warning(
+                LOG.warn(
                     "Initializing non-standard spacegroup setting %s, "
                     "some SG data may be missing",
                     symbol,

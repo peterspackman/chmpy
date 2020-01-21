@@ -98,7 +98,6 @@ class SHT:
         """
 
         max_coeff = (self._l_max + 2) * (self._l_max + 1) // 2
-        print(max_coeff)
         return self._shtns.synth(coefficients[:max_coeff]).transpose().flatten()
 
     @property
