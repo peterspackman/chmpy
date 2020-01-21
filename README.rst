@@ -76,6 +76,7 @@ class:
     >>> save_mesh(surfaces[0], "acetic_acid.ply")
     
 The resulting surface should look something like this when visualized:
+
 .. image:: https://raw.githubusercontent.com/peterspackman/shmolecule/master/tests/acetic_acid.png
   :height: 200px
 
