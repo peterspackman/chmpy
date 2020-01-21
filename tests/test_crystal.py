@@ -1,6 +1,7 @@
 import logging
 import unittest
 import numpy as np
+from copy import deepcopy
 from os.path import join, dirname
 from shmolecule.crystal import Crystal, AsymmetricUnit, UnitCell
 from shmolecule.space_group import SpaceGroup
@@ -15,6 +16,53 @@ _ACETIC = join(dirname(__file__), "acetic_acid.cif")
 _ACETIC_RES = join(dirname(__file__), "acetic_acid.res")
 _ICE_II_CELL = UnitCell.rhombohedral(7.78, 113.1, unit="degrees")
 _ICE_II_SG = SpaceGroup(1)
+
+
+_NONSTANDARD_SG2 = """data_c1
+_symmetry_cell_setting           triclinic
+_symmetry_space_group_name_H-M   'C -1'
+_symmetry_Int_Tables_number      2
+_space_group_name_Hall           '-C 1'
+loop_
+_symmetry_equiv_pos_site_id
+_symmetry_equiv_pos_as_xyz
+1 x,y,z
+2 1/2+x,1/2+y,z
+3 -x,-y,-z
+4 1/2-x,1/2-y,-z
+_cell_length_a     13.68
+_cell_length_b     13.67
+_cell_length_c     25.04
+_cell_angle_alpha  89.98
+_cell_angle_beta   99.20
+_cell_angle_gamma  89.98
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+O1 O 0.5842 0.1055 0.03779
+#END
+data_c2
+_symmetry_cell_setting           triclinic
+_symmetry_space_group_name_H-M   'C -1'
+_symmetry_Int_Tables_number      2
+_space_group_name_Hall           '-C 1'
+_cell_length_a     13.68
+_cell_length_b     13.67
+_cell_length_c     25.04
+_cell_angle_alpha  89.98
+_cell_angle_beta   99.20
+_cell_angle_gamma  89.98
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+O1 O 0.5842 0.1055 0.03779"""
+
 
 
 class CrystalTestCase(unittest.TestCase):
@@ -40,8 +88,33 @@ class CrystalTestCase(unittest.TestCase):
 
         c = Crystal.from_cif_file(_ACETIC, data_block_name="acetic_acid")
 
+    def test_bad_occupations(self):
+        asym = deepcopy(ice_ii_asym())
+        natom = len(asym) + 1
+        natom_old = len(asym)
+        asym.positions = np.vstack((asym.positions, asym.positions[0, :]))
+        asym.labels = np.hstack((asym.labels, asym.labels[0] + "X"))
+        asym.atomic_numbers = np.hstack((asym.atomic_numbers, asym.atomic_numbers[0]))
+        asym.elements.append(asym.elements[0])
+        asym.properties["occupation"] = np.ones(natom)
+        asym.properties["occupation"][0] = 0.5
+        asym.properties["occupation"][-1] = 0.5
+        x = Crystal(_ICE_II_CELL, _ICE_II_SG, asym)
+        atoms = x.unit_cell_atoms()
+        # should have merged the sites
+        self.assertEqual(len(atoms["element"]), natom_old)
+        self.assertEqual(x.titl, "H24O13")
+
     def test_repr(self):
         self.assertEqual(repr(self.acetic), "<Crystal C2H4O2 Pna2_1>")
+        self.acetic.properties["density"] = 0.5
+        self.acetic.properties["lattice_energy"] = 0.0
+        self.assertEqual(repr(self.acetic), "<Crystal C2H4O2 Pna2_1 (0.500, 0.000)>")
+
+    def test_nonstandard_spacegroups(self):
+        crystals = Crystal.from_cif_string(_NONSTANDARD_SG2)
+        for c in crystals.values():
+            self.assertEqual(c.space_group.international_tables_number, 2)
 
     def test_density(self):
         self.assertAlmostEqual(self.acetic.density, 1.271208154)
@@ -87,7 +160,6 @@ class CrystalTestCase(unittest.TestCase):
         )
 
     def test_handles_higher_occupation(self):
-        from copy import deepcopy
 
         asym = deepcopy(ice_ii_asym())
         natom = len(asym) + 1

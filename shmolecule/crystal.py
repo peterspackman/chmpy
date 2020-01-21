@@ -755,8 +755,6 @@ class Crystal:
             occupation[i] += occupation[j]
             mask[j] = False
         occupation = occupation[mask]
-        if not np.isclose(np.sum(occupation), expected_natoms):
-            LOG.warn("invalid total occupation after merging sites")
         if np.any(occupation > 1.0):
             LOG.debug("Some unit cell site occupations are > 1.0")
         setattr(
