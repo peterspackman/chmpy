@@ -16,6 +16,16 @@ from .util import cartesian_product
 
 LOG = logging.getLogger(__name__)
 
+# TODO add LinearSegmentedColormap objects for other
+# CrystalExplorer default colors
+DEFAULT_COLORMAPS = {
+    "d_norm": "bwr_r",
+    "d_e": "viridis_r",
+    "d_i": "viridis_r",
+    "d_norm_i": "viridis_r",
+    "d_norm_e": "viridis_r",
+}
+
 
 class UnitCell:
     """Storage class for the lattice vectors of a crystal
@@ -1156,6 +1166,8 @@ class Crystal:
             'd_i', 'd_norm_e', 'd_e')
         colormap: str, optional
             matplotlib colormap to use for surface coloring (default 'viridis_r')
+        midpoint: float, optional, default 0.0 if using d_norm
+            use the midpoint norm (as is used in CrystalExplorer)
 
         Returns
         -------
@@ -1170,12 +1182,21 @@ class Crystal:
         isovalue = kwargs.get("isovalue", 0.002)
         sep = kwargs.get("separation", kwargs.get("resolution", 0.2))
         vertex_color = kwargs.get("color", "d_norm_i")
+        midpoint = kwargs.get("midpoint", 0.0 if vertex_color == "d_norm" else None)
         meshes = []
-        colormap = get_cmap(kwargs.get("colormap", "viridis_r"))
+        colormap = get_cmap(
+            kwargs.get("colormap", DEFAULT_COLORMAPS.get(vertex_color, "viridis_r"))
+        )
         for mol in self.symmetry_unique_molecules():
             pro = PromoleculeDensity((mol.atomic_numbers, mol.positions))
             iso = promolecule_density_isosurface(pro, sep=sep, isovalue=isovalue)
             prop = iso.vertex_prop[vertex_color]
+            norm = None
+            if midpoint is not None:
+                from matplotlib.colors import DivergingNorm
+
+                norm = DivergingNorm(vmin=prop.min(), vcenter=midpoint, vmax=prop.max())
+                prop = norm(prop)
             color = colormap(prop)
             mesh = trimesh.Trimesh(
                 vertices=iso.vertices,
@@ -1216,6 +1237,8 @@ class Crystal:
             'd_i', 'd_norm_e', 'd_e', 'd_norm')
         colormap: str, optional
             matplotlib colormap to use for surface coloring (default 'viridis_r')
+        midpoint: float, optional, default 0.0 if using d_norm
+            use the midpoint norm (as is used in CrystalExplorer)
 
         Returns
         -------
@@ -1231,8 +1254,11 @@ class Crystal:
         radius = kwargs.get("radius", 12.0)
         vertex_color = kwargs.get("color", "d_norm")
         isovalue = kwargs.get("isovalue", 0.5)
+        midpoint = kwargs.get("midpoint", 0.0 if vertex_color == "d_norm" else None)
         meshes = []
-        colormap = get_cmap(kwargs.get("colormap", "viridis_r"))
+        colormap = get_cmap(
+            kwargs.get("colormap", DEFAULT_COLORMAPS.get(vertex_color, "viridis_r"))
+        )
         isos = []
         if kind == "atom":
             for n, pos, neighbour_els, neighbour_pos in self.atomic_surroundings(
@@ -1252,6 +1278,12 @@ class Crystal:
                 isos.append(iso)
         for iso in isos:
             prop = iso.vertex_prop[vertex_color]
+            norm = None
+            if midpoint is not None:
+                from matplotlib.colors import DivergingNorm
+
+                norm = DivergingNorm(vmin=prop.min(), vcenter=midpoint, vmax=prop.max())
+                prop = norm(prop)
             color = colormap(prop)
             mesh = trimesh.Trimesh(
                 vertices=iso.vertices,

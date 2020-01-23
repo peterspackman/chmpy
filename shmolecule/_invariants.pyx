@@ -140,11 +140,14 @@ cdef double clebsch(int j1, int m1, int j2, int m2, int j, int m) nogil:
 
    return res * tmp
 
+
 cdef int coefficient_c(int l, int m) nogil:
     return ((l+1)*(l+1)) - l + m - 1
 
+
 cdef int coefficient_r(int l, int m) nogil:
     return (l+1)*(l+2)/2 - l + m - 1
+
 
 cdef double complex invariant_P_c(double complex[::1] coeffs, int l, int l1, int l2) nogil:
     cdef double complex res = 0.0

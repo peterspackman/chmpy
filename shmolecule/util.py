@@ -1,5 +1,6 @@
 import numpy as np
 import logging
+import matplotlib.colors as colors
 
 LOG = logging.getLogger(__name__)
 
