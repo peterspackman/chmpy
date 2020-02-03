@@ -76,4 +76,5 @@ def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
     o = kwargs.get("origin", np.mean(p_i, axis=0, dtype=np.float32))
     r = sphere_stockholder_radii(s.s, o, g, r_min, r_max, 1e-7, 30)
     l_max = sht.l_max
-    return make_invariants(l_max, sht.analyse(r))
+    coeffs = sht.analyse(r)
+    return make_invariants(l_max, coeffs)

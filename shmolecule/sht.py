@@ -1,6 +1,8 @@
 import numpy as np
 from .util import spherical_to_cartesian
 
+_SHT_CACHE = {}
+
 
 class SHT:
     """Class encapsulating the logic of spherical harmonic transform implementations
@@ -20,8 +22,12 @@ class SHT:
         import shtns
 
         self._l_max = l_max
-        self._shtns = shtns.sht(l_max, l_max)
-        _, self.nphi = self._shtns.set_grid()
+        if l_max not in _SHT_CACHE:
+            sht = shtns.sht(l_max, l_max)
+            ntheta, nphi = sht.set_grid()
+            _SHT_CACHE[l_max] = (sht, ntheta, nphi)
+
+        self._shtns, self.ntheta, self.nphi = _SHT_CACHE[l_max]
 
     @property
     def mgrid(self):
