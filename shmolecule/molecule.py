@@ -231,6 +231,46 @@ class Molecule:
         b_min, b_max = self.bbox_corners
         return np.abs(b_max - b_min)
 
+    def matching_fragments(self, fragment, method="connectivity"):
+        """Find the indices of a matching fragment to the given
+        molecular fragment
+
+        Parameters
+        ----------
+        fragment: :obj:`Molecule`
+            Molecule object containing the desired fragment
+
+        Returns
+        -------
+        list of dict
+            List of maps between matching indices in this molecule and those
+            in the fragment
+        """
+        import networkx as nx
+        import networkx.algorithms.isomorphism as iso
+        if method != "connectivity":
+            raise NotImplementedError("Only connectivity matching is implemented")
+        if fragment.bonds is None:
+            fragment.guess_bonds()
+
+        query_graph = nx.from_scipy_sparse_matrix(fragment.bonds)
+        nx.set_node_attributes(query_graph, {i: e for i, e in enumerate(fragment.elements)}, "element")
+        if self.bonds is None:
+            self.guess_bonds()
+        mol_graph = nx.from_scipy_sparse_matrix(self.bonds)
+        nx.set_node_attributes(mol_graph, {i: e for i, e in enumerate(self.elements)}, "element")
+        matcher = iso.GraphMatcher(mol_graph, query_graph, node_match=iso.categorical_node_match("element", 1))
+        matches = list(matcher.subgraph_isomorphisms_iter())
+        unique = []
+        # remove changes in ordering
+        for m in matches:
+            for k in unique:
+                if m.keys() == k.keys():
+                    break
+            else:
+                unique.append(m)
+        return unique
+
     @property
     def asym_symops(self):
         "the symmetry operations which generate this molecule (default x,y,z if not set)"
