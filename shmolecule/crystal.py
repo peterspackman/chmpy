@@ -1150,6 +1150,61 @@ class Crystal:
             results.append((mol, elements[keep], positions[keep]))
         return results
 
+    def functional_group_surroundings(self, radius=6.0, kind="carboxylic_acid"):
+        """Calculate the atomic information for all
+        atoms surrounding each functional group in each symmetry unique molecule
+        in this crystal within the given radius.
+
+        Parameters
+        ----------
+        radius: float, optional
+            Maximum distance in Angstroms between any atom in the molecule
+            and the resulting neighbouring atoms
+
+        Returns
+        -------
+        list of tuple
+            A list of tuples of (func_el, func_pos, neigh_el, neigh_pos)
+            where `func_el` and `neigh_el` are :obj:`np.ndarray` of atomic numbers,
+            and `func_pos` and `neigh_pos` are :obj:`np.ndarray` of Cartesian atomic positions
+        """
+        results = []
+        for mol in self.symmetry_unique_molecules():
+            hklmax = np.array([-np.inf, -np.inf, -np.inf])
+            hklmin = np.array([np.inf, np.inf, np.inf])
+            frac_radius = radius / np.array(self.unit_cell.lengths)
+            for pos in self.to_fractional(mol.positions):
+                hklmax = np.maximum(hklmax, np.ceil(frac_radius + pos))
+                hklmin = np.minimum(hklmin, np.floor(pos - frac_radius))
+            hmax, kmax, lmax = hklmax.astype(int)
+            hmin, kmin, lmin = hklmin.astype(int)
+            slab = self.slab(bounds=((hmin, kmin, lmin), (hmax, kmax, lmax)))
+            elements = slab["element"]
+            positions = slab["cart_pos"]
+            tree = KDTree(positions)
+            groups = mol.functional_groups(kind=kind)
+            for fg in groups:
+                keep = np.zeros(positions.shape[0], dtype=bool)
+                inside = []
+                for i, (n, pos) in enumerate(
+                    zip(mol.atomic_numbers[fg], mol.positions[fg])
+                ):
+                    idxs = tree.query_ball_point(pos, radius)
+                    d, nn = tree.query(pos)
+                    keep[idxs] = True
+                    if d < 1e-3:
+                        inside.append(nn)
+                        keep[inside] = False
+                results.append(
+                    (
+                        mol.atomic_numbers[fg],
+                        mol.positions[fg],
+                        elements[keep],
+                        positions[keep],
+                    )
+                )
+        return results
+
     def promolecule_density_isosurfaces(self, **kwargs):
         """Calculate promolecule electron density isosurfaces
         for each symmetry unique molecule in this crystal.

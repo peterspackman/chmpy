@@ -10,7 +10,7 @@ def load_data():
     import graph_tool as gt
 
     graphs = {}
-    LOG.error("Loading graph data from %s", DIR)
+    LOG.info("Loading graph data from %s", DIR)
     for fname in DIR.glob("*.gt"):
         graphs[fname.stem] = gt.load_graph(str(fname))
     return graphs
