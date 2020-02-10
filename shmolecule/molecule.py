@@ -8,6 +8,7 @@ import os
 from .element import Element
 
 
+_FUNCTIONAL_GROUP_SUBGRAPHS = {}
 LOG = logging.getLogger(__name__)
 
 
@@ -91,6 +92,12 @@ class Molecule:
         self.bonds = np.zeros(dist.shape)
         self.bonds[mask] = dist[mask]
         self.bonds = dok_matrix(self.bonds)
+        try:
+            import graph_tool as gt
+
+            self.bond_graph()
+        except ImportError as e:
+            pass
 
     def assign_default_labels(self):
         "Assign the default labels to atom sites in this molecule (number them by element)"
@@ -231,6 +238,107 @@ class Molecule:
         b_min, b_max = self.bbox_corners
         return np.abs(b_max - b_min)
 
+    def bond_graph(self):
+        """Calculate the graph_tool.Graph object corresponding
+        to this molecule. Requires the graph_tool library to be
+        installed
+
+        Returns
+        -------
+        :obj:`graph_tool.Graph`
+            the (undirected) graph of this molecule
+        """
+
+        if hasattr(self, "_bond_graph"):
+            return self._bond_graph
+        try:
+            import graph_tool as gt
+        except ImportError as e:
+            raise RuntimeError(
+                "Please install the graph_tool library for graph operations"
+            )
+        if self.bonds is None:
+            self.guess_bonds()
+        g = gt.Graph(directed=False)
+        v_el = g.new_vertex_property("int")
+        g.add_edge_list(self.bonds.keys())
+        e_w = g.new_edge_property("float")
+        v_el.a[:] = self.atomic_numbers
+        g.vertex_properties["element"] = v_el
+        e_w.a[:] = list(self.bonds.values())
+        g.edge_properties["bond_distance"] = e_w
+        self._bond_graph = g
+        return g
+
+    def functional_groups(self, kind=None):
+        """Find all indices of atom groups which constitute
+        subgraph isomorphisms with stored functional group data
+
+        Parameters
+        ----------
+        kind: str, optional
+            Find only matches of the given kind
+
+        Returns
+        -------
+        Either
+            a dict with keys as functional group type and values as list of
+            lists of indices, or a list of lists of indices if kind is specified.
+        """
+        global _FUNCTIONAL_GROUP_SUBGRAPHS
+        try:
+            import graph_tool.topology as top
+        except ImportError as e:
+            raise RuntimeError(
+                "Please install the graph_tool library for graph operations"
+            )
+        if not _FUNCTIONAL_GROUP_SUBGRAPHS:
+            from shmolecule.subgraphs import load_data
+
+            _FUNCTIONAL_GROUP_SUBGRAPHS = load_data()
+
+        if kind is not None:
+            sub = _FUNCTIONAL_GROUP_SUBGRAPHS[kind]
+            return self.matching_subgraph(sub)
+
+        matches = {}
+        for n, sub in _FUNCTIONAL_GROUP_SUBGRAPHS.items():
+            matches[n] = self.matching_subgraph(sub)
+        return matches
+
+    def matching_subgraph(self, sub):
+        """Find all indices of atoms which match the given graph
+
+        Parameters
+        ----------
+        sub: :obj:`graph_tool.Graph`
+            the subgraph
+
+        Returns
+        -------
+        list
+            list of lists of atomic indices matching the atoms in sub
+            to those in this molecule
+        """
+
+        try:
+            import graph_tool.topology as top
+        except ImportError as e:
+            raise RuntimeError(
+                "Please install the graph_tool library for graph operations"
+            )
+
+        g = self.bond_graph()
+        matches = top.subgraph_isomorphism(
+            sub,
+            g,
+            vertex_label=(
+                sub.vertex_properties["element"],
+                g.vertex_properties["element"],
+            ),
+        )
+        return [list(x.a) for x in matches]
+
     def matching_fragments(self, fragment, method="connectivity"):
         """Find the indices of a matching fragment to the given
         molecular fragment
@@ -246,30 +354,24 @@ class Molecule:
             List of maps between matching indices in this molecule and those
             in the fragment
         """
-        import networkx as nx
-        import networkx.algorithms.isomorphism as iso
-        if method != "connectivity":
-            raise NotImplementedError("Only connectivity matching is implemented")
-        if fragment.bonds is None:
-            fragment.guess_bonds()
+        try:
+            import graph_tool.topology as top
+        except ImportError as e:
+            raise RuntimeError(
+                "Please install the graph_tool library for graph operations"
+            )
 
-        query_graph = nx.from_scipy_sparse_matrix(fragment.bonds)
-        nx.set_node_attributes(query_graph, {i: e for i, e in enumerate(fragment.elements)}, "element")
-        if self.bonds is None:
-            self.guess_bonds()
-        mol_graph = nx.from_scipy_sparse_matrix(self.bonds)
-        nx.set_node_attributes(mol_graph, {i: e for i, e in enumerate(self.elements)}, "element")
-        matcher = iso.GraphMatcher(mol_graph, query_graph, node_match=iso.categorical_node_match("element", 1))
-        matches = list(matcher.subgraph_isomorphisms_iter())
-        unique = []
-        # remove changes in ordering
-        for m in matches:
-            for k in unique:
-                if m.keys() == k.keys():
-                    break
-            else:
-                unique.append(m)
-        return unique
+        sub = fragment.bond_graph()
+        g = self.bond_graph()
+        matches = top.subgraph_isomorphism(
+            sub,
+            g,
+            vertex_label=(
+                sub.vertex_properties["element"],
+                g.vertex_properties["element"],
+            ),
+        )
+        return [list(x.a) for x in matches]
 
     @property
     def asym_symops(self):

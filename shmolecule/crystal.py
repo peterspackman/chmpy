@@ -1512,9 +1512,11 @@ class Crystal:
         """Initialize a crystal structure from a CIF file"""
         cif = Cif.from_file(filename)
         if data_block_name is not None:
-            return cls.from_cif_data(cif.data[data_block_name])
+            return cls.from_cif_data(cif.data[data_block_name], titl=data_block_name)
 
-        crystals = {name: cls.from_cif_data(data) for name, data in cif.data.items()}
+        crystals = {
+            name: cls.from_cif_data(data, titl=name) for name, data in cif.data.items()
+        }
         keys = list(crystals.keys())
         if len(keys) == 1:
             return crystals[keys[0]]
@@ -1556,6 +1558,16 @@ class Crystal:
             shelx_dict["CELL"]["lengths"], shelx_dict["CELL"]["angles"], unit="degrees"
         )
         return cls(unit_cell, space_group, asymmetric_unit, **kwargs)
+
+    @property
+    def name(self):
+        "synonym for titl"
+        return self.titl
+
+    @property
+    def id(self):
+        "synonym for titl"
+        return self.titl
 
     @property
     def titl(self):

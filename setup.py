@@ -46,9 +46,9 @@ setup(
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
     packages=["shmolecule"],
-    package_data={"shmolecule": ["*.npz"]},
+    package_data={"shmolecule": ["*.npz"],"shmolecule.subgraphs": ["*.gt"]},
     ext_modules=ext_modules,
     install_requires=["numpy", "scipy", "trimesh", "matplotlib"],
-    extras_require={"sht": ["shtns"]},
+    extras_require={"sht": ["shtns"], "graph": ["graph_tool"],},
     zip_safe=True,
 )
