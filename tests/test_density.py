@@ -29,8 +29,8 @@ class PromoleculeDensityTestCase(unittest.TestCase):
         from shmolecule.element import Element
 
         bbox = self.dens.bb()
-        buff = Element[1].vdw + 2.5
-        expected = np.array(((-buff, -buff, -buff), (1.0 + buff, buff, buff)))
+        buff = Element[1].vdw + 3.8
+        expected = np.array(((-4.89, -4.89, -4.89), (5.89, 4.89, 4.89)))
         np.testing.assert_allclose(bbox, expected, atol=1e-5)
 
     def test_repr(self):
@@ -101,5 +101,5 @@ class StockholderWeightTestCase(unittest.TestCase):
 
     def test_bb(self):
         bbox = self.stock.bb()
-        expected = np.array(((-3.59, -3.59, -3.59), (3.59, 3.59, 3.59)))
+        expected = np.array(((-4.89, -4.89, -4.89), (4.89, 4.89, 4.89)))
         np.testing.assert_allclose(bbox, expected, atol=1e-5)
