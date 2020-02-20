@@ -1,6 +1,8 @@
 shmolecule
 -----------
 
+![CI](https://github.com/peterspackman/shmolecule/workflows/CI/badge.svg)
+
 A library for Hirshfeld & promolecule surfaces, spherical harmonic shape
 descriptors and more...
 
