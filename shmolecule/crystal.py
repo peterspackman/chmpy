@@ -778,6 +778,39 @@ class Crystal:
             meshes.append(mesh)
         return meshes
 
+    def void_surface(self, **kwargs):
+        from shmolecule.density import PromoleculeDensity
+        import trimesh
+        from .mc import marching_cubes
+        from scipy.spatial import cKDTree as KDTree
+
+        atoms = self.slab()
+        density = PromoleculeDensity((atoms["element"], atoms["cart_pos"]))
+        sep = kwargs.get("separation", kwargs.get("resolution", 0.5))
+        isovalue = kwargs.get("isovalue", 5e-4)
+        seps = sep / np.array(self.unit_cell.lengths)
+        x_grid = np.arange(0, 1.0, seps[0], dtype=np.float32)
+        y_grid = np.arange(0, 1.0, seps[1], dtype=np.float32)
+        z_grid = np.arange(0, 1.0, seps[2], dtype=np.float32)
+        x, y, z = np.meshgrid(x_grid, y_grid, z_grid)
+        separations = np.array((sep, sep, sep))
+        shape = x.shape
+        pts = np.c_[x.ravel(), y.ravel(), z.ravel()]
+        pts = pts.astype(np.float32)
+        pts = self.to_cartesian(pts)
+        tree = KDTree(atoms["cart_pos"])
+        distances, idxs = tree.query(pts)
+        values = np.ones(pts.shape[0], dtype=np.float32)
+        mask = distances > 1.0  # minimum bigger than 1 angstrom
+        rho = density.rho(pts[mask])
+        values[mask] = rho
+        values = values.reshape(shape)
+        verts, faces, normals, _ = marching_cubes(
+            values, isovalue, spacing=separations, gradient_direction="ascent"
+        )
+        mesh = trimesh.Trimesh(vertices=verts, faces=faces, normals=normals,)
+        return mesh
+
     def hirshfeld_surfaces(self, **kwargs):
         "Alias for `self.stockholder_weight_isosurfaces`"
         return self.stockholder_weight_isosurfaces(**kwargs)
@@ -840,13 +873,19 @@ class Crystal:
                 )
                 iso = stockholder_weight_isosurface(s, isovalue=isovalue, sep=sep)
                 isos.append(iso)
-        else:
+        elif kind == "mol":
             for mol, n_e, n_p in self.molecule_surroundings(radius=radius):
                 s = StockholderWeight.from_arrays(
                     mol.atomic_numbers, mol.positions, n_e, n_p
                 )
                 iso = stockholder_weight_isosurface(s, isovalue=isovalue, sep=sep)
                 isos.append(iso)
+        else:
+            for arr in self.functional_group_surroundings(radius=radius, kind=kind):
+                s = StockholderWeight.from_arrays(*arr)
+                iso = stockholder_weight_isosurface(s, isovalue=isovalue, sep=sep)
+                isos.append(iso)
+
         for iso in isos:
             prop = iso.vertex_prop[vertex_color]
             norm = None

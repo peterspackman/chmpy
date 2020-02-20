@@ -43,7 +43,7 @@ class PromoleculeDensity:
     def natoms(self):
         return len(self.elements)
 
-    def bb(self, vdw_buffer=2.5):
+    def bb(self, vdw_buffer=3.8):
         extra = self.vdw_radii[:, np.newaxis] + vdw_buffer
         return (
             np.min(self.positions - extra, axis=0),
@@ -119,7 +119,7 @@ class StockholderWeight:
     def from_arrays(cls, n1, p1, n2, p2, unit="angstrom"):
         return cls(PromoleculeDensity((n1, p1)), PromoleculeDensity((n2, p2)))
 
-    def bb(self, vdw_buffer=2.5):
+    def bb(self, vdw_buffer=3.8):
         extra = self.dens_a.vdw_radii[:, np.newaxis] + vdw_buffer
         return (
             np.min(self.dens_a.positions - extra, axis=0),
