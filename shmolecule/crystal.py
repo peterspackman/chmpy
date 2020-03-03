@@ -22,8 +22,8 @@ DEFAULT_COLORMAPS = {
     "d_norm": "bwr_r",
     "d_e": "viridis_r",
     "d_i": "viridis_r",
-    "d_norm_i": "viridis_r",
-    "d_norm_e": "viridis_r",
+    "d_norm_i": "bwr",
+    "d_norm_e": "bwr_r",
 }
 
 

@@ -373,7 +373,7 @@ class Molecule:
         )
         return [list(x.a) for x in matches]
 
-    def atomic_shape_descriptors(self, l_max=5, radius=3.8, background=1e-6):
+    def atomic_shape_descriptors(self, l_max=5, radius=6.0, background=1e-5):
         """Calculate the shape descriptors[1,2] for all
         atoms in this isolated molecule. If you wish to use
         the crystal environment please see the corresponding method
@@ -383,10 +383,13 @@ class Molecule:
         ----------
         l_max: int, optional
             maximum level of angular momenta to include in the spherical harmonic
-            transform of the shape function.
+            transform of the shape function. (default=5)
         radius: float, optional
             Maximum distance in Angstroms between any atom in the molecule
-            and the resulting neighbouring atoms
+            and the resulting neighbouring atoms (default=6.0)
+        background: float, optional
+            'background' density to ensure closed surfaces for isolated atoms
+            (default=1e-5)
 
         Returns
         -------
@@ -407,12 +410,12 @@ class Molecule:
         sph = SHT(l_max=l_max)
         elements = self.atomic_numbers
         positions = self.positions
+        dists = cdist(self.positions, self.positions)
 
         for n in range(elements.shape[0]):
             els = elements[n : n + 1]
             pos = positions[n : n + 1, :]
-            dists = np.linalg.norm(positions - pos, axis=1)
-            idxs = np.where((dists < radius) & (dists > 1e-3))[0]
+            idxs = np.where((dists[n, :] < radius) & (dists[n, :] > 1e-3))[0]
             neighbour_els = elements[idxs]
             neighbour_pos = positions[idxs]
             ubound = Element[n].vdw_radius * 3
@@ -428,6 +431,89 @@ class Molecule:
                 )
             )
         return np.asarray(descriptors)
+
+    def atomic_stockholder_weight_isosurfaces(self, **kwargs):
+        """Calculate the stockholder weight isosurfaces for the atoms
+        in this molecule, with the provided background density.
+
+        Keyword Args
+        ------------
+        background: float, optional
+            'background' density to ensure closed surfaces for isolated atoms
+            (default=1e-5)
+        isovalue: float, optional
+            level set value for the isosurface (default=0.5). Must be between
+            0 and 1, but values other than 0.5 probably won't make sense anyway.
+        separation: float, optional
+            separation between density grid used in the surface calculation
+            (default 0.2) in Angstroms.
+        radius: float, optional
+            maximum distance for contributing neighbours for the stockholder
+            weight calculation
+        color: str, optional
+            surface property to use for vertex coloring, one of ('d_norm_i',
+            'd_i', 'd_norm_e', 'd_e', 'd_norm')
+        colormap: str, optional
+            matplotlib colormap to use for surface coloring (default 'viridis_r')
+        midpoint: float, optional, default 0.0 if using d_norm
+            use the midpoint norm (as is used in CrystalExplorer)
+
+        Returns
+        -------
+        list of :obj:`trimesh.Trimesh`
+            A list of meshes representing the stockholder weight isosurfaces
+        """
+
+        from .density import StockholderWeight
+        from .surface import stockholder_weight_isosurface
+        from matplotlib.cm import get_cmap
+        import trimesh
+        from .crystal import DEFAULT_COLORMAPS
+
+        sep = kwargs.get("separation", kwargs.get("resolution", 0.2))
+        radius = kwargs.get("radius", 12.0)
+        background = kwargs.get("background", 1e-5)
+        vertex_color = kwargs.get("color", "d_norm_i")
+        isovalue = kwargs.get("isovalue", 0.5)
+        midpoint = kwargs.get("midpoint", 0.0 if vertex_color == "d_norm" else None)
+        meshes = []
+        colormap = get_cmap(
+            kwargs.get("colormap", DEFAULT_COLORMAPS.get(vertex_color, "viridis_r"))
+        )
+        isos = []
+        elements = self.atomic_numbers
+        positions = self.positions
+        dists = cdist(self.positions, self.positions)
+
+        for n in range(elements.shape[0]):
+            els = elements[n : n + 1]
+            pos = positions[n : n + 1, :]
+            idxs = np.where((dists[n, :] < radius) & (dists[n, :] > 1e-3))[0]
+            neighbour_els = elements[idxs]
+            neighbour_pos = positions[idxs]
+
+            s = StockholderWeight.from_arrays(
+                els, pos, neighbour_els, neighbour_pos, background=background
+            )
+            iso = stockholder_weight_isosurface(s, isovalue=isovalue, sep=sep)
+            isos.append(iso)
+        for iso in isos:
+            prop = iso.vertex_prop[vertex_color]
+            norm = None
+            if midpoint is not None:
+                from matplotlib.colors import DivergingNorm
+
+                norm = DivergingNorm(vmin=prop.min(), vcenter=midpoint, vmax=prop.max())
+                prop = norm(prop)
+            color = colormap(prop)
+            mesh = trimesh.Trimesh(
+                vertices=iso.vertices,
+                faces=iso.faces,
+                normals=iso.normals,
+                vertex_colors=color,
+            )
+            meshes.append(mesh)
+        return meshes
 
     @property
     def asym_symops(self):
