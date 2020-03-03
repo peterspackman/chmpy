@@ -904,6 +904,61 @@ class Crystal:
             meshes.append(mesh)
         return meshes
 
+
+    def functional_group_shape_descriptors(self, l_max=5, radius=6.0, kind="carboxylic_acid"):
+        """Calculate the shape descriptors[1,2] for the all atoms in the functional group
+        given for all symmetry unique molecules in this crystal.
+
+        Parameters
+        ----------
+        l_max: int, optional
+            maximum level of angular momenta to include in the spherical harmonic
+            transform of the molecular shape function. (default: 5)
+        radius: float, optional
+            maximum distance (Angstroms) of neighbouring atoms to include in 
+            stockholder weight calculation (default: 5)
+        kind: str, optional
+            Identifier for the functional group type (default: 'carboxylic_acid')
+
+        Returns
+        -------
+        :obj:`np.ndarray`
+            shape description vector
+
+        References
+        ----------
+        [1] PR Spackman et al. Sci. Rep. 6, 22204 (2016)
+            https://dx.doi.org/10.1038/srep22204
+        [2] PR Spackman et al. Angew. Chem. 58 (47), 16780-16784 (2019)
+            https://dx.doi.org/10.1002/anie.201906602
+
+        """
+        descriptors = []
+        from .sht import SHT
+        from .shape_descriptors import stockholder_weight_descriptor
+
+        sph = SHT(l_max=l_max)
+        for in_els, in_pos, neighbour_els, neighbour_pos in self.functional_group_surroundings(
+            radius=radius
+        ):
+            masses = np.asarray([Element[x].mass for x in in_els])
+            c = np.sum(in_pos * masses[:, np.newaxis] / np.sum(masses), axis=0).astype(np.float32)
+            dists = np.linalg.norm(in_pos - c, axis=1)
+            bounds = np.min(dists) / 2, np.max(dists) + 10.0
+            descriptors.append(
+                stockholder_weight_descriptor(
+                    sph,
+                    in_els,
+                    in_pos,
+                    neighbour_els,
+                    neighbour_pos,
+                    origin=c,
+                    bounds=bounds,
+                )
+            )
+        return np.asarray(descriptors)
+
+
     def molecular_shape_descriptors(self, l_max=5, radius=6.0):
         """Calculate the molecular shape descriptors[1,2] for all symmetry unique
         molecules in this crystal.
