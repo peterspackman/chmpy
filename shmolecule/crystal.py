@@ -904,8 +904,9 @@ class Crystal:
             meshes.append(mesh)
         return meshes
 
-
-    def functional_group_shape_descriptors(self, l_max=5, radius=6.0, kind="carboxylic_acid"):
+    def functional_group_shape_descriptors(
+        self, l_max=5, radius=6.0, kind="carboxylic_acid"
+    ):
         """Calculate the shape descriptors[1,2] for the all atoms in the functional group
         given for all symmetry unique molecules in this crystal.
 
@@ -938,11 +939,16 @@ class Crystal:
         from .shape_descriptors import stockholder_weight_descriptor
 
         sph = SHT(l_max=l_max)
-        for in_els, in_pos, neighbour_els, neighbour_pos in self.functional_group_surroundings(
-            radius=radius
-        ):
+        for (
+            in_els,
+            in_pos,
+            neighbour_els,
+            neighbour_pos,
+        ) in self.functional_group_surroundings(radius=radius):
             masses = np.asarray([Element[x].mass for x in in_els])
-            c = np.sum(in_pos * masses[:, np.newaxis] / np.sum(masses), axis=0).astype(np.float32)
+            c = np.sum(in_pos * masses[:, np.newaxis] / np.sum(masses), axis=0).astype(
+                np.float32
+            )
             dists = np.linalg.norm(in_pos - c, axis=1)
             bounds = np.min(dists) / 2, np.max(dists) + 10.0
             descriptors.append(
@@ -957,7 +963,6 @@ class Crystal:
                 )
             )
         return np.asarray(descriptors)
-
 
     def molecular_shape_descriptors(self, l_max=5, radius=6.0):
         """Calculate the molecular shape descriptors[1,2] for all symmetry unique
