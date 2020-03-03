@@ -69,8 +69,9 @@ def make_invariants(l_max, coefficients, kinds="NP"):
 
 def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
     isovalue = kwargs.get("isovalue", 0.5)
+    background = kwargs.get("background", 0.0)
     r_min, r_max = kwargs.get("bounds", (0.1, 20.0))
-    s = StockholderWeight.from_arrays(n_i, p_i, n_e, p_e)
+    s = StockholderWeight.from_arrays(n_i, p_i, n_e, p_e, background=background)
     g = np.empty(sht.grid.shape, dtype=np.float32)
     g[:, :] = sht.grid[:, :]
     o = kwargs.get("origin", np.mean(p_i, axis=0, dtype=np.float32))

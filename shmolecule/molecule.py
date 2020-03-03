@@ -373,6 +373,62 @@ class Molecule:
         )
         return [list(x.a) for x in matches]
 
+    def atomic_shape_descriptors(self, l_max=5, radius=3.8, background=1e-6):
+        """Calculate the shape descriptors[1,2] for all
+        atoms in this isolated molecule. If you wish to use
+        the crystal environment please see the corresponding method
+        in :obj:`shmolecule.crystal.Crystal`.
+
+        Parameters
+        ----------
+        l_max: int, optional
+            maximum level of angular momenta to include in the spherical harmonic
+            transform of the shape function.
+        radius: float, optional
+            Maximum distance in Angstroms between any atom in the molecule
+            and the resulting neighbouring atoms
+
+        Returns
+        -------
+        :obj:`np.ndarray`
+            shape description vector
+
+        References
+        ----------
+        [1] PR Spackman et al. Sci. Rep. 6, 22204 (2016)
+            https://dx.doi.org/10.1038/srep22204
+        [2] PR Spackman et al. Angew. Chem. 58 (47), 16780-16784 (2019)
+            https://dx.doi.org/10.1002/anie.201906602
+        """
+        descriptors = []
+        from .sht import SHT
+        from .shape_descriptors import stockholder_weight_descriptor
+
+        sph = SHT(l_max=l_max)
+        elements = self.atomic_numbers
+        positions = self.positions
+
+        for n in range(elements.shape[0]):
+            els = elements[n : n + 1]
+            pos = positions[n : n + 1, :]
+            dists = np.linalg.norm(positions - pos, axis=1)
+            idxs = np.where((dists < radius) & (dists > 1e-3))[0]
+            neighbour_els = elements[idxs]
+            neighbour_pos = positions[idxs]
+            ubound = Element[n].vdw_radius * 3
+            descriptors.append(
+                stockholder_weight_descriptor(
+                    sph,
+                    els,
+                    pos,
+                    neighbour_els,
+                    neighbour_pos,
+                    bounds=(0.2, ubound),
+                    background=background,
+                )
+            )
+        return np.asarray(descriptors)
+
     @property
     def asym_symops(self):
         "the symmetry operations which generate this molecule (default x,y,z if not set)"

@@ -67,10 +67,12 @@ cdef class PromoleculeDensity:
 @cython.final
 cdef class StockholderWeight:
     cdef public PromoleculeDensity dens_a, dens_b
+    cdef float background
 
-    def __init__(self, dens_a, dens_b):
+    def __init__(self, dens_a, dens_b, background=0.0):
         self.dens_a = dens_a
         self.dens_b = dens_b
+        self.background = background
 
     cpdef weights(self, const float[:, ::1] positions):
         cdef np.ndarray[np.float32_t, ndim=1] rho = np.empty(
@@ -78,12 +80,12 @@ cdef class StockholderWeight:
         )
         rho_a = self.dens_a.rho(positions)
         rho_b = self.dens_b.rho(positions)
-        return rho_a / (rho_a + rho_b)
+        return rho_a / (rho_a + rho_b + self.background)
     
     cdef float one_weight(self, const float position[3]) nogil:
         cdef float rho_a = self.dens_a.one_rho(position)
         cdef float rho_b = self.dens_b.one_rho(position)
-        return rho_a / (rho_b + rho_a)
+        return rho_a / (rho_b + rho_a + self.background)
 
 
 cdef void log_interp_d(const double[::1] x, const double[::1] xi,

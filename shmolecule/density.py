@@ -83,13 +83,13 @@ class PromoleculeDensity:
 
 
 class StockholderWeight:
-    def __init__(self, dens_a, dens_b):
+    def __init__(self, dens_a, dens_b, background=0.0):
         assert isinstance(dens_a, PromoleculeDensity) and isinstance(
             dens_b, PromoleculeDensity
         ), "Must be PromoleculeDensity instances"
         self.dens_a = dens_a
         self.dens_b = dens_b
-        self.s = cStock(dens_a.dens, dens_b.dens)
+        self.s = cStock(dens_a.dens, dens_b.dens, background=background)
 
     @property
     def positions(self):
@@ -116,8 +116,8 @@ class StockholderWeight:
         )
 
     @classmethod
-    def from_arrays(cls, n1, p1, n2, p2, unit="angstrom"):
-        return cls(PromoleculeDensity((n1, p1)), PromoleculeDensity((n2, p2)))
+    def from_arrays(cls, n1, p1, n2, p2, unit="angstrom", **kwargs):
+        return cls(PromoleculeDensity((n1, p1)), PromoleculeDensity((n2, p2)), **kwargs)
 
     def bb(self, vdw_buffer=3.8):
         extra = self.dens_a.vdw_radii[:, np.newaxis] + vdw_buffer
