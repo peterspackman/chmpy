@@ -299,11 +299,21 @@ class Molecule:
 
         if kind is not None:
             sub = _FUNCTIONAL_GROUP_SUBGRAPHS[kind]
-            return self.matching_subgraph(sub)
+            matches = self.matching_subgraph(sub)
+            if kind == "ring":
+                matches = list(
+                    set(tuple(sorted(x)) for x in matches)
+                )
+            return matches
 
         matches = {}
         for n, sub in _FUNCTIONAL_GROUP_SUBGRAPHS.items():
-            matches[n] = self.matching_subgraph(sub)
+            m = self.matching_subgraph(sub)
+            if n == "ring":
+                m = list(
+                    set(tuple(sorted(x)) for x in m)
+                )
+            matches[n] = m
         return matches
 
     def matching_subgraph(self, sub):
@@ -337,7 +347,7 @@ class Molecule:
                 g.vertex_properties["element"],
             ),
         )
-        return [list(x.a) for x in matches]
+        return [tuple(x.a) for x in matches]
 
     def matching_fragments(self, fragment, method="connectivity"):
         """Find the indices of a matching fragment to the given

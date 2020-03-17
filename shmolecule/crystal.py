@@ -700,6 +700,7 @@ class Crystal:
             tree = KDTree(positions)
             groups = mol.functional_groups(kind=kind)
             for fg in groups:
+                fg = list(fg)
                 keep = np.zeros(positions.shape[0], dtype=bool)
                 inside = []
                 for i, (n, pos) in enumerate(
@@ -944,7 +945,7 @@ class Crystal:
             in_pos,
             neighbour_els,
             neighbour_pos,
-        ) in self.functional_group_surroundings(radius=radius):
+        ) in self.functional_group_surroundings(kind=kind, radius=radius):
             masses = np.asarray([Element[x].mass for x in in_els])
             c = np.sum(in_pos * masses[:, np.newaxis] / np.sum(masses), axis=0).astype(
                 np.float32
