@@ -8,7 +8,7 @@ IsosurfaceMesh = namedtuple("IsosurfaceMesh", "vertices faces normals vertex_pro
 LOG = logging.getLogger(__name__)
 
 
-def promolecule_density_isosurface(promol, isovalue=0.002, sep=0.2, props=True):
+def promolecule_density_isosurface(promol, isovalue=0.002, sep=0.2, props=True, extra_props=None):
     """Calculate the promolecule density isosurface for a given :obj:`PromoleculeDensity`
     object.
 
@@ -49,6 +49,10 @@ def promolecule_density_isosurface(promol, isovalue=0.002, sep=0.2, props=True):
     LOG.debug("Min (x,y,z): %s", np.min(verts, axis=0))
     vertex_props = {}
     if props:
+        if extra_props is not None:
+            for k, func in extra_props.items():
+                LOG.debug("Calculating additional surface property: %s", k)
+                vertex_props[k] = func(verts)
         d_i, d_norm_i, vecs = promol.d_norm(verts)
         vertex_props["d_i"] = d_i
         vertex_props["d_norm_i"] = d_norm_i

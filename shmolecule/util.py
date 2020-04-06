@@ -4,6 +4,8 @@ import matplotlib.colors as colors
 
 LOG = logging.getLogger(__name__)
 
+BOHR_PER_ANGSTROM = 1.8897259886
+ANGSTROM_PER_BOHR = 0.529177249
 
 def save_mesh(mesh, filename):
     """Save the given Trimesh to a file.

@@ -170,6 +170,23 @@ class Molecule:
         return np.sum(self.positions * masses[:, np.newaxis] / np.sum(masses), axis=0)
 
     @property
+    def partial_charges(self):
+        from openbabel.pybel import readstring
+        m = readstring("xyz", self.to_xyz_string())
+        charges = np.array(m.calccharges(), dtype=np.float32)
+        return charges
+
+    def electrostatic_potential(self, positions):
+        from shmolecule.util import BOHR_PER_ANGSTROM
+        v_pot = np.zeros(positions.shape[0])
+        for charge, position in zip(self.partial_charges, self.positions):
+            if charge == 0.0:
+                continue
+            r = np.linalg.norm(positions - position[np.newaxis, :], axis=1)
+            v_pot += charge / (r * BOHR_PER_ANGSTROM)
+        return v_pot
+
+    @property
     def molecular_formula(self):
         "string of the molecular formula for this molecule"
         from .element import chemical_formula
@@ -224,6 +241,18 @@ class Molecule:
         extension = os.path.splitext(filename)[-1].lower()
         return extension_map[extension](filename, **kwargs)
 
+    def to_xyz_string(self, header=True):
+        if header:
+            lines = [
+                f"{len(self)}",
+                self.properties.get("comment", self.molecular_formula),
+            ]
+        else:
+            lines = []
+        for el, (x, y, z) in zip(self.elements, self.positions):
+            lines.append(f"{el} {x: 20.12f} {y: 20.12f} {z: 20.12f}")
+        return "\n".join(lines)
+
     def save(self, filename, header=True):
         """save this molecule to the destination file in xyz format,
         optionally discarding the typical header.
@@ -236,17 +265,7 @@ class Molecule:
             optionally disable writing of the header (no. of atoms and a comment line)
         """
         from pathlib import Path
-
-        if header:
-            lines = [
-                f"{len(self)}",
-                self.properties.get("comment", self.molecular_formula),
-            ]
-        else:
-            lines = []
-        for el, (x, y, z) in zip(self.elements, self.positions):
-            lines.append(f"{el} {x: 20.12f} {y: 20.12f} {z: 20.12f}")
-        Path(filename).write_text("\n".join(lines))
+        Path(filename).write_text(self.to_xyz_string(header=header))
 
     @property
     def bbox_corners(self):
