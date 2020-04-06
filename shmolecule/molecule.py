@@ -99,6 +99,29 @@ class Molecule:
         except ImportError as e:
             pass
 
+    def connected_fragments(self):
+        from shmolecule.util import cartesian_product
+        from scipy.sparse.csgraph import connected_components
+
+        if self.bonds is None:
+            self.guess_bonds()
+
+        nfrag, labels = connected_components(self.bonds)
+        molecules = []
+        for frag in range(nfrag):
+            atoms = np.where(labels == frag)[0]
+            na = len(atoms)
+            sqidx = cartesian_product(atoms, atoms)
+            molecules.append(
+                Molecule(
+                    [self.elements[i] for i in atoms],
+                    self.positions[atoms],
+                    labels=self.labels[atoms],
+                    bonds=self.bonds[sqidx[:, 0], sqidx[:, 1]].reshape(na, na),
+                )
+            )
+        return molecules
+
     def assign_default_labels(self):
         "Assign the default labels to atom sites in this molecule (number them by element)"
         counts = defaultdict(int)
