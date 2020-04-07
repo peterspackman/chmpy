@@ -70,12 +70,20 @@ def make_invariants(l_max, coefficients, kinds="NP"):
 def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
     isovalue = kwargs.get("isovalue", 0.5)
     background = kwargs.get("background", 0.0)
+    property_function = kwargs.get("with_property", None)
     r_min, r_max = kwargs.get("bounds", (0.1, 20.0))
     s = StockholderWeight.from_arrays(n_i, p_i, n_e, p_e, background=background)
     g = np.empty(sht.grid.shape, dtype=np.float32)
     g[:, :] = sht.grid[:, :]
     o = kwargs.get("origin", np.mean(p_i, axis=0, dtype=np.float32))
     r = sphere_stockholder_radii(s.s, o, g, r_min, r_max, 1e-7, 30)
+    if property_function is not None:
+        xyz = sht.grid_cartesian * r[:, np.newaxis]
+        prop_values = property_function(xyz)
+        r_cplx = np.empty(r.shape, dtype=np.complex128)
+        r_cplx.real = r
+        r_cplx.imag = prop_values
+        r = r_cplx
     l_max = sht.l_max
     coeffs = sht.analyse(r)
     return make_invariants(l_max, coeffs)
