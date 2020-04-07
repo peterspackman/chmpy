@@ -22,7 +22,9 @@ def promolecule_density_isosurface(promol, isovalue=0.002, sep=0.2, props=True, 
         (default 0.2) in Angstroms.
     props: bool, optional
         calculate surface properties
-
+    extra_props: dict, optional
+        dictionary of property names and functions of vertex positions
+        for the calculation of additional properties on the isosurface 
     Returns
     -------
     :obj:`IsosurfaceMesh`
@@ -62,7 +64,7 @@ def promolecule_density_isosurface(promol, isovalue=0.002, sep=0.2, props=True, 
     return IsosurfaceMesh(verts, faces, normals, vertex_props)
 
 
-def stockholder_weight_isosurface(s, isovalue=0.5, sep=0.2, props=True):
+def stockholder_weight_isosurface(s, isovalue=0.5, sep=0.2, props=True, extra_props=None):
     """Calculate the promolecule density isosurface for a given :obj:`StockholderWeight`
     object.
 
@@ -76,7 +78,10 @@ def stockholder_weight_isosurface(s, isovalue=0.5, sep=0.2, props=True):
         (default 0.2) in Angstroms.
     props: bool, optional
         calculate surface properties
-
+    extra_props: dict, optional
+        dictionary of property names and functions of vertex positions
+        for the calculation of additional properties on the isosurface
+        
     Returns
     -------
     :obj:`IsosurfaceMesh`
@@ -104,6 +109,10 @@ def stockholder_weight_isosurface(s, isovalue=0.5, sep=0.2, props=True):
     LOG.debug("Min (x,y,z): %s", np.min(verts, axis=0))
     vertex_props = {}
     if props:
+        if extra_props is not None:
+            for k, func in extra_props.items():
+                LOG.debug("Calculating additional surface property: %s", k)
+                vertex_props[k] = func(verts)
         d_i, d_e, d_norm_i, d_norm_e, dp, angles = s.d_norm(verts)
         vertex_props["d_i"] = d_i
         vertex_props["d_e"] = d_e
