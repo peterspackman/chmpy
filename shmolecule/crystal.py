@@ -16,17 +16,6 @@ from .util import cartesian_product
 
 LOG = logging.getLogger(__name__)
 
-# TODO add LinearSegmentedColormap objects for other
-# CrystalExplorer default colors
-DEFAULT_COLORMAPS = {
-    "d_norm": "bwr_r",
-    "d_e": "viridis_r",
-    "d_i": "viridis_r",
-    "d_norm_i": "bwr",
-    "d_norm_e": "bwr_r",
-}
-
-
 class AsymmetricUnit:
     """Storage class for the coordinates and labels in a crystal
     asymmetric unit
@@ -748,28 +737,21 @@ class Crystal:
         """
         from .density import PromoleculeDensity
         from .surface import promolecule_density_isosurface
-        from matplotlib.cm import get_cmap
+        from .util import property_to_color
         import trimesh
 
         isovalue = kwargs.get("isovalue", 0.002)
         sep = kwargs.get("separation", kwargs.get("resolution", 0.2))
         vertex_color = kwargs.get("color", "d_norm_i")
-        midpoint = kwargs.get("midpoint", 0.0 if vertex_color == "d_norm" else None)
         meshes = []
-        colormap = get_cmap(
-            kwargs.get("colormap", DEFAULT_COLORMAPS.get(vertex_color, "viridis_r"))
-        )
+        extra_props = {}
         for mol in self.symmetry_unique_molecules():
             pro = PromoleculeDensity((mol.atomic_numbers, mol.positions))
-            iso = promolecule_density_isosurface(pro, sep=sep, isovalue=isovalue)
+            if vertex_color == "esp":
+                extra_props["esp"] = mol.electrostatic_potential
+            iso = promolecule_density_isosurface(pro, sep=sep, isovalue=isovalue, extra_props=extra_props)
             prop = iso.vertex_prop[vertex_color]
-            norm = None
-            if midpoint is not None:
-                from matplotlib.colors import DivergingNorm
-
-                norm = DivergingNorm(vmin=prop.min(), vcenter=midpoint, vmax=prop.max())
-                prop = norm(prop)
-            color = colormap(prop)
+            color = property_to_color(prop, cmap=kwargs.get("cmap", vertex_color))
             mesh = trimesh.Trimesh(
                 vertices=iso.vertices,
                 faces=iso.faces,
@@ -852,18 +834,15 @@ class Crystal:
         """
         from .density import StockholderWeight
         from .surface import stockholder_weight_isosurface
-        from matplotlib.cm import get_cmap
+        from .util import property_to_color
         import trimesh
 
         sep = kwargs.get("separation", kwargs.get("resolution", 0.2))
         radius = kwargs.get("radius", 12.0)
         vertex_color = kwargs.get("color", "d_norm")
         isovalue = kwargs.get("isovalue", 0.5)
-        midpoint = kwargs.get("midpoint", 0.0 if vertex_color == "d_norm" else None)
         meshes = []
-        colormap = get_cmap(
-            kwargs.get("colormap", DEFAULT_COLORMAPS.get(vertex_color, "viridis_r"))
-        )
+        extra_props = {}
         isos = []
         if kind == "atom":
             for n, pos, neighbour_els, neighbour_pos in self.atomic_surroundings(
@@ -876,10 +855,12 @@ class Crystal:
                 isos.append(iso)
         elif kind == "mol":
             for mol, n_e, n_p in self.molecule_surroundings(radius=radius):
+                if vertex_color == "esp":
+                    extra_props["esp"] = mol.electrostatic_potential
                 s = StockholderWeight.from_arrays(
                     mol.atomic_numbers, mol.positions, n_e, n_p
                 )
-                iso = stockholder_weight_isosurface(s, isovalue=isovalue, sep=sep)
+                iso = stockholder_weight_isosurface(s, isovalue=isovalue, sep=sep, extra_props=extra_props)
                 isos.append(iso)
         else:
             for arr in self.functional_group_surroundings(radius=radius, kind=kind):
@@ -889,13 +870,7 @@ class Crystal:
 
         for iso in isos:
             prop = iso.vertex_prop[vertex_color]
-            norm = None
-            if midpoint is not None:
-                from matplotlib.colors import DivergingNorm
-
-                norm = DivergingNorm(vmin=prop.min(), vcenter=midpoint, vmax=prop.max())
-                prop = norm(prop)
-            color = colormap(prop)
+            color = property_to_color(prop, cmap=kwargs.get("cmap", vertex_color))
             mesh = trimesh.Trimesh(
                 vertices=iso.vertices,
                 faces=iso.faces,
@@ -965,7 +940,7 @@ class Crystal:
             )
         return np.asarray(descriptors)
 
-    def molecular_shape_descriptors(self, l_max=5, radius=6.0):
+    def molecular_shape_descriptors(self, l_max=5, radius=6.0, with_property=None):
         """Calculate the molecular shape descriptors[1,2] for all symmetry unique
         molecules in this crystal.
 
@@ -1008,6 +983,7 @@ class Crystal:
                     neighbour_pos,
                     origin=c,
                     bounds=bounds,
+                    with_property=with_property,
                 )
             )
         return np.asarray(descriptors)

@@ -173,7 +173,7 @@ class Molecule:
     def partial_charges(self):
         from openbabel.pybel import readstring
         m = readstring("xyz", self.to_xyz_string())
-        charges = np.array(m.calccharges(), dtype=np.float32)
+        charges = np.array(m.calccharges(model="eem"), dtype=np.float32)
         return charges
 
     def electrostatic_potential(self, positions):

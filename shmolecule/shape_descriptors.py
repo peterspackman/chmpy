@@ -78,6 +78,13 @@ def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
     o = kwargs.get("origin", np.mean(p_i, axis=0, dtype=np.float32))
     r = sphere_stockholder_radii(s.s, o, g, r_min, r_max, 1e-7, 30)
     if property_function is not None:
+        if property_function == "d_norm":
+            property_function = s.d_norm
+        elif property_function == "esp":
+            from shmolecule import Molecule
+            els = s.dens_a.elements
+            pos = s.dens_a.positions
+            property_function = Molecule.from_arrays(s.dens_a.elements, s.dens_a.positions).electrostatic_potential
         xyz = sht.grid_cartesian * r[:, np.newaxis]
         prop_values = property_function(xyz)
         r_cplx = np.empty(r.shape, dtype=np.complex128)
@@ -86,4 +93,7 @@ def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
         r = r_cplx
     l_max = sht.l_max
     coeffs = sht.analyse(r)
-    return make_invariants(l_max, coeffs)
+    invariants = make_invariants(l_max, coeffs)
+    if kwargs.get("coefficients", False):
+        return coeffs, invariants
+    return invariants
