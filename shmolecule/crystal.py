@@ -735,33 +735,29 @@ class Crystal:
         list of :obj:`trimesh.Trimesh`
             A list of meshes representing the promolecule density isosurfaces
         """
-        from .density import PromoleculeDensity
-        from .surface import promolecule_density_isosurface
-        from .util import property_to_color
-        import trimesh
-
-        isovalue = kwargs.get("isovalue", 0.002)
-        sep = kwargs.get("separation", kwargs.get("resolution", 0.2))
-        vertex_color = kwargs.get("color", "d_norm_i")
-        meshes = []
-        extra_props = {}
-        for mol in self.symmetry_unique_molecules():
-            pro = PromoleculeDensity((mol.atomic_numbers, mol.positions))
-            if vertex_color == "esp":
-                extra_props["esp"] = mol.electrostatic_potential
-            iso = promolecule_density_isosurface(pro, sep=sep, isovalue=isovalue, extra_props=extra_props)
-            prop = iso.vertex_prop[vertex_color]
-            color = property_to_color(prop, cmap=kwargs.get("cmap", vertex_color))
-            mesh = trimesh.Trimesh(
-                vertices=iso.vertices,
-                faces=iso.faces,
-                normals=iso.normals,
-                vertex_colors=color,
-            )
-            meshes.append(mesh)
-        return meshes
+        return [
+            mol.promolecule_density_isosurface(**kwargs)
+            for mol in self.symmetry_unique_molecules()
+        ]
 
     def void_surface(self, **kwargs):
+        """Calculate void surface based on promolecule electron density
+        for the unit cell of this crystal
+
+        Keyword Args
+        ------------
+        isovalue: float, optional
+            level set value for the isosurface (default=0.002) in au.
+        separation: float, optional
+            separation between density grid used in the surface calculation
+            (default 0.2) in Angstroms.
+
+        Returns
+        -------
+        :obj:`trimesh.Trimesh`
+            the mesh representing the promolecule density void isosurface
+        """
+
         from shmolecule.density import PromoleculeDensity
         import trimesh
         from .mc import marching_cubes

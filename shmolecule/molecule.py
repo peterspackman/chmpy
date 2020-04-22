@@ -48,6 +48,9 @@ class Molecule:
         self.properties.update(kwargs)
         self.bonds = None
 
+        self.charge = kwargs.get("charge", 0)
+        self.multiplicity = kwargs.get("multiplicity", 1)
+
         if bonds is None:
             if kwargs.get("guess_bonds", False):
                 self.guess_bonds()
@@ -65,6 +68,10 @@ class Molecule:
 
     def __len__(self):
         return len(self.elements)
+
+    @property
+    def distance_matrix(self):
+        return cdist(self.positions, self.positions)
 
     def guess_bonds(self, tolerance=0.40):
         """Use geometric distances and covalent radii
@@ -171,10 +178,12 @@ class Molecule:
 
     @property
     def partial_charges(self):
-        from openbabel.pybel import readstring
-        m = readstring("xyz", self.to_xyz_string())
-        charges = np.array(m.calccharges(model="eem"), dtype=np.float32)
-        return charges
+        "partial charges assigned based on EEM method"
+        if not hasattr(self, '_partial_charges'):
+            from shmolecule.charges import EEM
+            charges = EEM.calculate_charges(self)
+            self._partial_charges = charges.astype(np.float32)
+        return self._partial_charges
 
     def electrostatic_potential(self, positions):
         from shmolecule.util import BOHR_PER_ANGSTROM
@@ -462,7 +471,7 @@ class Molecule:
         sph = SHT(l_max=l_max)
         elements = self.atomic_numbers
         positions = self.positions
-        dists = cdist(self.positions, self.positions)
+        dists = self.distance_matrix
 
         for n in range(elements.shape[0]):
             els = elements[n : n + 1]
@@ -535,7 +544,7 @@ class Molecule:
         isos = []
         elements = self.atomic_numbers
         positions = self.positions
-        dists = cdist(self.positions, self.positions)
+        dists = self.distance_matrix
 
         for n in range(elements.shape[0]):
             els = elements[n : n + 1]
@@ -566,6 +575,96 @@ class Molecule:
             )
             meshes.append(mesh)
         return meshes
+
+    def shape_descriptors(self, l_max=5, **kwargs):
+        """Calculate the molecular shape descriptors[1,2] for all symmetry unique
+        molecules in this crystal using promolecule density.
+
+        Parameters
+        ----------
+        l_max: int, optional
+            maximum level of angular momenta to include in the spherical harmonic
+            transform of the molecular shape function.
+
+        with_property: str, optional
+            describe the combination of the radial shape function and a surface
+            property in the real, imaginary channels of a complex function
+        isovalue: float, optional
+            the isovalue for the promolecule density surface (default 0.0002 au)
+
+        Returns
+        -------
+        :obj:`np.ndarray`
+            shape description vector
+
+        References
+        ----------
+        [1] PR Spackman et al. Sci. Rep. 6, 22204 (2016)
+            https://dx.doi.org/10.1038/srep22204
+        [2] PR Spackman et al. Angew. Chem. 58 (47), 16780-16784 (2019)
+            https://dx.doi.org/10.1002/anie.201906602
+
+        """
+        descriptors = []
+        from .sht import SHT
+        from .shape_descriptors import promolecule_density_descriptor
+
+        sph = SHT(l_max=l_max)
+        return promolecule_density_descriptor(
+            sph,
+            self.atomic_numbers,
+            self.positions,
+            **kwargs
+        )
+
+
+    def promolecule_density_isosurface(self, **kwargs):
+        """Calculate promolecule electron density isosurface
+        for this molecule.
+
+        Keyword Args
+        ------------
+        isovalue: float, optional
+            level set value for the isosurface (default=0.002) in au.
+        separation: float, optional
+            separation between density grid used in the surface calculation
+            (default 0.2) in Angstroms.
+        color: str, optional
+            surface property to use for vertex coloring, one of ('d_norm_i',
+            'd_i', 'd_norm_e', 'd_e')
+        colormap: str, optional
+            matplotlib colormap to use for surface coloring (default 'viridis_r')
+        midpoint: float, optional, default 0.0 if using d_norm
+            use the midpoint norm (as is used in CrystalExplorer)
+
+        Returns
+        -------
+        :obj:`trimesh.Trimesh`
+            A mesh representing the promolecule density isosurface
+        """
+        from .density import PromoleculeDensity
+        from .surface import promolecule_density_isosurface
+        from .util import property_to_color
+        import trimesh
+
+        isovalue = kwargs.get("isovalue", 0.002)
+        sep = kwargs.get("separation", kwargs.get("resolution", 0.2))
+        vertex_color = kwargs.get("color", "d_norm_i")
+        meshes = []
+        extra_props = {}
+        pro = PromoleculeDensity((self.atomic_numbers, self.positions))
+        if vertex_color == "esp":
+            extra_props["esp"] = self.electrostatic_potential
+        iso = promolecule_density_isosurface(pro, sep=sep, isovalue=isovalue, extra_props=extra_props)
+        prop = iso.vertex_prop[vertex_color]
+        color = property_to_color(prop, cmap=kwargs.get("cmap", vertex_color))
+        mesh = trimesh.Trimesh(
+            vertices=iso.vertices,
+            faces=iso.faces,
+            normals=iso.normals,
+            vertex_colors=color,
+        )
+        return mesh
 
     @property
     def asym_symops(self):
