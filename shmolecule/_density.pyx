@@ -169,10 +169,11 @@ cdef inline void fvmul(const float o[3], const float a, const float v[3], float 
     dest[1] = o[1] + v[1] * a
     dest[2] = o[2] + v[2] * a
 
-cdef float brents(StockholderWeight stock, const float origin[3],
+cdef float brents_stock(StockholderWeight stock, const float origin[3],
                    const float direction[3],
                    const float lower, const float upper,
-                   const float tol, const int max_iter) nogil:
+                   const float tol, const int max_iter,
+                   const float isovalue) nogil:
     cdef float xpre, xcur, xblk, fpre, fcur, fblk, spre, scur, sbis, stry, dpre, dblk
     cdef float delta, xtol = 1e-5
     cdef int i
@@ -182,9 +183,9 @@ cdef float brents(StockholderWeight stock, const float origin[3],
     xblk = 0.0; fblk = 0.0
     spre = 0.0; scur = 0.0
     fvmul(origin, xpre, direction, v)
-    fpre = stock.one_weight(v) - 0.5
+    fpre = stock.one_weight(v) - isovalue
     fvmul(origin, xcur, direction, v)
-    fcur = stock.one_weight(v) - 0.5
+    fcur = stock.one_weight(v) - isovalue
     if (fpre * fcur > 0):
         return -1.0
     if fpre == 0:
@@ -228,14 +229,79 @@ cdef float brents(StockholderWeight stock, const float origin[3],
             xcur += (delta if (sbis > 0) else -delta)
 
         fvmul(origin, xcur, direction, v)
-        fcur = stock.one_weight(v) - 0.5
+        fcur = stock.one_weight(v) - isovalue
 
     return xcur
 
 
-cpdef sphere_stockholder_radii(
-        StockholderWeight s, const float[::1] origin, const float[:, ::1] grid,
-        const float l, const float u, const float tol, const int max_iter):
+cdef float brents_pro(PromoleculeDensity pro, const float origin[3],
+                   const float direction[3],
+                   const float lower, const float upper,
+                   const float tol, const int max_iter,
+                   const float isovalue) nogil:
+    cdef float xpre, xcur, xblk, fpre, fcur, fblk, spre, scur, sbis, stry, dpre, dblk
+    cdef float delta, xtol = 1e-5
+    cdef int i
+    cdef float v[3]
+    xpre = lower
+    xcur = upper
+    xblk = 0.0; fblk = 0.0
+    spre = 0.0; scur = 0.0
+    fvmul(origin, xpre, direction, v)
+    fpre = pro.one_rho(v) - isovalue
+    fvmul(origin, xcur, direction, v)
+    fcur = pro.one_rho(v) - isovalue
+    if (fpre * fcur > 0):
+        return -1.0
+    if fpre == 0:
+        return xpre
+    if fcur == 0:
+        return xcur
+
+    for i in range(max_iter):
+        if (fpre * fcur) < 0:
+            xblk = xpre
+            fblk = fpre
+            scur = xcur - xpre
+            spre = scur
+        if fabs(fblk) < fabs(fcur):
+            xpre = xcur; xcur = xblk; xblk = xpre
+            fpre = fcur; fcur = fblk; fblk = fpre
+        delta = (xtol + tol * fabs(xcur))/2
+        sbis = (xblk - xcur)/2
+        if (fcur == 0) or (fabs(sbis) < delta):
+            return xcur
+
+        if (fabs(spre) > delta) and (fabs(fcur) < fabs(fpre)):
+            if xpre == xblk:
+                stry = -fcur*(xcur - xpre)/(fcur - fpre)
+            else:
+                dpre = (fpre - fcur) / (xpre - xcur)
+                dblk = (fblk - fcur) / (xblk - xcur)
+                stry = -fcur*(fblk * dblk - fpre*dpre)/(dblk*dpre*(fblk - fpre))
+
+            if (2 * fabs(stry) < min(fabs(spre), 3*fabs(sbis) - delta)):
+                spre = scur; scur = stry
+            else:
+                spre = sbis; scur = sbis
+        else:
+            spre = sbis; scur = sbis
+
+        xpre = xcur; fpre = fcur
+        if (fabs(scur) > delta):
+            xcur += scur
+        else:
+            xcur += (delta if (sbis > 0) else -delta)
+
+        fvmul(origin, xcur, direction, v)
+        fcur = pro.one_rho(v) - isovalue
+
+    return xcur
+
+cpdef sphere_promolecule_radii(
+        PromoleculeDensity s, const float[::1] origin, const float[:, ::1] grid,
+        const float l, const float u, const float tol, const int max_iter,
+        const float isovalue):
     cdef int i, N = grid.shape[0]
     cdef float d[3], o[3]
     r = np.empty(N, dtype=np.float64)
@@ -248,7 +314,27 @@ cpdef sphere_stockholder_radii(
         d[0] = sin(grid[i, 1]) * cos(grid[i, 0])
         d[1] = sin(grid[i, 1]) * sin(grid[i, 0])
         d[2] = cos(grid[i, 1])
-        rview[i] = brents(s, o, d, l, u, tol, max_iter)
+        rview[i] = brents_pro(s, o, d, l, u, tol, max_iter, isovalue)
+    return r
+
+
+
+cpdef sphere_stockholder_radii(
+        StockholderWeight s, const float[::1] origin, const float[:, ::1] grid,
+        const float l, const float u, const float tol, const int max_iter, const float isovalue):
+    cdef int i, N = grid.shape[0]
+    cdef float d[3], o[3]
+    r = np.empty(N, dtype=np.float64)
+    cdef double[::1] rview  = r
+    o[0] = origin[0]
+    o[1] = origin[1]
+    o[2] = origin[2]
+    
+    for i in prange(N, nogil=True):
+        d[0] = sin(grid[i, 1]) * cos(grid[i, 0])
+        d[1] = sin(grid[i, 1]) * sin(grid[i, 0])
+        d[2] = cos(grid[i, 1])
+        rview[i] = brents_stock(s, o, d, l, u, tol, max_iter, isovalue)
     return r
 
 

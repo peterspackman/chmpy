@@ -1,7 +1,7 @@
-from .density import StockholderWeight
+from .density import StockholderWeight, PromoleculeDensity
 from .util import spherical_to_cartesian
 from scipy.optimize import minimize_scalar
-from ._density import sphere_stockholder_radii
+from ._density import sphere_stockholder_radii, sphere_promolecule_radii
 from ._invariants import p_invariants_c, p_invariants_r
 import logging
 import numpy as np
@@ -76,7 +76,7 @@ def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
     g = np.empty(sht.grid.shape, dtype=np.float32)
     g[:, :] = sht.grid[:, :]
     o = kwargs.get("origin", np.mean(p_i, axis=0, dtype=np.float32))
-    r = sphere_stockholder_radii(s.s, o, g, r_min, r_max, 1e-7, 30)
+    r = sphere_stockholder_radii(s.s, o, g, r_min, r_max, 1e-7, 30, isovalue)
     if property_function is not None:
         if property_function == "d_norm":
             property_function = s.d_norm
@@ -85,6 +85,36 @@ def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
             els = s.dens_a.elements
             pos = s.dens_a.positions
             property_function = Molecule.from_arrays(s.dens_a.elements, s.dens_a.positions).electrostatic_potential
+        xyz = sht.grid_cartesian * r[:, np.newaxis]
+        prop_values = property_function(xyz)
+        r_cplx = np.empty(r.shape, dtype=np.complex128)
+        r_cplx.real = r
+        r_cplx.imag = prop_values
+        r = r_cplx
+    l_max = sht.l_max
+    coeffs = sht.analyse(r)
+    invariants = make_invariants(l_max, coeffs)
+    if kwargs.get("coefficients", False):
+        return coeffs, invariants
+    return invariants
+
+def promolecule_density_descriptor(sht, n_i, p_i, **kwargs):
+    isovalue = kwargs.get("isovalue", 0.0002)
+    property_function = kwargs.get("with_property", None)
+    r_min, r_max = kwargs.get("bounds", (0.4, 20.0))
+    pro = PromoleculeDensity((n_i, p_i))
+    g = np.empty(sht.grid.shape, dtype=np.float32)
+    g[:, :] = sht.grid[:, :]
+    o = kwargs.get("origin", np.mean(p_i, axis=0, dtype=np.float32))
+    r = sphere_promolecule_radii(pro.dens, o, g, r_min, r_max, 1e-7, 30, isovalue)
+    if property_function is not None:
+        if property_function == "d_norm":
+            property_function = pro.d_norm
+        elif property_function == "esp":
+            from shmolecule import Molecule
+            els = pro.elements
+            pos = pro.positions
+            property_function = Molecule.from_arrays(els, pos).electrostatic_potential
         xyz = sht.grid_cartesian * r[:, np.newaxis]
         prop_values = property_function(xyz)
         r_cplx = np.empty(r.shape, dtype=np.complex128)

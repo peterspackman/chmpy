@@ -97,7 +97,10 @@ def property_to_color(prop, cmap="viridis", **kwargs):
     )
     norm = None
     if midpoint is not None:
-        from matplotlib.colors import TwoSlopeNorm
+        try:
+            from matplotlib.colors import TwoSlopeNorm
+        except ImportError:
+            from matplotlib.colors import DivergingNorm as TwoSlopeNorm
         norm = TwoSlopeNorm(vmin=prop.min(), vcenter=midpoint, vmax=prop.max())
         prop = norm(prop)
     return colormap(prop)
