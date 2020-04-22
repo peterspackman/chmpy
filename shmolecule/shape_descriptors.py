@@ -109,7 +109,7 @@ def promolecule_density_descriptor(sht, n_i, p_i, **kwargs):
     r = sphere_promolecule_radii(pro.dens, o, g, r_min, r_max, 1e-7, 30, isovalue)
     if property_function is not None:
         if property_function == "d_norm":
-            property_function = pro.d_norm
+            property_function = lambda x: pro.d_norm(x)[1]
         elif property_function == "esp":
             from shmolecule import Molecule
             els = pro.elements
