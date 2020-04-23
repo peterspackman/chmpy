@@ -246,7 +246,7 @@ class Molecule:
         filename: str
             path to the file (in xyz format)
         """
-        extension_map = {".xyz": cls.from_xyz_file}
+        extension_map = {".xyz": cls.from_xyz_file, ".sdf": cls.from_sdf_file}
         extension = os.path.splitext(filename)[-1].lower()
         return extension_map[extension](filename, **kwargs)
 
@@ -684,3 +684,20 @@ class Molecule:
             (N, 3) array of Cartesian coordinates for each atom in this molecule (Angstroms)
         """
         return cls([Element[x] for x in elements], np.array(positions), **kwargs)
+
+    @classmethod
+    def from_sdf_dict(cls, sdf_dict):
+        atoms = sdf_dict["atoms"]
+        positions = np.c_[atoms["x"], atoms["y"], atoms["z"]]
+        elements = [Element[x] for x in atoms["symbol"]]
+        bonds = sdf_dict["bonds"]
+        return cls(elements, positions, **sdf_dict["data"])
+
+    @classmethod
+    def from_sdf_file(cls, filename, **kwargs):
+        from .sdf import parse_sdf_file
+        sdf_data = parse_sdf_file(filename, **kwargs)
+        molecules = [cls.from_sdf_dict(d, **kwargs) for d in sdf_data]
+        if len(molecules) == 1:
+            return molecules[0]
+        return molecules
