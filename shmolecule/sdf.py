@@ -99,12 +99,41 @@ def parse_data_lines(lines):
     return result
 
 
-def parse_sdf_file(filename, limit=None):
+def parse_property_line(line):
+    n = int(line[:4])
+    l = 4
+    props = []
+    for i in range(n):
+        props.append((int(line[l : l + 4]), int(line[l + 4 : l + 8])))
+    return props
+
+
+def parse_property_lines(lines):
+    charges = []
+    isotopes = []
+
+    for line in lines:
+        if "CHG" in line:
+            charges += parse_property_line(line[6:])
+        elif "ISO" in line:
+            isotopes += parse_property_line(line[6:])
+    return charges, isotopes
+
+
+def parse_sdf_file(filename, limit=None, progress=False):
     contents = Path(filename).read_text()
     compounds = contents.split("$$$$\n")
     results = []
     if limit is None:
         limit = len(compounds)
+    update = lambda x: None
+
+    if progress:
+        from tqdm import tqdm
+
+        pbar = tqdm(desc="Loading SDF V2000 file", total=len(compounds), leave=False)
+        update = pbar.update
+
     for compound in compounds[:limit]:
         lines = compound.splitlines()
         if len(lines) == 0:
@@ -112,18 +141,30 @@ def parse_sdf_file(filename, limit=None):
         header = lines[:3]
         counts = parse_counts_line(lines[3])
         if counts["version"] != "V2000":
-            raise ValueError("Only v2000 files are supported")
+            raise ValueError("Only V2000 files are supported")
         l, u = 4, 4 + counts["atoms"]
         atom_lines = lines[l:u]
         atoms = parse_atom_lines(atom_lines)
         l, u = u, u + counts["bonds"]
         bond_lines = lines[l:u]
         bonds = parse_bond_lines(bond_lines)
+        l = u
         while lines[u].startswith("M "):
             u += 1
+        property_lines = lines[l : u - 1]
+        charges, isotopes = parse_property_lines(property_lines)
+        LOG.debug("Overriding charges with values from M  CHG block")
+        for idx, charge in charges:
+            atoms["charge"][idx - 1] = charge
+        LOG.debug("Ignoring isotopes set with M  ISO")
         data_lines = lines[u:]
         additional_data = parse_data_lines(data_lines)
         results.append(
             {"header": header, "atoms": atoms, "bonds": bonds, "data": additional_data}
         )
+        update(1)
+
+    if progress:
+        pbar.close()
+
     return results

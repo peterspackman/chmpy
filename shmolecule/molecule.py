@@ -205,8 +205,8 @@ class Molecule:
         return chemical_formula(self.elements, subscript=False)
 
     def __repr__(self):
-        return "<{}: {}({:.2f},{:.2f},{:.2f})>".format(
-            self.__class__.__name__, self.molecular_formula, *self.center_of_mass
+        return "<{} ({})[{:.2f} {:.2f} {:.2f}]>".format(
+            self.name, self.molecular_formula, *self.center_of_mass
         )
 
     @classmethod
@@ -664,6 +664,12 @@ class Molecule:
         return mesh
 
     @property
+    def name(self):
+        return self.properties.get(
+            "GENERIC_NAME", self.properties.get("name", self.__class__.__name__)
+        )
+
+    @property
     def asym_symops(self):
         "the symmetry operations which generate this molecule (default x,y,z if not set)"
         return self.properties.get("generator_symop", [16484] * len(self))
@@ -683,7 +689,7 @@ class Molecule:
         return cls([Element[x] for x in elements], np.array(positions), **kwargs)
 
     @classmethod
-    def from_sdf_dict(cls, sdf_dict):
+    def from_sdf_dict(cls, sdf_dict, **kwargs):
         atoms = sdf_dict["atoms"]
         positions = np.c_[atoms["x"], atoms["y"], atoms["z"]]
         elements = [Element[x] for x in atoms["symbol"]]
@@ -695,7 +701,25 @@ class Molecule:
         from .sdf import parse_sdf_file
 
         sdf_data = parse_sdf_file(filename, **kwargs)
-        molecules = [cls.from_sdf_dict(d, **kwargs) for d in sdf_data]
+        progress = kwargs.get("progress", False)
+        update = lambda x: None
+
+        if progress:
+            from tqdm import tqdm
+
+            pbar = tqdm(
+                desc="Creating molecule objects", total=len(sdf_data), leave=False
+            )
+            update = pbar.update
+
+        molecules = []
+        for d in sdf_data:
+            molecules.append(cls.from_sdf_dict(d, **kwargs))
+            update(1)
+
+        if progress:
+            pbar.close()
+
         if len(molecules) == 1:
             return molecules[0]
         return molecules
