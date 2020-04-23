@@ -7,6 +7,7 @@ LOG = logging.getLogger(__name__)
 BOHR_PER_ANGSTROM = 1.8897259886
 ANGSTROM_PER_BOHR = 0.529177249
 
+
 def save_mesh(mesh, filename):
     """Save the given Trimesh to a file.
 
@@ -89,12 +90,12 @@ DEFAULT_COLORMAPS = {
     "esp": "coolwarm_r",
 }
 
+
 def property_to_color(prop, cmap="viridis", **kwargs):
     from matplotlib.cm import get_cmap
+
     midpoint = kwargs.get("midpoint", 0.0 if cmap in ("d_norm", "esp") else None)
-    colormap = get_cmap(
-        kwargs.get("colormap", DEFAULT_COLORMAPS.get(cmap, cmap))
-    )
+    colormap = get_cmap(kwargs.get("colormap", DEFAULT_COLORMAPS.get(cmap, cmap)))
     norm = None
     if midpoint is not None:
         try:

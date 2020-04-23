@@ -2,6 +2,7 @@ import numpy as np
 import logging
 from collections import defaultdict
 from pathlib import Path
+
 LOG = logging.getLogger(__name__)
 
 _COUNTS_FIELDS = (
@@ -56,7 +57,7 @@ def parse_atom_lines(lines):
         n = 0
         for (name, parser, length) in _ATOM_FIELDS:
             if parser is not None:
-                atom_data[name].append(parser(line[n:n+length]))
+                atom_data[name].append(parser(line[n : n + length]))
             n += length
     return {x: np.array(y) for x, y in atom_data.items()}
 
@@ -67,7 +68,7 @@ def parse_bond_lines(lines):
         n = 0
         for (name, parser, length) in _BOND_FIELDS:
             if parser is not None:
-                bond_data[name].append(parser(line[n:n+length]))
+                bond_data[name].append(parser(line[n : n + length]))
             n += length
     return {x: np.array(y) for x, y in bond_data.items()}
 
@@ -80,9 +81,10 @@ def parse_counts_line(line):
             result[name] = parser(line[n:].strip())
         else:
             if parser is not None:
-                result[name] = parser(line[n:n+length])
+                result[name] = parser(line[n : n + length])
             n += length
     return result
+
 
 def parse_data_lines(lines):
     sections = "".join(lines).strip().split("> <")
@@ -92,9 +94,10 @@ def parse_data_lines(lines):
             continue
         i = section.find(">")
         k = section[:i]
-        v = section[i+1:]
+        v = section[i + 1 :]
         result[k] = v
     return result
+
 
 def parse_sdf_file(filename, limit=None):
     contents = Path(filename).read_text()
@@ -120,6 +123,7 @@ def parse_sdf_file(filename, limit=None):
             u += 1
         data_lines = lines[u:]
         additional_data = parse_data_lines(data_lines)
-        results.append({"header": header, "atoms": atoms, "bonds": bonds, "data": additional_data})
+        results.append(
+            {"header": header, "atoms": atoms, "bonds": bonds, "data": additional_data}
+        )
     return results
-

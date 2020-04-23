@@ -16,6 +16,7 @@ from .util import cartesian_product
 
 LOG = logging.getLogger(__name__)
 
+
 class AsymmetricUnit:
     """Storage class for the coordinates and labels in a crystal
     asymmetric unit
@@ -856,7 +857,9 @@ class Crystal:
                 s = StockholderWeight.from_arrays(
                     mol.atomic_numbers, mol.positions, n_e, n_p
                 )
-                iso = stockholder_weight_isosurface(s, isovalue=isovalue, sep=sep, extra_props=extra_props)
+                iso = stockholder_weight_isosurface(
+                    s, isovalue=isovalue, sep=sep, extra_props=extra_props
+                )
                 isos.append(iso)
         else:
             for arr in self.functional_group_surroundings(radius=radius, kind=kind):

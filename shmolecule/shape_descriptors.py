@@ -82,9 +82,12 @@ def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
             property_function = s.d_norm
         elif property_function == "esp":
             from shmolecule import Molecule
+
             els = s.dens_a.elements
             pos = s.dens_a.positions
-            property_function = Molecule.from_arrays(s.dens_a.elements, s.dens_a.positions).electrostatic_potential
+            property_function = Molecule.from_arrays(
+                s.dens_a.elements, s.dens_a.positions
+            ).electrostatic_potential
         xyz = sht.grid_cartesian * r[:, np.newaxis]
         prop_values = property_function(xyz)
         r_cplx = np.empty(r.shape, dtype=np.complex128)
@@ -97,6 +100,7 @@ def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
     if kwargs.get("coefficients", False):
         return coeffs, invariants
     return invariants
+
 
 def promolecule_density_descriptor(sht, n_i, p_i, **kwargs):
     isovalue = kwargs.get("isovalue", 0.0002)
@@ -112,6 +116,7 @@ def promolecule_density_descriptor(sht, n_i, p_i, **kwargs):
             property_function = lambda x: pro.d_norm(x)[1]
         elif property_function == "esp":
             from shmolecule import Molecule
+
             els = pro.elements
             pos = pro.positions
             property_function = Molecule.from_arrays(els, pos).electrostatic_potential

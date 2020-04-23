@@ -5,6 +5,7 @@ from trimesh import PointCloud
 
 LOG = logging.getLogger(__name__)
 
+
 def reconstruct(coefficients, kind="real"):
     if kind == "complex":
         l_max = int(np.sqrt(len(coefficients))) - 1

@@ -28,6 +28,7 @@ EEM_PARAMETERS = {
     "*": (0.20606, 1.31942),
 }
 
+
 class EEM:
     @staticmethod
     def calculate_charges(mol):

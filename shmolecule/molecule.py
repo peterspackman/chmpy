@@ -179,14 +179,16 @@ class Molecule:
     @property
     def partial_charges(self):
         "partial charges assigned based on EEM method"
-        if not hasattr(self, '_partial_charges'):
+        if not hasattr(self, "_partial_charges"):
             from shmolecule.charges import EEM
+
             charges = EEM.calculate_charges(self)
             self._partial_charges = charges.astype(np.float32)
         return self._partial_charges
 
     def electrostatic_potential(self, positions):
         from shmolecule.util import BOHR_PER_ANGSTROM
+
         v_pot = np.zeros(positions.shape[0])
         for charge, position in zip(self.partial_charges, self.positions):
             if charge == 0.0:
@@ -274,6 +276,7 @@ class Molecule:
             optionally disable writing of the header (no. of atoms and a comment line)
         """
         from pathlib import Path
+
         Path(filename).write_text(self.to_xyz_string(header=header))
 
     @property
@@ -352,18 +355,14 @@ class Molecule:
             sub = _FUNCTIONAL_GROUP_SUBGRAPHS[kind]
             matches = self.matching_subgraph(sub)
             if kind == "ring":
-                matches = list(
-                    set(tuple(sorted(x)) for x in matches)
-                )
+                matches = list(set(tuple(sorted(x)) for x in matches))
             return matches
 
         matches = {}
         for n, sub in _FUNCTIONAL_GROUP_SUBGRAPHS.items():
             m = self.matching_subgraph(sub)
             if n == "ring":
-                m = list(
-                    set(tuple(sorted(x)) for x in m)
-                )
+                m = list(set(tuple(sorted(x)) for x in m))
             matches[n] = m
         return matches
 
@@ -611,12 +610,8 @@ class Molecule:
 
         sph = SHT(l_max=l_max)
         return promolecule_density_descriptor(
-            sph,
-            self.atomic_numbers,
-            self.positions,
-            **kwargs
+            sph, self.atomic_numbers, self.positions, **kwargs
         )
-
 
     def promolecule_density_isosurface(self, **kwargs):
         """Calculate promolecule electron density isosurface
@@ -655,7 +650,9 @@ class Molecule:
         pro = PromoleculeDensity((self.atomic_numbers, self.positions))
         if vertex_color == "esp":
             extra_props["esp"] = self.electrostatic_potential
-        iso = promolecule_density_isosurface(pro, sep=sep, isovalue=isovalue, extra_props=extra_props)
+        iso = promolecule_density_isosurface(
+            pro, sep=sep, isovalue=isovalue, extra_props=extra_props
+        )
         prop = iso.vertex_prop[vertex_color]
         color = property_to_color(prop, cmap=kwargs.get("cmap", vertex_color))
         mesh = trimesh.Trimesh(
@@ -696,6 +693,7 @@ class Molecule:
     @classmethod
     def from_sdf_file(cls, filename, **kwargs):
         from .sdf import parse_sdf_file
+
         sdf_data = parse_sdf_file(filename, **kwargs)
         molecules = [cls.from_sdf_dict(d, **kwargs) for d in sdf_data]
         if len(molecules) == 1:

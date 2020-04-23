@@ -8,7 +8,9 @@ IsosurfaceMesh = namedtuple("IsosurfaceMesh", "vertices faces normals vertex_pro
 LOG = logging.getLogger(__name__)
 
 
-def promolecule_density_isosurface(promol, isovalue=0.002, sep=0.2, props=True, extra_props=None):
+def promolecule_density_isosurface(
+    promol, isovalue=0.002, sep=0.2, props=True, extra_props=None
+):
     """Calculate the promolecule density isosurface for a given :obj:`PromoleculeDensity`
     object.
 
@@ -64,7 +66,9 @@ def promolecule_density_isosurface(promol, isovalue=0.002, sep=0.2, props=True, 
     return IsosurfaceMesh(verts, faces, normals, vertex_props)
 
 
-def stockholder_weight_isosurface(s, isovalue=0.5, sep=0.2, props=True, extra_props=None):
+def stockholder_weight_isosurface(
+    s, isovalue=0.5, sep=0.2, props=True, extra_props=None
+):
     """Calculate the promolecule density isosurface for a given :obj:`StockholderWeight`
     object.
 
