@@ -49,7 +49,7 @@ class MoleculeTestCase(unittest.TestCase):
 
     def test_repr(self):
         mol = Molecule.load(_WATER)
-        expected = "<Molecule: H2O(-0.67,-0.00,0.01)>"
+        expected = "<Molecule (H2O)[-0.67 -0.00 0.01]>"
         self.assertEqual(repr(mol), expected)
 
     def test_save(self):
