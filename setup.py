@@ -21,6 +21,12 @@ ext_modules_cython = cythonize(
             include_dirs=[get_include()],
         ),
         Ext(
+            "shmolecule.sfac._sfac",
+            sources=["shmolecule/sfac/_sfac.pyx"],
+            language="c++",
+            include_dirs=[get_include()],
+        ),
+        Ext(
             "shmolecule.mc._mc_lewiner",
             sources=["shmolecule/mc/_mc_lewiner.pyx"],
             include_dirs=[get_include()],

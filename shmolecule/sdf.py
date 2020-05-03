@@ -120,7 +120,7 @@ def parse_property_lines(lines):
     return charges, isotopes
 
 
-def parse_sdf_file(filename, limit=None, progress=False):
+def parse_sdf_file(filename, limit=None, progress=False, keep_sdf_text=False):
     contents = Path(filename).read_text()
     compounds = contents.split("$$$$\n")
     results = []
@@ -159,9 +159,10 @@ def parse_sdf_file(filename, limit=None, progress=False):
         LOG.debug("Ignoring isotopes set with M  ISO")
         data_lines = lines[u:]
         additional_data = parse_data_lines(data_lines)
-        results.append(
-            {"header": header, "atoms": atoms, "bonds": bonds, "data": additional_data}
-        )
+        result = {"header": header, "atoms": atoms, "bonds": bonds, "data": additional_data}
+        if keep_sdf_text:
+            result["sdf"] = compound
+        results.append(result)
         update(1)
 
     if progress:

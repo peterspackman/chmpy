@@ -179,6 +179,7 @@ class Molecule:
     @property
     def partial_charges(self):
         "partial charges assigned based on EEM method"
+        assert len(self) > 0, "Must have at least one atom to calculate partial charges"
         if not hasattr(self, "_partial_charges"):
             from shmolecule.charges import EEM
 
@@ -688,13 +689,19 @@ class Molecule:
         """
         return cls([Element[x] for x in elements], np.array(positions), **kwargs)
 
+    def mask(self, mask, **kwargs):
+        return Molecule.from_arrays(self.atomic_numbers[mask], self.positions[mask], **kwargs)
+
     @classmethod
     def from_sdf_dict(cls, sdf_dict, **kwargs):
         atoms = sdf_dict["atoms"]
         positions = np.c_[atoms["x"], atoms["y"], atoms["z"]]
         elements = [Element[x] for x in atoms["symbol"]]
         bonds = sdf_dict["bonds"]
-        return cls(elements, positions, **sdf_dict["data"])
+        m = cls(elements, positions, **sdf_dict["data"])
+        if "sdf" in sdf_dict:
+            m.properties["sdf"] = sdf_dict["sdf"]
+        return  m
 
     @classmethod
     def from_sdf_file(cls, filename, **kwargs):
