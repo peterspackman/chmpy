@@ -690,7 +690,9 @@ class Molecule:
         return cls([Element[x] for x in elements], np.array(positions), **kwargs)
 
     def mask(self, mask, **kwargs):
-        return Molecule.from_arrays(self.atomic_numbers[mask], self.positions[mask], **kwargs)
+        return Molecule.from_arrays(
+            self.atomic_numbers[mask], self.positions[mask], **kwargs
+        )
 
     @classmethod
     def from_sdf_dict(cls, sdf_dict, **kwargs):
@@ -701,7 +703,7 @@ class Molecule:
         m = cls(elements, positions, **sdf_dict["data"])
         if "sdf" in sdf_dict:
             m.properties["sdf"] = sdf_dict["sdf"]
-        return  m
+        return m
 
     @classmethod
     def from_sdf_file(cls, filename, **kwargs):

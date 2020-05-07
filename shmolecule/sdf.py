@@ -159,7 +159,12 @@ def parse_sdf_file(filename, limit=None, progress=False, keep_sdf_text=False):
         LOG.debug("Ignoring isotopes set with M  ISO")
         data_lines = lines[u:]
         additional_data = parse_data_lines(data_lines)
-        result = {"header": header, "atoms": atoms, "bonds": bonds, "data": additional_data}
+        result = {
+            "header": header,
+            "atoms": atoms,
+            "bonds": bonds,
+            "data": additional_data,
+        }
         if keep_sdf_text:
             result["sdf"] = compound
         results.append(result)
