@@ -121,6 +121,18 @@ class Crystal:
         self.properties.update(kwargs)
 
     @property
+    def sg(self):
+        return self.space_group
+
+    @property
+    def uc(self):
+        return self.unit_cell
+
+    @property
+    def asym(self):
+        return self.asymmetric_unit
+
+    @property
     def site_positions(self):
         """Row major array of asymmetric unit atomic positions
 

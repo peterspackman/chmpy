@@ -1,6 +1,7 @@
 from typing import Tuple
 from dataclasses import dataclass
 
+
 @dataclass
 class PointGroup:
     table: Tuple[int]

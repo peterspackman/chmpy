@@ -3,8 +3,9 @@ from collections import namedtuple
 import os
 import json
 import re
+from copy import deepcopy
 from fractions import Fraction
-from .util import cartesian_product
+from .util import cartesian_product, subscript, overline
 from .point_group import POINT_GROUP_DATA
 import logging
 
@@ -26,8 +27,6 @@ SG_FROM_SYMOPS = {tuple(x.symops): x for k, sgs in SG_FROM_NUMBER.items() for x 
 SG_CHOICES = {int(k): [x.choice for x in v] for k, v in SG_FROM_NUMBER.items()}
 
 SYMM_STR_SYMBOL_REGEX = re.compile(r".*?([+-]*[xyz0-9\/\.]+)")
-
-
 
 LATTICE_TYPE_TRANSLATIONS = {
     1: (),
@@ -416,9 +415,6 @@ def reduced_symmetry_list(full_symops, lattice_type):
     List[:obj:`SymmetryOperation`]
         minimal list of symmetry operations given lattice type
     """
-    output_symmetry_operations = set(full_symops)
-    symop_codes = sorted(x.integer_code for x in full_symops)
-
     lattice_type_value = abs(lattice_type)
     translations = LATTICE_TYPE_TRANSLATIONS[lattice_type_value]
 
@@ -511,12 +507,34 @@ class SpaceGroup:
         return self._point_group
 
     @property
+    def pg(self):
+        return self._point_group
+
+    @property
+    def sym(self):
+        return self.symbol
+
+    @property
+    def symbol_unicode(self):
+        symbol = deepcopy(self.symbol)
+        if "_" in symbol:
+            tokens = symbol.split("_")
+            symbol = tokens[0] + "".join(subscript(x[0]) + x[1:] for x in tokens[1:])
+        if "-" in symbol:
+            tokens = symbol.split("-")
+            symbol = tokens[0] + "".join(overline(x[0]) + x[1:] for x in tokens[1:])
+        return symbol
+
+    @property
+    def symops(self):
+        return self.symmetry_operations
+
+    @property
     def laue_class(self):
         return self._point_group.laue
 
     @property
     def lattice_type(self):
-        latt = abs(self.latt)
         inum = self.international_tables_number
         if inum < 143 or inum > 194:
             return self.crystal_system
