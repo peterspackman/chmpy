@@ -5,6 +5,7 @@ import json
 import re
 from fractions import Fraction
 from .util import cartesian_product
+from .point_group import POINT_GROUP_DATA
 import logging
 
 LOG = logging.getLogger(__name__)
@@ -26,41 +27,7 @@ SG_CHOICES = {int(k): [x.choice for x in v] for k, v in SG_FROM_NUMBER.items()}
 
 SYMM_STR_SYMBOL_REGEX = re.compile(r".*?([+-]*[xyz0-9\/\.]+)")
 
-POINT_GROUP_DATA = (
-    ((0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "", "", None, None,),
-    ((0, 0, 0, 0, 0, 1, 0, 0, 0, 0), "1", "C1", "triclinic", "-1",),
-    ((0, 0, 0, 0, 1, 1, 0, 0, 0, 0), "-1", "Ci", "triclinic", "-1",),
-    ((0, 0, 0, 0, 0, 1, 1, 0, 0, 0), "2", "C2", "monoclinic", "2/m",),
-    ((0, 0, 0, 1, 0, 1, 0, 0, 0, 0), "m", "Cs", "monoclinic", "2/m",),
-    ((0, 0, 0, 1, 1, 1, 1, 0, 0, 0), "2/m", "C2h", "monoclinic", "2/m",),
-    ((0, 0, 0, 0, 0, 1, 3, 0, 0, 0), "222", "D2", "orthorhombic", "mmm",),
-    ((0, 0, 0, 2, 0, 1, 1, 0, 0, 0), "mm2", "C2v", "orthorhombic", "mmm",),
-    ((0, 0, 0, 3, 1, 1, 3, 0, 0, 0), "mmm", "D2h", "orthorhombic", "mmm",),
-    ((0, 0, 0, 0, 0, 1, 1, 0, 2, 0), "4", "C4", "tetragonal", "4/m",),
-    ((0, 2, 0, 0, 0, 1, 1, 0, 0, 0), "-4", "S4", "tetragonal", "4/m",),
-    ((0, 2, 0, 1, 1, 1, 1, 0, 2, 0), "4/m", "C4h", "tetragonal", "4/m",),
-    ((0, 0, 0, 0, 0, 1, 5, 0, 2, 0), "422", "D4", "tetragonal", "4/mmm",),
-    ((0, 0, 0, 4, 0, 1, 1, 0, 2, 0), "4mm", "C4v", "tetragonal", "4/mmm",),
-    ((0, 2, 0, 2, 0, 1, 3, 0, 0, 0), "-42m", "D2d", "tetragonal", "4/mmm",),
-    ((0, 2, 0, 5, 1, 1, 5, 0, 2, 0), "4/mmm", "D4h", "tetragonal", "4/mmm",),
-    ((0, 0, 0, 0, 0, 1, 0, 2, 0, 0), "3", "C3", "trigonal", "-3",),
-    ((0, 0, 2, 0, 1, 1, 0, 2, 0, 0), "-3", "C3i", "trigonal", "-3",),
-    ((0, 0, 0, 0, 0, 1, 3, 2, 0, 0), "32", "D3", "trigonal", "-3m",),
-    ((0, 0, 0, 3, 0, 1, 0, 2, 0, 0), "3m", "C3v", "trigonal", "-3m",),
-    ((0, 0, 2, 3, 1, 1, 3, 2, 0, 0), "-3m", "D3d", "trigonal", "-3m",),
-    ((0, 0, 0, 0, 0, 1, 1, 2, 0, 2), "6", "C6", "hexagonal", "6/m",),
-    ((2, 0, 0, 1, 0, 1, 0, 2, 0, 0), "-6", "C3h", "hexagonal", "6/m",),
-    ((2, 0, 2, 1, 1, 1, 1, 2, 0, 2), "6/m", "C6h", "hexagonal", "6/m",),
-    ((0, 0, 0, 0, 0, 1, 7, 2, 0, 2), "622", "D6", "hexagonal", "6/mmm",),
-    ((0, 0, 0, 6, 0, 1, 1, 2, 0, 2), "6mm", "C6v", "hexagonal", "6/mmm",),
-    ((2, 0, 0, 4, 0, 1, 3, 2, 0, 0), "-6m2", "D3h", "hexagonal", "6/mmm",),
-    ((2, 0, 2, 7, 1, 1, 7, 2, 0, 2), "6/mmm", "D6h", "hexagonal", "6/mmm",),
-    ((0, 0, 0, 0, 0, 1, 3, 8, 0, 0), "23", "T", "cubic", "m3",),
-    ((0, 0, 8, 3, 1, 1, 3, 8, 0, 0), "m-3", "Th", "cubic", "m3",),
-    ((0, 0, 0, 0, 0, 1, 9, 8, 6, 0), "432", "O", "cubic", "m3m",),
-    ((0, 6, 0, 6, 0, 1, 3, 8, 0, 0), "-43m", "Td", "cubic", "m3m",),
-    ((0, 6, 8, 9, 1, 1, 9, 8, 6, 0), "m-3m", "Oh", "cubic", "m3m",),
-)
+
 
 LATTICE_TYPE_TRANSLATIONS = {
     1: (),
@@ -504,7 +471,7 @@ class SpaceGroup:
         self.full_symbol = sgdata.full
         self.choice = sgdata.choice
         self.centering = sgdata.centering
-        self.point_group = sgdata.pointgroup
+        self._point_group = POINT_GROUP_DATA[sgdata.pointgroup]
         self.schoenflies = sgdata.schoenflies
         self.centrosymmetric = sgdata.centrosymmetric
         symops = sgdata.symops
@@ -540,12 +507,12 @@ class SpaceGroup:
         return "cubic"
 
     @property
-    def point_group_data(self):
-        return POINT_GROUP_DATA[self.point_group]
+    def point_group(self):
+        return self._point_group
 
     @property
     def laue_class(self):
-        return self.point_group_data[-1]
+        return self._point_group.laue
 
     @property
     def lattice_type(self):
