@@ -2,9 +2,9 @@ import logging
 import unittest
 import numpy as np
 from os.path import join, dirname
-from shmolecule.crystal import AsymmetricUnit
+from chmpy.crystal import AsymmetricUnit
 from tempfile import TemporaryDirectory
-from shmolecule.element import Element
+from chmpy.element import Element
 
 
 _ICE_II_LABELS = (

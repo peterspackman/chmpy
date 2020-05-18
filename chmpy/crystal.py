@@ -771,7 +771,7 @@ class Crystal:
             the mesh representing the promolecule density void isosurface
         """
 
-        from shmolecule.density import PromoleculeDensity
+        from chmpy.density import PromoleculeDensity
         import trimesh
         from .mc import marching_cubes
         from scipy.spatial import cKDTree as KDTree
@@ -1241,7 +1241,7 @@ class Crystal:
             cif_data = self.properties["cif_data"]
         else:
             cif_data = {
-                "audit_creation_method": "shmolecule python library version {version}",
+                "audit_creation_method": "chmpy python library version {version}",
                 "symmetry_equiv_pos_site_id": list(
                     range(1, len(self.symmetry_operations) + 1)
                 ),
@@ -1319,7 +1319,7 @@ class Crystal:
 
     def to_shelx_string(self, titl=None):
         """Represent this crystal structure as a shelx .res string"""
-        from shmolecule.shelx import to_res_contents
+        from chmpy.shelx import to_res_contents
 
         sfac = list(np.unique(self.site_atoms))
         atom_sfac = [sfac.index(x) + 1 for x in self.site_atoms]

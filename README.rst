@@ -1,17 +1,18 @@
-shmolecule
+chmpy
 -----------
 
-.. image:: https://github.com/peterspackman/shmolecule/workflows/CI/badge.svg
+.. image:: https://github.com/peterspackman/chmpy/workflows/CI/badge.svg
 
-A library for Hirshfeld & promolecule surfaces, spherical harmonic shape
-descriptors and more...
+A library for computational chemistry in python. Featuring support for
+molecules, crystals, Hirshfeld & promolecule density isosurfaces,
+spherical harmonic shape descriptors and much more...
 
 Installation
 ============
 
 Basic installation can be done through the python package manager ``pip``::
 
-    pip install git+https://github.com/peterspackman/shmolecule.git
+    pip install git+https://github.com/peterspackman/chmpy.git
 
 If you wish to utilise the spherical harmonic shape descriptors, you will
 need to install the wonderful SHTns library <https://nschaeff.bitbucket.io/shtns/>
@@ -44,7 +45,7 @@ Crystal structures and molecules
 Loading a crystal structure from a CIF (`.cif`) or SHELX (``.res``)
 file, or a molecule from an XMOL (``.xyz``) file is straightforward:
 
-    >>> from shmolecule import Crystal, Molecule
+    >>> from chmpy import Crystal, Molecule
     >>> c = Crystal.load("tests/acetic_acid.cif")
     >>> c
     <Crystal C2H4O2 Pna2_1>
@@ -73,8 +74,8 @@ class:
     >>> surfaces = c.hirshfeld_surfaces(separation=0.5)
     >>> surfaces
     [<trimesh.Trimesh(vertices.shape=(584, 3), faces.shape=(1164, 3))>]
-    # Surfaces can be saved via trimesh, or a utility function provided in shmolecule
-    >>> from shmolecule.util import save_mesh
+    # Surfaces can be saved via trimesh, or a utility function provided in chmpy
+    >>> from chmpy.util import save_mesh
     >>> save_mesh(surfaces[0], "acetic_acid.ply")
     
 The resulting surface should look something like this when visualized:

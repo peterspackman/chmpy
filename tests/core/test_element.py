@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 from os.path import join, dirname
 from tempfile import TemporaryDirectory
-from shmolecule.element import (
+from chmpy.element import (
     Element,
     vdw_radii,
     chemical_formula,

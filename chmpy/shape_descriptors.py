@@ -81,7 +81,7 @@ def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
         if property_function == "d_norm":
             property_function = s.d_norm
         elif property_function == "esp":
-            from shmolecule import Molecule
+            from chmpy import Molecule
 
             els = s.dens_a.elements
             pos = s.dens_a.positions
@@ -115,7 +115,7 @@ def promolecule_density_descriptor(sht, n_i, p_i, **kwargs):
         if property_function == "d_norm":
             property_function = lambda x: pro.d_norm(x)[1]
         elif property_function == "esp":
-            from shmolecule import Molecule
+            from chmpy import Molecule
 
             els = pro.elements
             pos = pro.positions

@@ -48,7 +48,7 @@ of the magic is in the lookup tables, which are provided as open source.
 
 Originally implemented in C++ by Thomas Lewiner in 2002, ported to Cython
 by Almar Klein in 2012. Adapted for scikit-image in 2016. Modified for
-inclusion in shmolecule by Peter Spackman in 2020.
+inclusion in chmpy by Peter Spackman in 2020.
 """
 
 # Cython specific imports

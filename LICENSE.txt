@@ -1,5 +1,5 @@
 ---------------------------------------------------------------------
-Code under the shmolecule/mc subdirectory contains some code modified
+Code under the chmpy/mc subdirectory contains some code modified
 from the scikit-image project, subject to the following license:
 ---------------------------------------------------------------------
 

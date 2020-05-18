@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from shmolecule.molecule import Molecule
+from chmpy.molecule import Molecule
 from tempfile import TemporaryDirectory
 from pathlib import Path
 import logging

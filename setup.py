@@ -5,30 +5,30 @@ from numpy import get_include
 from Cython.Build import cythonize
 
 ext_modules = [
-    NumpyExt("shmolecule.linterp", sources=["shmolecule/linterp.c"], language="c")
+    NumpyExt("chmpy.linterp", sources=["chmpy/linterp.c"], language="c")
 ]
 
 ext_modules_cython = cythonize(
     [
         Ext(
-            "shmolecule._density",
-            sources=["shmolecule/_density.pyx"],
+            "chmpy._density",
+            sources=["chmpy/_density.pyx"],
             include_dirs=[get_include()],
         ),
         Ext(
-            "shmolecule._invariants",
-            sources=["shmolecule/_invariants.pyx"],
+            "chmpy._invariants",
+            sources=["chmpy/_invariants.pyx"],
             include_dirs=[get_include()],
         ),
         Ext(
-            "shmolecule.sfac._sfac",
-            sources=["shmolecule/sfac/_sfac.pyx"],
+            "chmpy.sfac._sfac",
+            sources=["chmpy/sfac/_sfac.pyx"],
             language="c++",
             include_dirs=[get_include()],
         ),
         Ext(
-            "shmolecule.mc._mc_lewiner",
-            sources=["shmolecule/mc/_mc_lewiner.pyx"],
+            "chmpy.mc._mc_lewiner",
+            sources=["chmpy/mc/_mc_lewiner.pyx"],
             include_dirs=[get_include()],
         ),
     ]
@@ -37,10 +37,10 @@ ext_modules_cython = cythonize(
 ext_modules += ext_modules_cython
 
 setup(
-    name="shmolecule",
+    name="chmpy",
     version="1.0a1",
     description="Promolecule and Hirshfeld surfaces using python",
-    url="https://github.com/peterspackman/shmolecule",
+    url="https://github.com/peterspackman/chmpy",
     keywords=["chemistry", "molecule", "crystal", "electron density", "isosurface"],
     classifiers=[
         "Programming Language :: Python",
@@ -51,8 +51,8 @@ setup(
         "Topic :: Scientific/Engineering :: Chemistry",
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
-    packages=["shmolecule"],
-    package_data={"shmolecule": ["*.npz"],"shmolecule.subgraphs": ["*.gt"]},
+    packages=["chmpy"],
+    package_data={"chmpy": ["*.npz"],"chmpy.subgraphs": ["*.gt"]},
     ext_modules=ext_modules,
     install_requires=["numpy", "scipy", "trimesh", "matplotlib"],
     extras_require={"sht": ["shtns"], "graph": ["graph_tool"],},

@@ -107,7 +107,7 @@ class Molecule:
             pass
 
     def connected_fragments(self):
-        from shmolecule.util import cartesian_product
+        from chmpy.util import cartesian_product
         from scipy.sparse.csgraph import connected_components
 
         if self.bonds is None:
@@ -181,14 +181,14 @@ class Molecule:
         "partial charges assigned based on EEM method"
         assert len(self) > 0, "Must have at least one atom to calculate partial charges"
         if not hasattr(self, "_partial_charges"):
-            from shmolecule.charges import EEM
+            from chmpy.charges import EEM
 
             charges = EEM.calculate_charges(self)
             self._partial_charges = charges.astype(np.float32)
         return self._partial_charges
 
     def electrostatic_potential(self, positions):
-        from shmolecule.util import BOHR_PER_ANGSTROM
+        from chmpy.util import BOHR_PER_ANGSTROM
 
         v_pot = np.zeros(positions.shape[0])
         for charge, position in zip(self.partial_charges, self.positions):
@@ -348,7 +348,7 @@ class Molecule:
                 "Please install the graph_tool library for graph operations"
             )
         if not _FUNCTIONAL_GROUP_SUBGRAPHS:
-            from shmolecule.subgraphs import load_data
+            from chmpy.subgraphs import load_data
 
             _FUNCTIONAL_GROUP_SUBGRAPHS = load_data()
 
@@ -438,7 +438,7 @@ class Molecule:
         """Calculate the shape descriptors[1,2] for all
         atoms in this isolated molecule. If you wish to use
         the crystal environment please see the corresponding method
-        in :obj:`shmolecule.crystal.Crystal`.
+        in :obj:`chmpy.crystal.Crystal`.
 
         Parameters
         ----------

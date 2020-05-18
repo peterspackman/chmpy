@@ -13,12 +13,12 @@ except ImportError as e:
 @unittest.skipUnless(HAVE_SHTNS, "requires SHTns library")
 class SHTTestCase(unittest.TestCase):
     def setUp(self):
-        from shmolecule.sht import SHT
+        from chmpy.sht import SHT
 
         self.sht = SHT(l_max=2)
 
     def test_construction(self):
-        from shmolecule.sht import SHT
+        from chmpy.sht import SHT
 
         sht = SHT(l_max=20)
         self.assertEqual(sht._shtns.lmax, 20)
@@ -55,7 +55,7 @@ class SHTTestCase(unittest.TestCase):
         grid = self.sht.grid_cartesian
         vals = grid[:, 2] ** 2 * np.exp(-np.linalg.norm(grid, axis=1)) * 0.5
         from tempfile import TemporaryDirectory
-        from shmolecule.sht import plot_sphere
+        from chmpy.sht import plot_sphere
         from os.path import join
 
         with TemporaryDirectory() as tmpdirname:

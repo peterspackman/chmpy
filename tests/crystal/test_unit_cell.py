@@ -2,7 +2,7 @@ import logging
 import unittest
 import numpy as np
 from os.path import join, dirname
-from shmolecule.crystal import Crystal, UnitCell
+from chmpy.crystal import Crystal, UnitCell
 from tempfile import TemporaryDirectory
 
 LOG = logging.getLogger(__name__)

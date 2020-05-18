@@ -2,11 +2,11 @@ import logging
 import unittest
 import numpy as np
 from copy import deepcopy
-from shmolecule.crystal import Crystal, AsymmetricUnit, UnitCell
-from shmolecule.space_group import SpaceGroup
-from shmolecule.cif import Cif
+from chmpy.crystal import Crystal, AsymmetricUnit, UnitCell
+from chmpy.space_group import SpaceGroup
+from chmpy.cif import Cif
 from tempfile import TemporaryDirectory
-from shmolecule.element import Element
+from chmpy.element import Element
 from .test_asymmetric_unit import ice_ii_asym
 from .. import TEST_FILES
 from pathlib import Path
@@ -79,7 +79,7 @@ class CrystalTestCase(unittest.TestCase):
             contents = "LATT 4klj1klj\n"
             c = Crystal.from_shelx_string(contents)
 
-        from shmolecule.shelx import parse_shelx_file
+        from chmpy.shelx import parse_shelx_file
 
         shelx_data = parse_shelx_file(TEST_FILES["acetic_acid.res"])
 
@@ -199,14 +199,14 @@ class CrystalTestCase(unittest.TestCase):
 
 class CifTestCase(unittest.TestCase):
     def test_needs_quote(self):
-        from shmolecule.cif import needs_quote
+        from chmpy.cif import needs_quote
 
         self.assertTrue(needs_quote("this string will need quoting"))
         self.assertFalse(needs_quote("thiswon't"))
         self.assertFalse(needs_quote(3.45))
 
     def test_is_scalar(self):
-        from shmolecule.cif import is_scalar
+        from chmpy.cif import is_scalar
 
         self.assertTrue(is_scalar(3))
         self.assertTrue(is_scalar("test string"))
@@ -214,7 +214,7 @@ class CifTestCase(unittest.TestCase):
         self.assertFalse(is_scalar((3, 4)))
 
     def test_format_field(self):
-        from shmolecule.cif import format_field
+        from chmpy.cif import format_field
 
         self.assertTrue(len(format_field(5.4)) == 20)
         self.assertTrue(format_field("3.4") == "3.4")

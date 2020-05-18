@@ -2,9 +2,9 @@ import logging
 import unittest
 import numpy as np
 from os.path import join, dirname
-from shmolecule.crystal import Crystal
+from chmpy.crystal import Crystal
 from tempfile import TemporaryDirectory
-from shmolecule.util import save_mesh
+from chmpy.util import save_mesh
 from .. import TEST_FILES
 
 
