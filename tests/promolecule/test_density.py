@@ -24,7 +24,7 @@ class PromoleculeDensityTestCase(unittest.TestCase):
         np.testing.assert_allclose(rho, expected, atol=1e-5)
 
     def test_bb(self):
-        from chmpy.element import Element
+        from chmpy import Element
 
         bbox = self.dens.bb()
         buff = Element[1].vdw + 3.8

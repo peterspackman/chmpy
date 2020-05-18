@@ -4,7 +4,7 @@ import numpy as np
 from os.path import join, dirname
 from chmpy.crystal import AsymmetricUnit
 from tempfile import TemporaryDirectory
-from chmpy.element import Element
+from chmpy import Element
 
 
 _ICE_II_LABELS = (

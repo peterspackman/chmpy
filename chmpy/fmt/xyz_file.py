@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 import numpy as np
-from .element import Element
+from chmpy.core.element import Element
 
 LOG = logging.getLogger(__name__)
 

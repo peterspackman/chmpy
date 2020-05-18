@@ -220,7 +220,7 @@ class Molecule:
         contents: str
             contents of the .xyz file to read
         """
-        from .xyz_file import parse_xyz_string
+        from chmpy.fmt.xyz_file import parse_xyz_string
 
         elements, positions = parse_xyz_string(contents)
         return cls(elements, np.asarray(positions), **kwargs)
@@ -525,11 +525,11 @@ class Molecule:
             A list of meshes representing the stockholder weight isosurfaces
         """
 
-        from .density import StockholderWeight
-        from .surface import stockholder_weight_isosurface
+        from chmpy.density import StockholderWeight
+        from chmpy.surface import stockholder_weight_isosurface
         from matplotlib.cm import get_cmap
         import trimesh
-        from .crystal import DEFAULT_COLORMAPS
+        from chmpy.crystal import DEFAULT_COLORMAPS
 
         sep = kwargs.get("separation", kwargs.get("resolution", 0.2))
         radius = kwargs.get("radius", 12.0)
@@ -606,8 +606,8 @@ class Molecule:
 
         """
         descriptors = []
-        from .sht import SHT
-        from .shape_descriptors import promolecule_density_descriptor
+        from chmpy.sht import SHT
+        from chmpy.shape_descriptors import promolecule_density_descriptor
 
         sph = SHT(l_max=l_max)
         return promolecule_density_descriptor(
@@ -638,9 +638,9 @@ class Molecule:
         :obj:`trimesh.Trimesh`
             A mesh representing the promolecule density isosurface
         """
-        from .density import PromoleculeDensity
-        from .surface import promolecule_density_isosurface
-        from .util import property_to_color
+        from chmpy.density import PromoleculeDensity
+        from chmpy.surface import promolecule_density_isosurface
+        from chmpy.util import property_to_color
         import trimesh
 
         isovalue = kwargs.get("isovalue", 0.002)
@@ -714,7 +714,7 @@ class Molecule:
 
     @classmethod
     def from_sdf_file(cls, filename, **kwargs):
-        from .sdf import parse_sdf_file
+        from chmpy.fmt.sdf import parse_sdf_file
 
         sdf_data = parse_sdf_file(filename, **kwargs)
         progress = kwargs.get("progress", False)

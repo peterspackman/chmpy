@@ -3,7 +3,7 @@ from scipy.interpolate import interp1d
 from scipy.spatial.distance import cdist
 from scipy.spatial import cKDTree as KDTree
 from os.path import join, dirname
-from .element import vdw_radii
+from chmpy.core.element import vdw_radii
 from .interp import InterpolatorLog1D
 from ._density import PromoleculeDensity as cPromol, StockholderWeight as cStock
 import numpy as np
@@ -75,7 +75,7 @@ class PromoleculeDensity:
 
     @classmethod
     def from_xyz_file(cls, filename):
-        from .xyz_file import parse_xyz_file
+        from .fmt.xyz_file import parse_xyz_file
 
         els, pos = parse_xyz_file(filename)
         els = np.array([x.atomic_number for x in els])

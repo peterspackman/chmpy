@@ -9,8 +9,8 @@ from pathlib import Path
 from .cif import Cif
 from .unit_cell import UnitCell
 from .space_group import SpaceGroup, SymmetryOperation
-from .element import Element, chemical_formula
-from .molecule import Molecule
+from chmpy.core.element import Element, chemical_formula
+from chmpy.core.molecule import Molecule
 from .util import cartesian_product
 
 

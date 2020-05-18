@@ -6,7 +6,7 @@ from chmpy.crystal import Crystal, AsymmetricUnit, UnitCell
 from chmpy.space_group import SpaceGroup
 from chmpy.cif import Cif
 from tempfile import TemporaryDirectory
-from chmpy.element import Element
+from chmpy import Element
 from .test_asymmetric_unit import ice_ii_asym
 from .. import TEST_FILES
 from pathlib import Path
