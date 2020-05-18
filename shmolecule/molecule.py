@@ -696,6 +696,7 @@ class Molecule:
 
     def translated(self, translation):
         import copy
+
         result = copy.deepcopy(self)
         result.positions += translation
         return result

@@ -8,7 +8,6 @@ from shmolecule.util import save_mesh
 from .. import TEST_FILES
 
 
-
 class SurfaceTestCase(unittest.TestCase):
     def setUp(self):
         self.acetic_acid = Crystal.load(TEST_FILES["acetic_acid.cif"])

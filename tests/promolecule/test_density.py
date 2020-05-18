@@ -5,7 +5,6 @@ from shmolecule.density import PromoleculeDensity, StockholderWeight
 from .. import TEST_FILES
 
 
-
 class PromoleculeDensityTestCase(unittest.TestCase):
     pos = np.array([(0.0, 0.0, 0.0), (1.0, 0.0, 0.0)])
     els = np.ones(2, dtype=int)
@@ -86,7 +85,9 @@ class StockholderWeightTestCase(unittest.TestCase):
         np.testing.assert_allclose(d_b, expected_d, atol=1e-5)
 
     def test_from_xyz_files(self):
-        stock = StockholderWeight.from_xyz_files(TEST_FILES["water.xyz"], TEST_FILES["water.xyz"])
+        stock = StockholderWeight.from_xyz_files(
+            TEST_FILES["water.xyz"], TEST_FILES["water.xyz"]
+        )
         pts = np.array(
             (
                 (-0.7021961, -0.0560603, 0.0099423),

@@ -18,6 +18,7 @@ class MoleculeTestCase(unittest.TestCase):
     def load_water():
         global _WATER
         from copy import deepcopy
+
         if _WATER is None:
             _WATER = Molecule.load(TEST_FILES["water.xyz"])
         return deepcopy(_WATER)

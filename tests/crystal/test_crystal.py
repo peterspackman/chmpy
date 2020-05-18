@@ -62,7 +62,6 @@ _atom_site_fract_z
 O1 O 0.5842 0.1055 0.03779"""
 
 
-
 class CrystalTestCase(unittest.TestCase):
     def setUp(self):
         self.ice_ii = Crystal(_ICE_II_CELL, _ICE_II_SG, ice_ii_asym())
@@ -84,7 +83,9 @@ class CrystalTestCase(unittest.TestCase):
 
         shelx_data = parse_shelx_file(TEST_FILES["acetic_acid.res"])
 
-        c = Crystal.from_cif_file(TEST_FILES["acetic_acid.cif"], data_block_name="acetic_acid")
+        c = Crystal.from_cif_file(
+            TEST_FILES["acetic_acid.cif"], data_block_name="acetic_acid"
+        )
 
     def test_bad_occupations(self):
         asym = deepcopy(ice_ii_asym())

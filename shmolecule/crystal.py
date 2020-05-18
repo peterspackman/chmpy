@@ -1292,9 +1292,9 @@ class Crystal:
         molecules = []
         for q, r, s in product(h, k, l):
             for uc_mol in self.unit_cell_molecules():
-                molecules.append(uc_mol.translated(
-                    np.asarray([q, r, s]) @ self.unit_cell.lattice
-                ))
+                molecules.append(
+                    uc_mol.translated(np.asarray([q, r, s]) @ self.unit_cell.lattice)
+                )
 
         asym_pos = np.vstack([x.positions for x in molecules])
         asym_nums = np.hstack([x.atomic_numbers for x in molecules])
@@ -1302,9 +1302,7 @@ class Crystal:
             [Element[x] for x in asym_nums], sc.to_fractional(asym_pos)
         )
         new_titl = self.titl + "_P1_supercell_{}_{}_{}".format(*supercell)
-        new_crystal = Crystal(
-            sc, SpaceGroup(1), asymmetric_unit, titl=new_titl
-        )
+        new_crystal = Crystal(sc, SpaceGroup(1), asymmetric_unit, titl=new_titl)
         return new_crystal
 
     def to_cif_file(self, filename, **kwargs):
