@@ -41,9 +41,15 @@ class MoleculeTestCase(unittest.TestCase):
 
     def test_xyz_file_read(self):
         mol = self.load_water()
-        self.assertTrue(len(mol) == 3)
-        self.assertTrue(mol.positions.shape == (3, 3))
-        self.assertTrue(mol.molecular_formula == "H2O")
+        self.assertEqual(len(mol), 3)
+        self.assertEqual(mol.positions.shape, (3, 3))
+        self.assertEqual(mol.molecular_formula, "H2O")
+
+    def test_sdf_file_read(self):
+        mol = Molecule.load(TEST_FILES["DB09563.sdf"])
+        self.assertEqual(len(mol), 21)
+        self.assertEqual(mol.positions.shape, (21, 3))
+        self.assertEqual(mol.molecular_formula, "C5H14NO")
 
     def test_molecule_centroid(self):
         mol = self.load_water()
