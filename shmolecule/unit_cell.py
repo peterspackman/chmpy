@@ -142,26 +142,32 @@ class UnitCell:
             self.cell_type_index = 6
             self.cell_type = "cubic"
             self.unique_parameters = (self.a,)
+            self.unique_parameters_deg = self.unique_parameters
         elif self.is_rhombohedral:
             self.cell_type_index = 4
             self.cell_type = "rhombohedral"
             self.unique_parameters = self.a, self.alpha
+            self.unique_parameters_deg = (self.a, np.degrees(self.alpha))
         elif self.is_hexagonal:
             self.cell_type_index = 5
             self.cell_type = "hexagonal"
             self.unique_parameters = self.a, self.c
+            self.unique_parameters_deg = self.unique_parameters
         elif self.is_tetragonal:
             self.cell_type_index = 3
             self.cell_type = "tetragonal"
             self.unique_parameters = self.a, self.c
+            self.unique_parameters_deg = self.unique_parameters
         elif self.is_orthorhombic:
             self.cell_type_index = 2
             self.cell_type = "orthorhombic"
             self.unique_parameters = self.a, self.b, self.c
+            self.unique_parameters_deg = self.unique_parameters
         elif self.is_monoclinic:
             self.cell_type_index = 1
             self.cell_type = "monoclinic"
             self.unique_parameters = self.a, self.b, self.c, self.beta
+            self.unique_parameters_deg = (self.a, self.b, np.degrees(self.beta))
         else:
             self.cell_type_index = 0
             self.cell_type = "triclinic"
@@ -172,6 +178,14 @@ class UnitCell:
                 self.alpha,
                 self.beta,
                 self.gamma,
+            )
+            self.unique_parameters_deg = (
+                self.a,
+                self.b,
+                self.c,
+                np.degrees(self.alpha),
+                np.degrees(self.beta),
+                np.degrees(self.gamma),
             )
 
     def volume(self):

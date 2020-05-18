@@ -5,13 +5,13 @@ from os.path import join, dirname
 from shmolecule.crystal import Crystal
 from tempfile import TemporaryDirectory
 from shmolecule.util import save_mesh
+from .. import TEST_FILES
 
-_ACETIC = join(dirname(__file__), "acetic_acid.cif")
 
 
 class SurfaceTestCase(unittest.TestCase):
     def setUp(self):
-        self.acetic_acid = Crystal.load(_ACETIC)
+        self.acetic_acid = Crystal.load(TEST_FILES["acetic_acid.cif"])
 
     def test_promolecule_surfaces(self):
         surfaces = self.acetic_acid.promolecule_density_isosurfaces(separation=1.0)

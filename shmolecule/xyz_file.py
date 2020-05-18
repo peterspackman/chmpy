@@ -56,4 +56,5 @@ def parse_xyz_file(filename):
         array of (N) atomic numbers and (N, 3) Cartesian positions
         read from the given file
     """
-    return parse_xyz_string(Path(filename).read_text(), filename=filename)
+    path = Path(filename)
+    return parse_xyz_string(path.read_text(), filename=str(path.absolute()))

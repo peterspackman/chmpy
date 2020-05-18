@@ -2,18 +2,16 @@ import logging
 import unittest
 import numpy as np
 from copy import deepcopy
-from os.path import join, dirname
 from shmolecule.crystal import Crystal, AsymmetricUnit, UnitCell
 from shmolecule.space_group import SpaceGroup
 from shmolecule.cif import Cif
 from tempfile import TemporaryDirectory
 from shmolecule.element import Element
 from .test_asymmetric_unit import ice_ii_asym
+from .. import TEST_FILES
+from pathlib import Path
 
 LOG = logging.getLogger(__name__)
-_ICE_II = join(dirname(__file__), "iceII.cif")
-_ACETIC = join(dirname(__file__), "acetic_acid.cif")
-_ACETIC_RES = join(dirname(__file__), "acetic_acid.res")
 _ICE_II_CELL = UnitCell.rhombohedral(7.78, 113.1, unit="degrees")
 _ICE_II_SG = SpaceGroup(1)
 
@@ -68,11 +66,11 @@ O1 O 0.5842 0.1055 0.03779"""
 class CrystalTestCase(unittest.TestCase):
     def setUp(self):
         self.ice_ii = Crystal(_ICE_II_CELL, _ICE_II_SG, ice_ii_asym())
-        self.acetic = Crystal.load(_ACETIC)
-        self.acetic_res = Crystal.load(_ACETIC_RES)
+        self.acetic = Crystal.load(TEST_FILES["acetic_acid.cif"])
+        self.acetic_res = Crystal.load(TEST_FILES["acetic_acid.res"])
 
     def test_crystal_load(self):
-        c = Crystal.load(_ICE_II)
+        c = Crystal.load(TEST_FILES["iceII.cif"])
         self.assertTrue(len(c.asymmetric_unit) == len(self.ice_ii.asymmetric_unit))
         self.assertTrue(c.space_group == self.ice_ii.space_group)
         self.assertTrue(len(c.symmetry_operations) == 1)
@@ -84,9 +82,9 @@ class CrystalTestCase(unittest.TestCase):
 
         from shmolecule.shelx import parse_shelx_file
 
-        shelx_data = parse_shelx_file(_ACETIC_RES)
+        shelx_data = parse_shelx_file(TEST_FILES["acetic_acid.res"])
 
-        c = Crystal.from_cif_file(_ACETIC, data_block_name="acetic_acid")
+        c = Crystal.from_cif_file(TEST_FILES["acetic_acid.cif"], data_block_name="acetic_acid")
 
     def test_bad_occupations(self):
         asym = deepcopy(ice_ii_asym())
@@ -122,11 +120,11 @@ class CrystalTestCase(unittest.TestCase):
         self.assertAlmostEqual(self.acetic.density, 0.5)
 
     def test_crystal_save(self):
-        c = Crystal.load(_ICE_II)
+        c = Crystal.load(TEST_FILES["iceII.cif"])
         with TemporaryDirectory() as tmpdirname:
             LOG.debug("created temp directory: %s", tmpdirname)
-            c.save(join(tmpdirname, "tmp.cif"))
-            c.save(join(tmpdirname, "tmp.res"))
+            c.save(Path(tmpdirname, "tmp.cif"))
+            c.save(Path(tmpdirname, "tmp.res"))
 
         c = Crystal(_ICE_II_CELL, _ICE_II_SG, ice_ii_asym())
         c.properties["titl"] = "iceII"
@@ -135,7 +133,7 @@ class CrystalTestCase(unittest.TestCase):
         c2 = Crystal.from_cif_string(s, data_block_name="iceII")
 
     def test_crystal_molecules(self):
-        c = Crystal.load(_ICE_II)
+        c = Crystal.load(TEST_FILES["iceII.cif"])
         mols = c.symmetry_unique_molecules()
         self.assertTrue(len(mols) == 12, "Expect 12 water molecules in unit cell")
         formulae = [x.molecular_formula for x in mols]

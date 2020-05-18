@@ -694,6 +694,12 @@ class Molecule:
             self.atomic_numbers[mask], self.positions[mask], **kwargs
         )
 
+    def translated(self, translation):
+        import copy
+        result = copy.deepcopy(self)
+        result.positions += translation
+        return result
+
     @classmethod
     def from_sdf_dict(cls, sdf_dict, **kwargs):
         atoms = sdf_dict["atoms"]

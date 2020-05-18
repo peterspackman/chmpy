@@ -2,9 +2,8 @@ import unittest
 import numpy as np
 from os.path import join, dirname
 from shmolecule.density import PromoleculeDensity, StockholderWeight
+from .. import TEST_FILES
 
-
-_WATER = join(dirname(__file__), "water.xyz")
 
 
 class PromoleculeDensityTestCase(unittest.TestCase):
@@ -50,7 +49,7 @@ class PromoleculeDensityTestCase(unittest.TestCase):
         np.testing.assert_allclose(vecs, expected_vecs, atol=1e-5)
 
     def test_from_xyz_file(self):
-        dens = PromoleculeDensity.from_xyz_file(_WATER)
+        dens = PromoleculeDensity.from_xyz_file(TEST_FILES["water.xyz"])
 
 
 class StockholderWeightTestCase(unittest.TestCase):
@@ -87,7 +86,7 @@ class StockholderWeightTestCase(unittest.TestCase):
         np.testing.assert_allclose(d_b, expected_d, atol=1e-5)
 
     def test_from_xyz_files(self):
-        stock = StockholderWeight.from_xyz_files(_WATER, _WATER)
+        stock = StockholderWeight.from_xyz_files(TEST_FILES["water.xyz"], TEST_FILES["water.xyz"])
         pts = np.array(
             (
                 (-0.7021961, -0.0560603, 0.0099423),

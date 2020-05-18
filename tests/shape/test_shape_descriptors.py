@@ -3,9 +3,8 @@ import unittest
 import numpy as np
 from os.path import join, dirname
 from shmolecule.crystal import Crystal
+from .. import TEST_FILES
 
-_ACETIC = join(dirname(__file__), "acetic_acid.cif")
-_ICE_II = join(dirname(__file__), "iceII.cif")
 
 try:
     import shtns
@@ -18,8 +17,8 @@ except ImportError as e:
 @unittest.skipUnless(HAVE_SHTNS, "requires SHTns library")
 class ShapeDescriptorTestCase(unittest.TestCase):
     def setUp(self):
-        self.water = Crystal.load(_ICE_II)
-        self.acetic = Crystal.load(_ACETIC)
+        self.water = Crystal.load(TEST_FILES["iceII.cif"])
+        self.acetic = Crystal.load(TEST_FILES["acetic_acid.cif"])
 
     def test_atomic_descriptors(self):
         desc = self.acetic.atomic_shape_descriptors(l_max=3, radius=3.8)
