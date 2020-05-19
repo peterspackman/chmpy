@@ -1261,6 +1261,20 @@ class Crystal:
             }
         return {data_block_name: cif_data}
 
+    def structure_factors(self, **kwargs):
+        from chmpy.crystal.sfac import structure_factors
+        return structure_factors(self, **kwargs)
+
+    def unique_reflections(self, **kwargs):
+        from chmpy.crystal.sfac import reflections
+        return reflections(self, **kwargs)
+
+    def powder_pattern(self, **kwargs):
+        from chmpy.crystal.sfac import powder_pattern
+        from chmpy.crystal.powder import PowderPattern
+        tt, f2 = powder_pattern(self, **kwargs)
+        return PowderPattern(tt, f2, **kwargs)
+
     def to_translational_symmetry(self, supercell=(1, 1, 1)):
         """Create a supercell of this crystal in space group P 1.
 

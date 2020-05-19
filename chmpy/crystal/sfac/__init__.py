@@ -5,6 +5,7 @@ from collections import namedtuple
 
 
 StructureFactors = namedtuple("StructureFactors", "hkl q q_mag values normalization")
+Reflections = namedtuple("Reflection", "q q_mag hkl")
 
 LAMBDA_Cu = 1.54056
 
@@ -20,55 +21,55 @@ UNIQUE_REFLECTION_MULTIPLICITY = {
 
 
 UNIQUE_REFLECTION_TYPES = {
-    ("triclinic", "-1", "*"): (
+    ("-1", "*"): (
         ((0, 0, 0), ((1, 0, 0), (0, 1, 0), (0, 0, 1))),
         ((-1, 0, 1), ((-1, 0, 0), (0, 1, 0), (0, 0, 1))),
         ((-1, 1, 0), ((-1, 0, 0), (0, 1, 0), (0, 0, -1))),
         ((0, 1, -1), ((1, 0, 0), (0, 1, 0), (0, 0, -1))),
     ),
-    ("monoclinic", "2/m", "aface"): (
+    ("2/m", "aface"): (
         ((0, 0, 0), ((0, 1, 0), (1, 0, 0), (0, 0, 1))),
         ((0, -1, 1), ((0, -1, 0), (1, 0, 0), (0, 0, 1))),
     ),
-    ("monoclinic", "2/m", "bface"): (
+    ("2/m", "bface"): (
         ((0, 0, 0), ((1, 0, 0), (0, 1, 0), (0, 0, 1))),
         ((-1, 0, 1), ((-1, 0, 0), (0, 1, 0), (0, 0, 1))),
     ),
-    ("monoclinic", "2/m", "cface"): (
+    ("2/m", "cface"): (
         ((0, 0, 0), ((1, 0, 0), (0, 0, 1), (0, 1, 0))),
         ((-1, 1, 0), ((-1, 0, 0), (0, 0, 1), (0, 1, 0))),
     ),
-    ("orthorhombic", "mmm", "*"): (((0, 0, 0), ((1, 0, 0), (0, 1, 0), (0, 0, 1))),),
-    ("tetragonal", "4/mmm", "*"): (((0, 0, 0), ((1, 0, 0), (1, 1, 0), (0, 0, 1))),),
-    ("tetragonal", "4/m", "*"): (
+    ("mmm", "*"): (((0, 0, 0), ((1, 0, 0), (0, 1, 0), (0, 0, 1))),),
+    ("4/mmm", "*"): (((0, 0, 0), ((1, 0, 0), (1, 1, 0), (0, 0, 1))),),
+    ("4/m", "*"): (
         ((0, 0, 0), ((1, 0, 0), (1, 1, 0), (0, 0, 1))),
         ((1, 2, 0), ((1, 1, 0), (0, 1, 0), (0, 0, 1))),
     ),
-    ("hexagonal", "6/mmm", "*"): (((0, 0, 0), ((1, 0, 0), (1, 1, 0), (0, 0, 1))),),
-    ("hexagonal", "6/m", "*"): (
+    ("6/mmm", "*"): (((0, 0, 0), ((1, 0, 0), (1, 1, 0), (0, 0, 1))),),
+    ("6/m", "*"): (
         ((0, 0, 0), ((1, 0, 0), (1, 1, 0), (0, 0, 1))),
         ((1, 2, 0), ((0, 1, 0), (1, 1, 0), (0, 0, 1))),
     ),
-    ("hexagonal", "-3m1", "*"): (
+    ("-3m1", "*"): (
         ((0, 0, 0), ((1, 0, 0), (1, 1, 0), (0, 0, 1))),
         ((0, 1, 1), ((0, 1, 0), (1, 1, 0), (0, 0, 1))),
     ),
-    ("hexagonal", "-31m", "*"): (
+    ("-31m", "*"): (
         ((0, 0, 0), ((1, 0, 0), (1, 1, 0), (0, 0, 1))),
         ((1, 1, -1), ((1, 0, 0), (1, 1, 0), (0, 0, -1))),
     ),
-    ("hexagonal", "-3m", "*"): (
+    ("-3m", "*"): (
         ((0, 0, 0), ((1, 0, 0), (1, 0, -1), (1, 1, 1))),
         ((1, 1, 0), ((1, 0, -1), (0, 0, -1), (1, 1, 1))),
     ),
-    ("hexagonal", "-3", "*"): (
+    ("-3", "*"): (
         ((0, 0, 0), ((1, 0, 0), (1, 0, -1), (1, 1, 1))),
         ((1, 1, 0), ((1, 0, -1), (0, 0, -1), (1, 1, 1))),
         ((0, -1, -2), ((1, 0, 0), (1, 0, -1), (-1, -1, -1))),
         ((1, 0, -2), ((1, 0, -1), (0, 0, -1), (-1, -1, -1))),
     ),
-    ("cubic", "m3m", "*"): (((0, 0, 0), ((1, 0, 0), (1, 1, 0), (1, 1, 1))),),
-    ("cubic", "m3", "*"): (
+    ("m3m", "*"): (((0, 0, 0), ((1, 0, 0), (1, 1, 0), (1, 1, 1))),),
+    ("m3", "*"): (
         ((0, 0, 0), ((1, 0, 0), (1, 1, 0), (1, 1, 1))),
         ((1, 2, 0), ((0, 1, 0), (1, 1, 0), (1, 1, 1))),
     ),
@@ -84,8 +85,10 @@ def reflections(crystal, wavelength=LAMBDA_Cu, size=10):
     system = crystal.space_group.crystal_system
     centering = "*" if system != "monoclinic" else crystal.space_group.centering
     laue_class = crystal.space_group.laue_class
+    if crystal.unit_cell.is_rhombohedral:
+        raise NotImplementedError("Rhombohedral crystals not currently supported")
 
-    apexes, bases = zip(*UNIQUE_REFLECTION_TYPES[(system, laue_class, centering)])
+    apexes, bases = zip(*UNIQUE_REFLECTION_TYPES[(laue_class, centering)])
     h_range = np.r_[0 : h_max + 1]
     k_range = np.r_[0 : k_max + 1]
     l_range = np.r_[0 : l_max + 1]
@@ -104,7 +107,7 @@ def reflections(crystal, wavelength=LAMBDA_Cu, size=10):
     q = np.dot(hkl, recip)
     q_mag = np.linalg.norm(q, axis=1)
     mask = q_mag < (1 / wavelength)
-    return q[mask], q_mag[mask], hkl[mask]
+    return Reflections(q[mask], q_mag[mask], hkl[mask])
 
 
 def powder_pattern(crystal, wavelength=LAMBDA_Cu, two_theta_range=(5, 50)):
