@@ -181,7 +181,7 @@ class Molecule:
         "partial charges assigned based on EEM method"
         assert len(self) > 0, "Must have at least one atom to calculate partial charges"
         if not hasattr(self, "_partial_charges"):
-            from chmpy.charges import EEM
+            from chmpy.ext.charges import EEM
 
             charges = EEM.calculate_charges(self)
             self._partial_charges = charges.astype(np.float32)
