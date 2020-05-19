@@ -1,0 +1,21 @@
+{{title}}
+CRYSTAL
+{{iflag}} {{ifhr}} {{ifso}} 
+{{space_group}}
+{{cell_parameters}}
+{{natoms}}
+{% for (x, y, z), e in atoms -%}
+{{e.atomic_number}} {{"%10.6f" | format(x)}} {{"%10.6f" | format(y)}} {{"%10.6f" | format(z)}}
+{% endfor -%}
+FRACTION
+BASISSET
+{{basis_set}}
+{% for k, v in basis_set_keywords.items() -%}
+{{k}}{% if v != None %}={% endif %}{{v}}
+{% endfor -%}
+{{method}}
+END
+SHRINK
+{{shrink_factors[0]}} {{shrink_factors[1]}}
+END
+END

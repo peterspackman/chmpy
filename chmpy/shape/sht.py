@@ -1,5 +1,5 @@
 import numpy as np
-from .util import spherical_to_cartesian
+from chmpy.util.num import spherical_to_cartesian
 
 _SHT_CACHE = {}
 

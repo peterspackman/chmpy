@@ -1,13 +1,6 @@
-from ccpy.templates import load_template
-from shmolecule.element import Element
-from shmolecule import Crystal, Molecule
-from shmolecule.crystal import AsymmetricUnit
-from shmolecule.unit_cell import UnitCell
-from shmolecule.space_group import SpaceGroup
+from chmpy.templates import load_template
 from pathlib import Path
-import numpy as np
 import logging
-from collections import namedtuple
 
 LOG = logging.getLogger(__name__)
 CRYSTAL17_TEMPLATE = load_template("crystal17")
@@ -42,7 +35,6 @@ def to_crystal17_input(crystal, **kwargs):
 
 
 def load_crystal17_output_string(string):
-    from ccpy.util import units
     total_energy_line = ""
     for line in string.splitlines():
         if "TOTAL ENERGY" in line:

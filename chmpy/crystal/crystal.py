@@ -6,12 +6,12 @@ import numpy as np
 from scipy.sparse import dok_matrix
 import scipy.sparse.csgraph as csgraph
 from pathlib import Path
-from .cif import Cif
+from chmpy.fmt.cif import Cif
 from .unit_cell import UnitCell
 from .space_group import SpaceGroup, SymmetryOperation
 from chmpy.core.element import Element, chemical_formula
 from chmpy.core.molecule import Molecule
-from .util import cartesian_product
+from chmpy.util.num import cartesian_product
 
 
 LOG = logging.getLogger(__name__)
@@ -841,9 +841,9 @@ class Crystal:
         list of :obj:`trimesh.Trimesh`
             A list of meshes representing the stockholder weight isosurfaces
         """
-        from .density import StockholderWeight
-        from .surface import stockholder_weight_isosurface
-        from .util import property_to_color
+        from chmpy.density import StockholderWeight
+        from chmpy.surface import stockholder_weight_isosurface
+        from chmpy.util.color import property_to_color
         import trimesh
 
         sep = kwargs.get("separation", kwargs.get("resolution", 0.2))
@@ -922,8 +922,7 @@ class Crystal:
 
         """
         descriptors = []
-        from .sht import SHT
-        from .shape_descriptors import stockholder_weight_descriptor
+        from chmpy.shape import SHT, stockholder_weight_descriptor
 
         sph = SHT(l_max=l_max)
         for (
@@ -975,8 +974,7 @@ class Crystal:
 
         """
         descriptors = []
-        from .sht import SHT
-        from .shape_descriptors import stockholder_weight_descriptor
+        from chmpy.shape import SHT, stockholder_weight_descriptor
 
         sph = SHT(l_max=l_max)
         for mol, neighbour_els, neighbour_pos in self.molecule_surroundings(
@@ -1022,8 +1020,7 @@ class Crystal:
             https://dx.doi.org/10.1002/anie.201906602
         """
         descriptors = []
-        from .sht import SHT
-        from .shape_descriptors import stockholder_weight_descriptor
+        from chmpy.shape import SHT, stockholder_weight_descriptor
 
         sph = SHT(l_max=l_max)
         for n, pos, neighbour_els, neighbour_pos in self.atomic_surroundings(
@@ -1059,8 +1056,7 @@ class Crystal:
         [2] PR Spackman et al. Angew. Chem. 58 (47), 16780-16784 (2019)
             https://dx.doi.org/10.1002/anie.201906602
         """
-        from .sht import SHT
-        from .shape_descriptors import stockholder_weight_descriptor
+        from chmpy.shape import SHT, stockholder_weight_descriptor
 
         sph = SHT(l_max=l_max)
         inside, outside = self.atom_group_surroundings(atoms, radius=radius)
@@ -1205,7 +1201,7 @@ class Crystal:
     @classmethod
     def from_shelx_string(cls, file_content, **kwargs):
         """Initialize a crystal structure from a shelx .res string"""
-        from .shelx import parse_shelx_file_content
+        from chmpy.fmt.shelx import parse_shelx_file_content
 
         shelx_dict = parse_shelx_file_content(file_content)
         asymmetric_unit = AsymmetricUnit.from_records(shelx_dict["ATOM"])
@@ -1319,7 +1315,7 @@ class Crystal:
 
     def to_shelx_string(self, titl=None):
         """Represent this crystal structure as a shelx .res string"""
-        from chmpy.shelx import to_res_contents
+        from chmpy.fmt.shelx import to_res_contents
 
         sfac = list(np.unique(self.site_atoms))
         atom_sfac = [sfac.index(x) + 1 for x in self.site_atoms]

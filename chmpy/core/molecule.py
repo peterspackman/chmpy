@@ -465,8 +465,7 @@ class Molecule:
             https://dx.doi.org/10.1002/anie.201906602
         """
         descriptors = []
-        from .sht import SHT
-        from .shape_descriptors import stockholder_weight_descriptor
+        from chmpy.shape import SHT, stockholder_weight_descriptor
 
         sph = SHT(l_max=l_max)
         elements = self.atomic_numbers
@@ -606,8 +605,7 @@ class Molecule:
 
         """
         descriptors = []
-        from chmpy.sht import SHT
-        from chmpy.shape_descriptors import promolecule_density_descriptor
+        from chmpy.shape import SHT, promolecule_density_descriptor
 
         sph = SHT(l_max=l_max)
         return promolecule_density_descriptor(
@@ -640,7 +638,7 @@ class Molecule:
         """
         from chmpy.density import PromoleculeDensity
         from chmpy.surface import promolecule_density_isosurface
-        from chmpy.util import property_to_color
+        from chmpy.util.color import property_to_color
         import trimesh
 
         isovalue = kwargs.get("isovalue", 0.002)

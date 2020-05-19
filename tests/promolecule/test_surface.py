@@ -4,7 +4,7 @@ import numpy as np
 from os.path import join, dirname
 from chmpy.crystal import Crystal
 from tempfile import TemporaryDirectory
-from chmpy.util import save_mesh
+from chmpy.util.mesh import save_mesh
 from .. import TEST_FILES
 
 

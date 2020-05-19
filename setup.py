@@ -16,13 +16,13 @@ ext_modules_cython = cythonize(
             include_dirs=[get_include()],
         ),
         Ext(
-            "chmpy._invariants",
-            sources=["chmpy/_invariants.pyx"],
+            "chmpy.shape._invariants",
+            sources=["chmpy/shape/_invariants.pyx"],
             include_dirs=[get_include()],
         ),
         Ext(
-            "chmpy.sfac._sfac",
-            sources=["chmpy/sfac/_sfac.pyx"],
+            "chmpy.crystal.sfac._sfac",
+            sources=["chmpy/crystal/sfac/_sfac.pyx"],
             language="c++",
             include_dirs=[get_include()],
         ),

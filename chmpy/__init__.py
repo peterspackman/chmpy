@@ -1,7 +1,5 @@
-from .crystal import Crystal
-from .space_group import SpaceGroup
+from .crystal import Crystal, SpaceGroup, UnitCell
 from .core import Molecule, Element
-from .unit_cell import UnitCell
 from . import density
 from . import surface
 

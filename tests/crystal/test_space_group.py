@@ -2,8 +2,8 @@ import logging
 import unittest
 import numpy as np
 from os.path import join, dirname
-from chmpy.space_group import SymmetryOperation, SpaceGroup
-from chmpy.space_group import expanded_symmetry_list, reduced_symmetry_list
+from chmpy.crystal import SymmetryOperation, SpaceGroup
+from chmpy.crystal.space_group import expanded_symmetry_list, reduced_symmetry_list
 
 LOG = logging.getLogger(__name__)
 

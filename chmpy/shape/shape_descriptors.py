@@ -1,7 +1,7 @@
-from .density import StockholderWeight, PromoleculeDensity
-from .util import spherical_to_cartesian
+from chmpy.density import StockholderWeight, PromoleculeDensity
+from chmpy.util.num import spherical_to_cartesian
 from scipy.optimize import minimize_scalar
-from ._density import sphere_stockholder_radii, sphere_promolecule_radii
+from chmpy._density import sphere_stockholder_radii, sphere_promolecule_radii
 from ._invariants import p_invariants_c, p_invariants_r
 import logging
 import numpy as np

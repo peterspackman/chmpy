@@ -102,15 +102,15 @@ def parse_mol2_string(string):
     unknown_lines = []
     app = unknown_lines
     for i in range(len(lines)):
-        l = lines[i].strip()
-        if "@" in l:
+        line = lines[i].strip()
+        if "@" in line:
             app = unknown_lines
-            if atom_section in l:
+            if atom_section in line:
                 app = atom_lines
-            elif bond_section in l:
+            elif bond_section in line:
                 app = bond_lines
-        if l:
-            app.append(l)
+        if line:
+            app.append(line)
     return parse_atom_lines(atom_lines), parse_bond_lines(bond_lines)
 
 

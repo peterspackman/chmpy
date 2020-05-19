@@ -1,0 +1,18 @@
+{%- if periodic -%}
+$periodic 3
+$lattice {{lattice_units}}
+{% for x, y, z in lattice -%}
+{{"%10.6f" | format(x)}} {{"%10.6f" | format(y)}} {{"%10.6f" | format(z)}}
+{% endfor -%}
+{% endif -%}
+$coord {{units}}
+{% for (x, y, z), e in atoms -%}
+    {{"%10.6f" | format(x)}} {{"%10.6f" | format(y)}} {{"%10.6f" | format(z)}} {{e.symbol}}
+{% endfor -%}
+{% for block_name, block in blocks.items() -%}
+${{block_name}}
+{% for k, v in block.items() -%}
+{{k}}={{v}}
+{% endfor -%}
+{% endfor -%}
+$end

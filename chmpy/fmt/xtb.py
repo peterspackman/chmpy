@@ -1,9 +1,8 @@
 from ccpy.templates import load_template
-from shmolecule.element import Element
-from shmolecule import Crystal, Molecule
-from shmolecule.crystal import AsymmetricUnit
-from shmolecule.unit_cell import UnitCell
-from shmolecule.space_group import SpaceGroup
+from chmpy import Element, Molecule
+from chmpy.crystal import AsymmetricUnit
+from chmpy.unit_cell import UnitCell
+from chmpy.space_group import SpaceGroup
 import numpy as np
 import logging
 from collections import namedtuple
@@ -12,6 +11,7 @@ LOG = logging.getLogger(__name__)
 TMOL_TEMPLATE = load_template("turbomole")
 
 Cell = namedtuple("Cell", "a b c alpha beta gamma")
+
 
 def crystal_to_turbomole_string(crystal, **kwargs):
     uc_atoms = crystal.unit_cell_atoms()
@@ -40,21 +40,6 @@ def turbomole_string(obj, **kwargs):
         return molecule_to_turbomole_string(obj, **kwargs)
     else:
         return crystal_to_turbomole_string(obj, **kwargs)
-
-
-        elements = []
-        positions = []
-        for line in data["coord"]:
-            x, y, z, el = line.split()
-            positions.append((float(x), float(y), float(z)))
-            elements.append(Element[el])
-        direct = np.array(lattice) * 0.529177249
-        pos_cart = np.array(positions) * 0.52917749
-        uc = UnitCell(direct)
-        pos_frac = uc.to_fractional(pos_cart)
-        asym = AsymmetricUnit(elements, pos_frac)
-        return cls(uc, SpaceGroup(1), asym)
-
 
 
 def load_turbomole_string(tmol_string):

@@ -5,7 +5,8 @@ import json
 import re
 from copy import deepcopy
 from fractions import Fraction
-from .util import cartesian_product, subscript, overline
+from chmpy.util.num import cartesian_product
+from chmpy.util.text import subscript, overline
 from .point_group import POINT_GROUP_DATA
 import logging
 
