@@ -2,7 +2,7 @@ import logging
 import unittest
 import numpy as np
 from os.path import join, dirname
-from chmpy.interp import InterpolatorLog1D
+from chmpy.interpolate import InterpolatorLog1D
 
 
 class InterpolatorLog1DTestCase(unittest.TestCase):

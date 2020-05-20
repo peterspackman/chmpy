@@ -75,7 +75,7 @@ class PromoleculeDensity:
 
     @classmethod
     def from_xyz_file(cls, filename):
-        from .fmt.xyz_file import parse_xyz_file
+        from chmpy.fmt.xyz_file import parse_xyz_file
 
         els, pos = parse_xyz_file(filename)
         els = np.array([x.atomic_number for x in els])

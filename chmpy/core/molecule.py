@@ -524,7 +524,7 @@ class Molecule:
             A list of meshes representing the stockholder weight isosurfaces
         """
 
-        from chmpy.density import StockholderWeight
+        from chmpy import StockholderWeight
         from chmpy.surface import stockholder_weight_isosurface
         from matplotlib.cm import get_cmap
         import trimesh
@@ -636,7 +636,7 @@ class Molecule:
         :obj:`trimesh.Trimesh`
             A mesh representing the promolecule density isosurface
         """
-        from chmpy.density import PromoleculeDensity
+        from chmpy import PromoleculeDensity
         from chmpy.surface import promolecule_density_isosurface
         from chmpy.util.color import property_to_color
         import trimesh

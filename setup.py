@@ -5,14 +5,14 @@ from numpy import get_include
 from Cython.Build import cythonize
 
 ext_modules = [
-    NumpyExt("chmpy.linterp", sources=["chmpy/linterp.c"], language="c")
+    NumpyExt("chmpy.interpolate.linterp", sources=["chmpy/interpolate/linterp.c"], language="c")
 ]
 
 ext_modules_cython = cythonize(
     [
         Ext(
-            "chmpy._density",
-            sources=["chmpy/_density.pyx"],
+            "chmpy.interpolate._density",
+            sources=["chmpy/interpolate/_density.pyx"],
             include_dirs=[get_include()],
         ),
         Ext(
@@ -39,7 +39,7 @@ ext_modules += ext_modules_cython
 setup(
     name="chmpy",
     version="1.0a1",
-    description="Promolecule and Hirshfeld surfaces using python",
+    description="Molecules, crystals, promolecule and Hirshfeld surfaces using python",
     url="https://github.com/peterspackman/chmpy",
     keywords=["chemistry", "molecule", "crystal", "electron density", "isosurface"],
     classifiers=[
@@ -52,7 +52,12 @@ setup(
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
     packages=["chmpy"],
-    package_data={"chmpy": ["*.npz"],"chmpy.subgraphs": ["*.gt"]},
+    package_data={
+        "chmpy.interpolate": ["*.npz"],
+        "chmpy.subgraphs": ["*.gt"],
+        "chmpy.templates": ["*.jinja2"],
+        "chmpy.subgraphs": ["*.gt"],
+    },
     ext_modules=ext_modules,
     install_requires=["numpy", "scipy", "trimesh", "matplotlib"],
     extras_require={"sht": ["shtns"], "graph": ["graph_tool"],},

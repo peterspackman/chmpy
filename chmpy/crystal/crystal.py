@@ -771,7 +771,7 @@ class Crystal:
             the mesh representing the promolecule density void isosurface
         """
 
-        from chmpy.density import PromoleculeDensity
+        from chmpy import PromoleculeDensity
         import trimesh
         from .mc import marching_cubes
         from scipy.spatial import cKDTree as KDTree
@@ -841,7 +841,7 @@ class Crystal:
         list of :obj:`trimesh.Trimesh`
             A list of meshes representing the stockholder weight isosurfaces
         """
-        from chmpy.density import StockholderWeight
+        from chmpy import StockholderWeight
         from chmpy.surface import stockholder_weight_isosurface
         from chmpy.util.color import property_to_color
         import trimesh

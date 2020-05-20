@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 from os.path import join, dirname
-from chmpy.density import PromoleculeDensity, StockholderWeight
+from chmpy import PromoleculeDensity, StockholderWeight
 from .. import TEST_FILES
 
 

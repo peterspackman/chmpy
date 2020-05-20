@@ -1,6 +1,6 @@
 from .crystal import Crystal, SpaceGroup, UnitCell
 from .core import Molecule, Element
-from . import density
 from . import surface
+from .interpolate import PromoleculeDensity, StockholderWeight
 
-__all__ = ["surface", "density", "Crystal", "Molecule", "SpaceGroup", "UnitCell"]
+__all__ = ["surface", "Crystal", "Molecule", "SpaceGroup", "UnitCell"]
