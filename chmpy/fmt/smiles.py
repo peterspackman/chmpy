@@ -1,0 +1,61 @@
+import pyparsing as pp
+from pyparsing import Literal as Lit
+from pyparsing import Optional as Opt
+from pyparsing import Regex, oneOf
+from chmpy.core.element import element_symbols
+import numpy as np
+
+OrganicSymbol = Regex("Br?|Cl?|N|O|P|S|F|I|At|Ts|b|c|n|o|p|s")
+Symbol = Regex(
+    "A(c|g|l|m|r|s|t|u)|"
+    "B(a|e|h|i|k|r)?|"
+    "C(a|d|e|f|l|m|n|o|r|s|u)?|"
+    "D(b|s|y)|"
+    "E(r|s|u)|"
+    "F(e|l|m|r)?|"
+    "G(a|d|e)|"
+    "H(e|f|g|o|s)?|"
+    "I(n|r)?|"
+    "Kr?|"
+    "L(a|i|r|u|v)?|"
+    "M(c|g|n|o|t)?|"
+    "N(a|b|d|e|h|i|o|p)?|"
+    "O(g|s)?|"
+    "P(a|b|d|m|o|r|t|u)?|"
+    "R(a|b|e|f|g|h|n|u)|"
+    "S(b|c|e|g|i|m|n|r)?|"
+    "T(a|b|c|e|h|i|l|m|s)|"
+    "U|V|W|Xe|Yb?|Z(n|r)|"
+    "b|c|n|o|p|se?|as"
+)
+Chiral = Lit("@") + Opt(Lit("@"))
+Digit = Regex("[0-9]")
+Fifteen = (Lit("1") + Opt(oneOf("012345"))) ^ oneOf("23456789")
+Charge = (Lit("+") + Opt(Lit("+") ^ Fifteen)) ^ (Lit("-") + Opt(Lit("-") ^ Fifteen))
+HCount = Lit("H") + Opt(Digit)
+Isotope = Opt(Digit) + Opt(Digit) + Digit
+Map = Lit(":") + Opt(Digit) + Opt(Digit) + Digit
+Dot = Lit(".")
+Bond = oneOf("-=#$/\\")
+Line = pp.Forward()
+Atom = pp.Forward()
+RNum = Digit ^ (Lit("%") + Digit + Digit)
+Branch = Lit("(") + (pp.OneOrMore(Opt(Bond ^ Dot) + Line)) + Lit(")")
+Chain = pp.OneOrMore((Dot + Atom) ^ (Opt(Bond) + (Atom ^ RNum)))
+BracketAtom = Lit("[") + Opt(Isotope) + Symbol + Opt(Chiral) + Opt(HCount) + Opt(Charge) ^ Opt(Map) + Lit("]")
+Atom = OrganicSymbol ^ BracketAtom
+Line = Atom + pp.ZeroOrMore(Chain ^ Branch)
+
+
+class SMILESParser:
+    @classmethod
+    def is_valid(cls, text):
+        results = Line.parseString(text)
+        return True if results else False
+
+    @classmethod
+    def parse(cls, text):
+        return Line.parseString(text)
+
+def parse(s):
+    return SMILESParser.parse(s)
