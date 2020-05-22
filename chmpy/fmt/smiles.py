@@ -35,7 +35,10 @@ class SMILESParser:
         )
         Chiral = Regex("@@?")
         Fifteen = Regex("1(0|1|2|3|4|5)|2|3|4|5|6|7|8|9")
-        Charge = ((Lit("+") + Opt(Lit("+") ^ Fifteen)) ^ (Lit("-") + Opt(Lit("-") ^ Fifteen))).setParseAction(lambda x: int(x[0]))
+        Charge = pp.MatchFirst([
+            Lit("+") + Opt(pp.MatchFirst([Lit("+"), Fifteen])),
+            Lit("-") + Opt(pp.MatchFirst([Lit("-") ^ Fifteen]))
+        ]).setParseAction(lambda x: int(x[0]))
         HCount = Regex("H[0-9]?")
         Isotope = Regex("[0-9]?[0-9]?[0-9]")
         Map = Regex(":[0-9]?[0-9]?[0-9]")
@@ -46,22 +49,25 @@ class SMILESParser:
         Atom = pp.Forward()
         LBr = Lit("(").setParseAction(self._parse_lbr)
         RBr = Lit(")").setParseAction(self._parse_rbr)
-        Branch = (LBr + (pp.OneOrMore(Opt(Bond ^ Dot) + Line)) + RBr)
-        Chain = pp.OneOrMore((Dot + Atom("atoms")) ^ (Opt(Bond("explicit_bonds")) + (Atom("atoms") ^ RNum("rings"))))
+        Branch = (LBr + (pp.OneOrMore(Opt(pp.MatchFirst([Bond, Dot]))+ Line)) + RBr)
+        Chain = pp.OneOrMore(
+            pp.MatchFirst([
+                (Dot + Atom("atoms")),
+                (Opt(Bond("explicit_bonds")) + pp.MatchFirst([Atom("atoms"), RNum("rings")]))
+            ])
+        )
         BracketAtom = Lit("[") + Opt(Isotope("isotopes")) + Symbol + Opt(Chiral("chirality")) + Opt(HCount("explicit_hydrogens")) + Opt(Charge) ^ Opt(Map) + Lit("]")
-        Atom << (OrganicSymbol ^ BracketAtom).setParseAction(self._parse_atom)
-        Line << Atom("atom") + pp.ZeroOrMore(Chain ^ Branch)
+        Atom << pp.MatchFirst([OrganicSymbol, BracketAtom]).setParseAction(self._parse_atom)
+        Line << Atom("atom") + pp.ZeroOrMore(pp.MatchFirst([Chain, Branch]))
         self.parser = Line
 
     def parse(self, tok):
-        print(tok, self.count)
         self.count += 1
 
     def _parse_atom(self, tok):
         N = len(self.atoms)
         if self._prev_idx > -1:
             self.bonds.append((self._prev_idx, N + 1, self._bond_type))
-            print("adding bond", self.bonds[-1])
         self._bond_type = "-"
         self.atoms.append(tok[0])
         self._prev_idx = N + 1
@@ -74,20 +80,19 @@ class SMILESParser:
 
     def _parse_ring_num(self, toks):
         idx = int(toks[0])
-        print("parse ring num")
         if idx in self._rings:
-            self._rings[idx] = (self._rings[idx][0], len(self.atoms))
+            a, b = self._rings[idx][0], len(self.atoms)
+            self._rings[idx] = (a, b)
+            self.bonds.append((a, b, "r"))
         else:
             self._rings[idx] = (len(self.atoms), -1)
 
     def _parse_lbr(self, toks):
         self._branch_idx = self._prev_idx
-        print("lbr", self._prev_idx)
 
     def _parse_rbr(self, toks):
         self._prev_idx = self._branch_idx
-        self._branch_idx = None
-        print("rbr", self._prev_idx)
+        self._branch_idx = -1
 
     def parseString(self, s):
         self.count = 0
@@ -98,10 +103,9 @@ class SMILESParser:
         self._bond_type = "-"
         self._rings = {}
         self.parser.parseString(s)
-        print(self.atoms)
-        print(self.bonds)
-        print(self._rings)
+        return (self.atoms, self.bonds)
 
+_DEFAULT_PARSER = SMILESParser()
 
 def parse(s):
-    return SMILESParser().parseString(s)
+    return _DEFAULT_PARSER.parseString(s)
