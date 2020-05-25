@@ -21,6 +21,12 @@ def property_to_color(prop, cmap="viridis", **kwargs):
             from matplotlib.colors import TwoSlopeNorm
         except ImportError:
             from matplotlib.colors import DivergingNorm as TwoSlopeNorm
-        norm = TwoSlopeNorm(vmin=prop.min(), vcenter=midpoint, vmax=prop.max())
+        vmin = prop.min()
+        vmax = prop.max()
+        if vmin >= 0.0:
+            vmin = -1.0
+        if vmax <= 0.0:
+            vmax = 1.0
+        norm = TwoSlopeNorm(vmin=vmin, vcenter=midpoint, vmax=vmax)
         prop = norm(prop)
     return colormap(prop)
