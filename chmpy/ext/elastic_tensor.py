@@ -279,3 +279,15 @@ class ElasticTensor:
         r = f(sphere.vertices)
         sphere.vertices *= r[:, np.newaxis]
         return sphere
+
+    def shape_descriptors(self, kind="youngs_modulus", l_max=5, **kwargs):
+        from chmpy.shape.shape_descriptors import make_invariants
+        from chmpy.shape.sht import SHT
+        sht = SHT(l_max=l_max)
+        f = getattr(self, kind)
+        points = sht.grid_cartesian
+        coeffs = sht.analyse(f(points))
+        invariants = make_invariants(l_max, coeffs)
+        if kwargs.get("coefficients", False):
+            return coeffs, invariants
+        return invariants
