@@ -1121,7 +1121,8 @@ class Crystal:
     @classmethod
     def from_vasp_string(cls, string, **kwargs):
         from chmpy.fmt.vasp import parse_poscar
-        vasp_data =  parse_poscar(string)
+
+        vasp_data = parse_poscar(string)
         uc = UnitCell(vasp_data["direct"])
         sg = SpaceGroup(1)
         coords = vasp_data["positions"]
@@ -1283,15 +1284,18 @@ class Crystal:
 
     def structure_factors(self, **kwargs):
         from chmpy.crystal.sfac import structure_factors
+
         return structure_factors(self, **kwargs)
 
     def unique_reflections(self, **kwargs):
         from chmpy.crystal.sfac import reflections
+
         return reflections(self, **kwargs)
 
     def powder_pattern(self, **kwargs):
         from chmpy.crystal.sfac import powder_pattern
         from chmpy.crystal.powder import PowderPattern
+
         tt, f2 = powder_pattern(self, **kwargs)
         return PowderPattern(tt, f2, **kwargs)
 
@@ -1437,9 +1441,9 @@ class Crystal:
         sc_mols = []
         for q, r, s in it.product(u, v, w):
             for uc_mol in self.unit_cell_molecules():
-                sc_mols.append(uc_mol.translated(
-                    np.asarray([q, r, s]) @ self.unit_cell.lattice
-                ))
+                sc_mols.append(
+                    uc_mol.translated(np.asarray([q, r, s]) @ self.unit_cell.lattice)
+                )
 
         asym_pos = np.vstack([x.positions for x in sc_mols])
         asym_nums = np.hstack([x.atomic_numbers for x in sc_mols])
@@ -1449,4 +1453,3 @@ class Crystal:
         new_crystal = Crystal(sc, SpaceGroup(1), asymmetric_unit)
         new_crystal.titl = self.titl + "-P1-{}-{}-{}".format(*size)
         return new_crystal
-

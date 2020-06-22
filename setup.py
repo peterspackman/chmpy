@@ -5,7 +5,11 @@ from numpy import get_include
 from Cython.Build import cythonize
 
 ext_modules = [
-    NumpyExt("chmpy.interpolate.linterp", sources=["chmpy/interpolate/linterp.c"], language="c")
+    NumpyExt(
+        "chmpy.interpolate.linterp",
+        sources=["chmpy/interpolate/linterp.c"],
+        language="c",
+    )
 ]
 
 ext_modules_cython = cythonize(

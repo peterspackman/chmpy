@@ -29,9 +29,7 @@ def crystal_to_turbomole_string(crystal, **kwargs):
 
 def molecule_to_turbomole_string(molecule, **kwargs):
     return TMOL_TEMPLATE.render(
-        atoms=zip(molecule.positions, molecule.elements),
-        units="angs",
-        blocks=kwargs,
+        atoms=zip(molecule.positions, molecule.elements), units="angs", blocks=kwargs,
     )
 
 
@@ -44,6 +42,7 @@ def turbomole_string(obj, **kwargs):
 
 def load_turbomole_string(tmol_string):
     from ccpy.util import units
+
     "Initialize from an xtb coord string resulting from optimization"
     data = {}
     sections = tmol_string.split("$")

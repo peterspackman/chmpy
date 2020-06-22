@@ -4,6 +4,7 @@ import unittest
 from .. import TEST_FILES
 import numpy as np
 
+
 class EEMTestCase(unittest.TestCase):
     def setUp(self):
         self.eem = EEM()

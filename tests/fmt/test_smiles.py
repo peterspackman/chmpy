@@ -15,6 +15,7 @@ _PYRIDINE = "c1cnccc1"
 class SMILESParserTest(unittest.TestCase):
     def test_parse_valid(self):
         from pyparsing import ParseException
+
         with self.assertRaises(ParseException):
             parse("invalid")
         parse(_WATER)
@@ -23,4 +24,3 @@ class SMILESParserTest(unittest.TestCase):
     def test_cubane_bonds(self):
         atoms, bonds = parse(_CUBANE)
         self.assertEqual(len(bonds), 12)
-

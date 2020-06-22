@@ -10,7 +10,9 @@ pp.ParserElement.enablePackrat()
 
 class SMILESParser:
     def __init__(self):
-        OrganicSymbol = Regex("Br?|Cl?|N|O|P|S|F|I|At|Ts|b|c|n|o|p|s").setParseAction(self.parse)
+        OrganicSymbol = Regex("Br?|Cl?|N|O|P|S|F|I|At|Ts|b|c|n|o|p|s").setParseAction(
+            self.parse
+        )
         Symbol = Regex(
             "A(c|g|l|m|r|s|t|u)|"
             "B(a|e|h|i|k|r)?|"
@@ -35,10 +37,12 @@ class SMILESParser:
         )
         Chiral = Regex("@@?")
         Fifteen = Regex("1(0|1|2|3|4|5)|2|3|4|5|6|7|8|9")
-        Charge = pp.MatchFirst([
-            Lit("+") + Opt(pp.MatchFirst([Lit("+"), Fifteen])),
-            Lit("-") + Opt(pp.MatchFirst([Lit("-") ^ Fifteen]))
-        ]).setParseAction(lambda x: int(x[0]))
+        Charge = pp.MatchFirst(
+            [
+                Lit("+") + Opt(pp.MatchFirst([Lit("+"), Fifteen])),
+                Lit("-") + Opt(pp.MatchFirst([Lit("-") ^ Fifteen])),
+            ]
+        ).setParseAction(lambda x: int(x[0]))
         HCount = Regex("H[0-9]?")
         Isotope = Regex("[0-9]?[0-9]?[0-9]")
         Map = Regex(":[0-9]?[0-9]?[0-9]")
@@ -49,15 +53,24 @@ class SMILESParser:
         Atom = pp.Forward()
         LBr = Lit("(").setParseAction(self._parse_lbr)
         RBr = Lit(")").setParseAction(self._parse_rbr)
-        Branch = (LBr + (pp.OneOrMore(Opt(pp.MatchFirst([Bond, Dot]))+ Line)) + RBr)
+        Branch = LBr + (pp.OneOrMore(Opt(pp.MatchFirst([Bond, Dot])) + Line)) + RBr
         Chain = pp.OneOrMore(
-            pp.MatchFirst([
-                (Dot + Atom("atoms")),
-                (Opt(Bond("explicit_bonds")) + pp.MatchFirst([Atom("atoms"), RNum("rings")]))
-            ])
+            pp.MatchFirst(
+                [
+                    (Dot + Atom("atoms")),
+                    (
+                        Opt(Bond("explicit_bonds"))
+                        + pp.MatchFirst([Atom("atoms"), RNum("rings")])
+                    ),
+                ]
+            )
         )
-        BracketAtom = Lit("[") + Opt(Isotope("isotopes")) + Symbol + Opt(Chiral("chirality")) + Opt(HCount("explicit_hydrogens")) + Opt(Charge) ^ Opt(Map) + Lit("]")
-        Atom << pp.MatchFirst([OrganicSymbol, BracketAtom]).setParseAction(self._parse_atom)
+        BracketAtom = Lit("[") + Opt(Isotope("isotopes")) + Symbol + Opt(
+            Chiral("chirality")
+        ) + Opt(HCount("explicit_hydrogens")) + Opt(Charge) ^ Opt(Map) + Lit("]")
+        Atom << pp.MatchFirst([OrganicSymbol, BracketAtom]).setParseAction(
+            self._parse_atom
+        )
         Line << Atom("atom") + pp.ZeroOrMore(pp.MatchFirst([Chain, Branch]))
         self.parser = Line
 
@@ -105,7 +118,9 @@ class SMILESParser:
         self.parser.parseString(s)
         return (self.atoms, self.bonds)
 
+
 _DEFAULT_PARSER = SMILESParser()
+
 
 def parse(s):
     return _DEFAULT_PARSER.parseString(s)

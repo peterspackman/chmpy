@@ -12,6 +12,7 @@ TENSOR = """
     0.000	0.000	0.000	0.006	0.000	11.947
 """
 
+
 class ElasticTensorTestCase(unittest.TestCase):
     def setUp(self):
         self.elastic = ElasticTensor.from_string(TENSOR)

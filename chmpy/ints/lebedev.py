@@ -2,13 +2,9 @@ import numpy as np
 from pathlib import Path
 from chmpy.util.num import spherical_to_cartesian
 
-_GRIDS = {
-    k: v
-    for k, v in np.load(Path(__file__).parent / "lebedev_grids.npz").items()
-}
-_GRID_LMAX_LIST = tuple(
-    sorted(int(k.split("_")[-1]) for k in _GRIDS.keys())
-)
+_GRIDS = {k: v for k, v in np.load(Path(__file__).parent / "lebedev_grids.npz").items()}
+_GRID_LMAX_LIST = tuple(sorted(int(k.split("_")[-1]) for k in _GRIDS.keys()))
+
 
 def load_grid(l_max, cartesian=False):
     for g in _GRID_LMAX_LIST:

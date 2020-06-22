@@ -18,11 +18,8 @@ def angles_to_cartesian(theta, phi):
     sinp = np.sin(phi)
     cost = np.cos(theta)
     cosp = np.cos(phi)
-    return np.c_[
-        sint * cosp,
-        sint * sinp,
-        cost
-    ]
+    return np.c_[sint * cosp, sint * sinp, cost]
+
 
 def angles_to_cartesian_2(theta, phi, chi):
     sint = np.sin(theta)
@@ -32,10 +29,9 @@ def angles_to_cartesian_2(theta, phi, chi):
     sinc = np.sin(chi)
     cosc = np.cos(chi)
     return np.c_[
-        cost * cosp * cosp - sinp * sinc,
-        cost * sinp * cosc + cosp * sinc,
-        -sint * cosc
+        cost * cosp * cosp - sinp * sinc, cost * sinp * cosc + cosp * sinc, -sint * cosc
     ]
+
 
 def _minimize(func, dim):
     if dim == 2:
@@ -99,8 +95,7 @@ class ElasticTensor:
             [
                 [
                     [
-                        sv_coeff(vm[i, j], vm[k, l])
-                        * self.s_voigt[vm[i, j], vm[k, l]]
+                        sv_coeff(vm[i, j], vm[k, l]) * self.s_voigt[vm[i, j], vm[k, l]]
                         for i in range(3)
                     ]
                     for j in range(3)
@@ -138,26 +133,18 @@ class ElasticTensor:
         return self.youngs_modulus(a)
 
     def youngs_modulus(self, a):
-        return 1 / np.einsum(
-            "ai,aj,ak,al,ijkl->a",
-            a, a, a, a,
-            self.elasticity_tensor
-        )
+        return 1 / np.einsum("ai,aj,ak,al,ijkl->a", a, a, a, a, self.elasticity_tensor)
 
     def linear_compressibility_angular(self, theta, phi):
         a = angles_to_cartesian(theta, phi)
         return self.linear_compressibility(a)
-    
+
     def linear_compressibility(self, a):
-        return 1000 *  np.einsum(
-            "ai,aj,ijkk->a",
-            a, a, self.elasticity_tensor
-        )
+        return 1000 * np.einsum("ai,aj,ijkk->a", a, a, self.elasticity_tensor)
 
     def shear_modulus(self, a, b):
         return 0.25 / np.einsum(
-            "ai,aj,ak,al,ijkl->a",
-            a, b, a, b, self.elasticity_tensor
+            "ai,aj,ak,al,ijkl->a", a, b, a, b, self.elasticity_tensor
         )
 
     def shear_modulus_angular(self, theta, phi, chi):
@@ -166,21 +153,14 @@ class ElasticTensor:
         return self.shear_modulus(a, b)
 
     def poisson_ratio(self, a, b):
-        r1 = np.einsum(
-            "ai,aj,ak,al,ijkl->a",
-            a, a, b, b, self.elasticity_tensor
-        )
-        r2 = np.einsum(
-            "ai,aj,ak,al,ijkl->a",
-            a, a, a, a, self.elasticity_tensor
-        )
-        return - r1 /r2
+        r1 = np.einsum("ai,aj,ak,al,ijkl->a", a, a, b, b, self.elasticity_tensor)
+        r2 = np.einsum("ai,aj,ak,al,ijkl->a", a, a, a, a, self.elasticity_tensor)
+        return -r1 / r2
 
     def poisson_ratio_angular(self, theta, phi, chi):
         a = angles_to_cartesian(theta, phi)
         b = angles_to_cartesian_2(theta, phi, chi)
         return self.poisson_ratio(a, b)
-
 
     def averages(self):
         A = (self.c_voigt[0, 0] + self.c_voigt[1, 1] + self.c_voigt[2, 2]) / 3
@@ -199,40 +179,42 @@ class ElasticTensor:
         KH = (KV + KR) / 2
         GH = (GV + GR) / 2
 
-        return np.array((
+        return np.array(
             (
-                KV,
-                1 / (1 / (3 * GV) + 1 / (9 * KV)),
-                GV,
-                (1 - 3 * GV / (3 * KV + GV)) / 2,
-            ),
-            (
-                KR,
-                1 / (1 / (3 * GR) + 1 / (9 * KR)),
-                GR,
-                (1 - 3 * GR / (3 * KR + GR)) / 2,
-            ),
-            (
-                KH,
-                1 / (1 / (3 * GH) + 1 / (9 * KH)),
-                GH,
-                (1 - 3 * GH / (3 * KH + GH)) / 2,
+                (
+                    KV,
+                    1 / (1 / (3 * GV) + 1 / (9 * KV)),
+                    GV,
+                    (1 - 3 * GV / (3 * KV + GV)) / 2,
+                ),
+                (
+                    KR,
+                    1 / (1 / (3 * GR) + 1 / (9 * KR)),
+                    GR,
+                    (1 - 3 * GR / (3 * KR + GR)) / 2,
+                ),
+                (
+                    KH,
+                    1 / (1 / (3 * GH) + 1 / (9 * KH)),
+                    GH,
+                    (1 - 3 * GH / (3 * KH + GH)) / 2,
+                ),
             )
-        ))
+        )
 
     def plot2d(self, kind="youngs_modulus", axis="xy", npoints=100, **kwargs):
         u = np.linspace(0, np.pi * 2, npoints)
-        v = np.zeros_like(u) 
+        v = np.zeros_like(u)
         f = getattr(self, kind + "_angular")
         fig, ax = plt.subplots()
         fig.set_size_inches(kwargs.pop("figsize", (3, 3)))
         font = "Arial"
         xlims = kwargs.pop("xlim", None)
         ylims = kwargs.pop("ylim", None)
-#        ax.set_title(f"${axis}$-plane", fontname=font, fontsize=12)
+        #        ax.set_title(f"${axis}$-plane", fontname=font, fontsize=12)
         ax.set_xlabel(f"{axis[0]}", fontsize=12)
         ax.set_ylabel(f"{axis[1]}", fontsize=12, rotation=0)
-        if axis =="xy":
+        if axis == "xy":
             v[:] = np.pi / 2
             r = f(v, u)
             x = r * np.cos(u)
@@ -253,8 +235,8 @@ class ElasticTensor:
         ax.xaxis.set_major_locator(plt.MaxNLocator(9))
         ax.yaxis.set_major_locator(plt.MaxNLocator(9))
         ax.plot(x, y, c="k", **kwargs)
-        #ax.spines["right"].set_color("none")
-        #ax.spines["top"].set_color("none")
+        # ax.spines["right"].set_color("none")
+        # ax.spines["top"].set_color("none")
         sns.despine(ax=ax, offset=0)
         ax.spines["bottom"].set_position("zero")
         ax.spines["left"].set_position("zero")
@@ -274,6 +256,7 @@ class ElasticTensor:
 
     def mesh(self, kind="youngs_modulus", subdivisions=3):
         import trimesh
+
         f = getattr(self, kind)
         sphere = trimesh.creation.icosphere(subdivisions=subdivisions)
         r = f(sphere.vertices)
@@ -283,6 +266,7 @@ class ElasticTensor:
     def shape_descriptors(self, kind="youngs_modulus", l_max=5, **kwargs):
         from chmpy.shape.shape_descriptors import make_invariants
         from chmpy.shape.sht import SHT
+
         sht = SHT(l_max=l_max)
         f = getattr(self, kind)
         points = sht.grid_cartesian
@@ -294,13 +278,16 @@ class ElasticTensor:
 
     def spackman_average(self, kind="youngs_modulus"):
         from chmpy.ints.lebedev import load_grid
+
         grid = load_grid(l_max=20, cartesian=True)
         f = getattr(self, kind)
         r = f(grid[:, :3])
         return np.sum(r * grid[:, -1])
 
     def __repr__(self):
-        s = np.array2string(self.c_voigt, precision=4, suppress_small=True, separator="  ")
+        s = np.array2string(
+            self.c_voigt, precision=4, suppress_small=True, separator="  "
+        )
         s = s.replace("[", " ")
         s = s.replace("]", " ")
         return f"<ElasticTensor:\n{s}>"
