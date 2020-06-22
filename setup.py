@@ -53,6 +53,7 @@ setup(
     ],
     packages=["chmpy"],
     package_data={
+        "chmpy.ints": ["*.npz"],
         "chmpy.interpolate": ["*.npz"],
         "chmpy.subgraphs": ["*.gt"],
         "chmpy.templates": ["*.jinja2"],

@@ -634,6 +634,9 @@ class SpaceGroup:
     def reduced_symmetry_operations(self):
         return reduced_symmetry_list(self.symmetry_operations, self.latt)
 
+    def has_hexagonal_rhombohedral_choices(self):
+        return self.international_tables_number in (146, 148, 155, 160, 161, 166, 167)
+
     @classmethod
     def from_symmetry_operations(cls, symops, expand_latt=None):
         """Find a matching spacegroup for a given set of symmetry

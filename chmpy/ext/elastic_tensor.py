@@ -291,3 +291,16 @@ class ElasticTensor:
         if kwargs.get("coefficients", False):
             return coeffs, invariants
         return invariants
+
+    def spackman_average(self, kind="youngs_modulus"):
+        from chmpy.ints.lebedev import load_grid
+        grid = load_grid(l_max=20, cartesian=True)
+        f = getattr(self, kind)
+        r = f(grid[:, :3])
+        return np.sum(r * grid[:, -1])
+
+    def __repr__(self):
+        s = np.array2string(self.c_voigt, precision=4, suppress_small=True, separator="  ")
+        s = s.replace("[", " ")
+        s = s.replace("]", " ")
+        return f"<ElasticTensor:\n{s}>"

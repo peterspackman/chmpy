@@ -211,7 +211,7 @@ class Crystal:
 
         return self.unit_cell.to_fractional(coords)
 
-    def unit_cell_atoms(self, tolerance=1e-3):
+    def unit_cell_atoms(self, tolerance=1e-2):
         """Generate all atoms in the unit cell (i.e. with 
         fractional coordinates in [0, 1]) along with associated
         information about symmetry operations, occupation, elements
@@ -1110,9 +1110,29 @@ class Crystal:
         :obj:`Crystal`
             the resulting crystal structure
         """
+        n = Path(filename).name
+        fname_map = {"POSCAR": cls.from_vasp_file, "CONTCAR": cls.from_vasp_file}
+        if n in fname_map:
+            return fname_map[n](filename)
         extension_map = {".cif": cls.from_cif_file, ".res": cls.from_shelx_file}
         extension = os.path.splitext(filename)[-1].lower()
         return extension_map[extension](filename)
+
+    @classmethod
+    def from_vasp_string(cls, string, **kwargs):
+        from chmpy.fmt.vasp import parse_poscar
+        vasp_data =  parse_poscar(string)
+        uc = UnitCell(vasp_data["direct"])
+        sg = SpaceGroup(1)
+        coords = vasp_data["positions"]
+        if not vasp_data["coord_type"].startswith("d"):
+            coords = uc.to_fractional(coords)
+        asym = AsymmetricUnit(vasp_data["elements"], coords)
+        return Crystal(uc, sg, asym, titl=vasp_data["name"])
+
+    @classmethod
+    def from_vasp_file(cls, filename, **kwargs):
+        return cls.from_vasp_string(Path(filename).read_text(), **kwargs)
 
     @classmethod
     def from_cif_data(cls, cif_data, titl=None):
@@ -1357,3 +1377,76 @@ class Crystal:
         extension_map = {".cif": self.to_cif_file, ".res": self.to_shelx_file}
         extension = os.path.splitext(filename)[-1].lower()
         return extension_map[extension](filename)
+
+    def choose_trigonal_lattice(self, choice="H"):
+        """Change the choice of lattice for this crystal to either
+        rhombohedral or hexagonal cell
+
+        Parameters
+        ----------
+        choice: str, optional
+            The choice of the resulting lattice, either 'H' for hexagonal
+            or 'R' for rhombohedral (default 'H').
+        """
+        if not self.space_group.has_hexagonal_rhombohedral_choices():
+            raise ValueError("Invalid space group for choose_trigonal_lattice")
+        if self.space_group.choice == choice:
+            return
+        cart_asym_pos = self.to_cartesian(self.asymmetric_unit.positions)
+        assert choice in ("H", "R"), "Valid choices are H, R"
+        if self.space_group.choice == "R":
+            T = np.array(((-1, 1, 0), (1, 0, -1), (1, 1, 1)))
+        else:
+            T = 1 / 3 * np.array(((-1, 1, 1), (2, 1, 1), (-1, -2, 1)))
+        new_uc = UnitCell(np.dot(T, self.unit_cell.direct))
+        self.unit_cell = new_uc
+        self.asymmetric_unit.positions = self.to_fractional(cart_asym_pos)
+        self.space_group = SpaceGroup(
+            self.space_group.international_tables_number, choice=choice
+        )
+
+    def as_P1(self):
+        """Create a copy of this crystal in space group P 1, with the new
+        asymmetric_unit consisting of self.unit_cell_molecules()"""
+        return self.as_P1_supercell((1, 1, 1))
+
+    def as_P1_supercell(self, size):
+        """Create a supercell of this crystal in space group P 1.
+
+        Parameters
+        ----------
+        size: tuple of int
+            size of the P 1 supercell to be created
+
+        Returns
+        -------
+        :obj: Crystal
+            Crystal object of a supercell in space group P 1
+        """
+        import itertools as it
+
+        umax, vmax, wmax = size
+        a, b, c = self.unit_cell.lengths
+        sc = UnitCell.from_lengths_and_angles(
+            (umax * a, vmax * b, wmax * c), self.unit_cell.angles
+        )
+
+        u = np.arange(umax)
+        v = np.arange(vmax)
+        w = np.arange(wmax)
+        sc_mols = []
+        for q, r, s in it.product(u, v, w):
+            for uc_mol in self.unit_cell_molecules():
+                sc_mols.append(uc_mol.translated(
+                    np.asarray([q, r, s]) @ self.unit_cell.lattice
+                ))
+
+        asym_pos = np.vstack([x.positions for x in sc_mols])
+        asym_nums = np.hstack([x.atomic_numbers for x in sc_mols])
+        asymmetric_unit = AsymmetricUnit(
+            [Element[x] for x in asym_nums], sc.to_fractional(asym_pos)
+        )
+        new_crystal = Crystal(sc, SpaceGroup(1), asymmetric_unit)
+        new_crystal.titl = self.titl + "-P1-{}-{}-{}".format(*size)
+        return new_crystal
+
