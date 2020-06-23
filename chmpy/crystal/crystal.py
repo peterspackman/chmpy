@@ -779,7 +779,7 @@ class Crystal:
         atoms = self.slab()
         density = PromoleculeDensity((atoms["element"], atoms["cart_pos"]))
         sep = kwargs.get("separation", kwargs.get("resolution", 0.5))
-        isovalue = kwargs.get("isovalue", 5e-4)
+        isovalue = kwargs.get("isovalue", 3e-4)
         seps = sep / np.array(self.unit_cell.lengths)
         x_grid = np.arange(0, 1.0, seps[0], dtype=np.float32)
         y_grid = np.arange(0, 1.0, seps[1], dtype=np.float32)
@@ -798,10 +798,18 @@ class Crystal:
         values[mask] = rho
         values = values.reshape(shape)
         verts, faces, normals, _ = marching_cubes(
-            values, isovalue, spacing=separations, gradient_direction="ascent"
+            values, isovalue, spacing=seps, gradient_direction="ascent"
         )
-        mesh = trimesh.Trimesh(vertices=verts, faces=faces, normals=normals,)
+        mesh = trimesh.Trimesh(
+            vertices=self.to_cartesian(verts), faces=faces, normals=normals,
+        )
         return mesh
+
+    def mesh_scene(self):
+        from trimesh.scene.scene import append_scenes
+
+        meshes = [m.to_mesh() for m in self.unit_cell_molecules()]
+        return append_scenes(meshes)
 
     def hirshfeld_surfaces(self, **kwargs):
         "Alias for `self.stockholder_weight_isosurfaces`"
@@ -1141,7 +1149,16 @@ class Crystal:
         of CIF data"""
         labels = cif_data.get("atom_site_label", None)
         symbols = cif_data.get("atom_site_type_symbol", None)
-        elements = [Element[x] for x in symbols]
+        if symbols is None:
+            if labels is None:
+                raise ValueError(
+                    "Unable to determine elements in CIF, "
+                    "need one of _atom_site_label or "
+                    "_atom_site_type_symbol present"
+                )
+            elements = [Element[x] for x in labels]
+        else:
+            elements = [Element[x] for x in symbols]
         x = np.asarray(cif_data.get("atom_site_fract_x", []))
         y = np.asarray(cif_data.get("atom_site_fract_y", []))
         z = np.asarray(cif_data.get("atom_site_fract_z", []))
@@ -1153,32 +1170,38 @@ class Crystal:
         lengths = [cif_data[f"cell_length_{x}"] for x in ("a", "b", "c")]
         angles = [cif_data[f"cell_angle_{x}"] for x in ("alpha", "beta", "gamma")]
         unit_cell = UnitCell.from_lengths_and_angles(lengths, angles, unit="degrees")
-        space_group = SpaceGroup(int(cif_data.get("symmetry_Int_Tables_number", 1)))
 
-        if "symmetry_equiv_pos_as_xyz" in cif_data:
-            latt = space_group.latt
-            symops = [
-                SymmetryOperation.from_string_code(x)
-                for x in cif_data["symmetry_equiv_pos_as_xyz"]
-            ]
-            try:
-                new_sg = SpaceGroup.from_symmetry_operations(symops)
-                space_group = new_sg
-            except ValueError as e:
-                space_group.symmetry_operations = symops
-                symbol = cif_data.get(
-                    "symmetry_space_group_name_H-M", space_group.symbol
-                )
-                space_group.symbol = symbol
-                space_group.full_symbol = symbol
-                LOG.warn(
-                    "Initializing non-standard spacegroup setting %s, "
-                    "some SG data may be missing",
-                    symbol,
-                )
-
-        elif "symmetry_Int_Tables_number" in cif_data:
-            space_group = SpaceGroup(cif_data["symmetry_Int_Tables_number"])
+        space_group = SpaceGroup(1)
+        symop_data_names = (
+            "symmetry_equiv_pos_as_xyz",
+            "space_group_symop_operation_xyz",
+        )
+        for symop_data_block in symop_data_names:
+            if symop_data_block in cif_data:
+                latt = space_group.latt
+                symops = [
+                    SymmetryOperation.from_string_code(x)
+                    for x in cif_data[symop_data_block]
+                ]
+                try:
+                    new_sg = SpaceGroup.from_symmetry_operations(symops)
+                    space_group = new_sg
+                except ValueError as e:
+                    space_group.symmetry_operations = symops
+                    symbol = cif_data.get(
+                        "symmetry_space_group_name_H-M", space_group.symbol
+                    )
+                    space_group.symbol = symbol
+                    space_group.full_symbol = symbol
+                    LOG.warn(
+                        "Initializing non-standard spacegroup setting %s, "
+                        "some SG data may be missing",
+                        symbol,
+                    )
+        else:
+            # fall back to international tables number
+            if "symmetry_Int_Tables_number" in cif_data:
+                space_group = SpaceGroup(cif_data["symmetry_Int_Tables_number"])
 
         return Crystal(unit_cell, space_group, asym, cif_data=cif_data, titl=titl)
 

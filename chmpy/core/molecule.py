@@ -662,6 +662,11 @@ class Molecule:
         )
         return mesh
 
+    def to_mesh(self):
+        from chmpy.util.mesh import molecule_to_meshes
+
+        return molecule_to_meshes(self)
+
     @property
     def name(self):
         return self.properties.get(
