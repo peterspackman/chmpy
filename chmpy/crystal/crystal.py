@@ -773,7 +773,7 @@ class Crystal:
 
         from chmpy import PromoleculeDensity
         import trimesh
-        from .mc import marching_cubes
+        from chmpy.mc import marching_cubes
         from scipy.spatial import cKDTree as KDTree
 
         atoms = self.slab()

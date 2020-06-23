@@ -1,5 +1,7 @@
 BOHR_TO_ANGSTROM = 0.52917749
 AU_TO_KJ_PER_MOL = 2625.499639
+EV_TO_KJ_PER_MOL = 96.48530749925973
+AU_TO_EV = 27.211399
 
 
 class units:
@@ -15,9 +17,15 @@ class units:
         ("angstrom", "bohr"): 1 / BOHR_TO_ANGSTROM,
         ("angstrom", "au"): 1 / BOHR_TO_ANGSTROM,
         ("au", "kj_per_mol"): AU_TO_KJ_PER_MOL,
+        ("au", "ev"): AU_TO_EV,
         ("hartree", "kj_per_mol"): AU_TO_KJ_PER_MOL,
+        ("hartree", "ev"): AU_TO_EV,
+        ("ev", "kj_per_mol"): EV_TO_KJ_PER_MOL,
+        ("ev", "au"): 1 / AU_TO_EV,
+        ("ev", "hartree"): 1 / AU_TO_EV,
         ("kj_per_mol", "au"): 1 / AU_TO_KJ_PER_MOL,
         ("kj_per_mol", "hartree"): 1 / AU_TO_KJ_PER_MOL,
+        ("kj_per_mol", "ev"): 1 / EV_TO_KJ_PER_MOL,
     }
 
     @classmethod
