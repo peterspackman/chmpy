@@ -73,6 +73,13 @@ class Molecule:
     def distance_matrix(self):
         return cdist(self.positions, self.positions)
 
+    @property
+    def unique_bonds(self):
+        return tuple(
+            (a, b, self.bonds[a, b])
+            for a, b in set(tuple(sorted(x)) for x in self.bonds.keys())
+        )
+
     def guess_bonds(self, tolerance=0.40):
         """Use geometric distances and covalent radii
         to determine bonding information for this molecule.
