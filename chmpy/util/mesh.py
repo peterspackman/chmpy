@@ -40,7 +40,6 @@ def molecule_to_meshes(molecule, **kwargs):
         faces.append(offset + base_sphere.faces)
         colors.append(np.repeat([el.color], n_points, axis=0))
         offset += n_points
-
     bond_thickness = 0.9 * Element["H"].ball_stick_radius
     for i, (a, b, d) in enumerate(molecule.unique_bonds):
         x1 = molecule.positions[a]

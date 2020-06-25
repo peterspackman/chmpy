@@ -3,8 +3,8 @@ from collections import defaultdict
 from scipy.spatial import cKDTree as KDTree
 from scipy.spatial.distance import cdist
 from scipy.sparse import dok_matrix
+from pathlib import Path
 import numpy as np
-import os
 from .element import Element
 
 
@@ -195,7 +195,8 @@ class Molecule:
         return self._partial_charges
 
     def electrostatic_potential(self, positions):
-        from chmpy.util import BOHR_PER_ANGSTROM
+        from chmpy.util.unit import BOHR_TO_ANGSTROM
+        BOHR_PER_ANGSTROM = 1 / BOHR_TO_ANGSTROM
 
         v_pot = np.zeros(positions.shape[0])
         for charge, position in zip(self.partial_charges, self.positions):
@@ -242,9 +243,22 @@ class Molecule:
         filename: str
             path to the .xyz file
         """
-        from pathlib import Path
 
         return cls.from_xyz_string(Path(filename).read_text(), **kwargs)
+
+    @classmethod
+    def _ext_load_map(cls):
+        return {".xyz": cls.from_xyz_file, ".sdf": cls.from_sdf_file}
+
+    @classmethod
+    def _fname_load_map(cls):
+        return {}
+
+    def _ext_save_map(self):
+        return {".xyz": self.to_xyz_file}
+
+    def _fname_save_map(self):
+        return {}
 
     @classmethod
     def load(cls, filename, **kwargs):
@@ -256,8 +270,15 @@ class Molecule:
         filename: str
             path to the file (in xyz format)
         """
-        extension_map = {".xyz": cls.from_xyz_file, ".sdf": cls.from_sdf_file}
-        extension = os.path.splitext(filename)[-1].lower()
+        fpath = Path(filename)
+        n = fpath.name
+        fname_map = cls._fname_load_map()
+        if n in fname_map:
+            return fname_map[n](filename)
+        extension_map = cls._ext_load_map()
+        extension = kwargs.pop("fmt", fpath.suffix.lower())
+        if not extension.startswith("."):
+            extension = "." + extension
         return extension_map[extension](filename, **kwargs)
 
     def to_xyz_string(self, header=True):
@@ -272,7 +293,10 @@ class Molecule:
             lines.append(f"{el} {x: 20.12f} {y: 20.12f} {z: 20.12f}")
         return "\n".join(lines)
 
-    def save(self, filename, header=True):
+    def to_xyz_file(self, filename, **kwargs):
+        Path(filename).write_text(self.to_xyz_string(**kwargs))
+
+    def save(self, filename, **kwargs):
         """save this molecule to the destination file in xyz format,
         optionally discarding the typical header.
 
@@ -283,9 +307,16 @@ class Molecule:
         header: bool, optional
             optionally disable writing of the header (no. of atoms and a comment line)
         """
-        from pathlib import Path
-
-        Path(filename).write_text(self.to_xyz_string(header=header))
+        fpath = Path(filename)
+        n = fpath.name
+        fname_map = self._fname_save_map()
+        if n in fname_map:
+            return fname_map[n](filename, **kwargs)
+        extension_map = self._ext_save_map()
+        extension = kwargs.pop("fmt", fpath.suffix.lower())
+        if not extension.startswith("."):
+            extension = "." + extension
+        return extension_map[extension](filename, **kwargs)
 
     @property
     def bbox_corners(self):
@@ -703,6 +734,9 @@ class Molecule:
         return Molecule.from_arrays(
             self.atomic_numbers[mask], self.positions[mask], **kwargs
         )
+
+    def translate(self, translation):
+        self.positions += translation
 
     def translated(self, translation):
         import copy

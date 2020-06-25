@@ -1,6 +1,5 @@
 import logging
 from collections import defaultdict
-import os
 from scipy.spatial import cKDTree as KDTree
 import numpy as np
 from scipy.sparse import dok_matrix
@@ -430,7 +429,6 @@ class Crystal:
             asym_atoms = uc_asym[nodes]
             reorder = np.argsort(asym_atoms)
             asym_atoms = asym_atoms[reorder]
-
             mol = Molecule.from_arrays(
                 elements=elements[reorder],
                 positions=positions[reorder],
@@ -440,9 +438,36 @@ class Crystal:
                 asymmetric_unit_labels=self.asymmetric_unit.labels[asym_atoms],
                 generator_symop=uc_symop[np.asarray(nodes)[reorder]],
             )
+            centroid = mol.center_of_mass
+            frac_centroid = self.to_fractional(centroid)
+            new_centroid = np.fmod(frac_centroid + 7.0, 1.0)
+            translation = self.to_cartesian(new_centroid - frac_centroid)
+            mol.translate(translation)
             molecules.append(mol)
         setattr(self, "_unit_cell_molecules", molecules)
         return molecules
+
+    def molecular_shell(self, mol_idx=0, radius=3.8, method="nearest_atom"):
+        mol = self.symmetry_unique_molecules()[mol_idx]
+        frac_origin = self.to_fractional(mol.center_of_mass)
+        frac_radius = radius / np.array(self.unit_cell.lengths)
+        hmax, kmax, lmax = np.ceil(frac_radius + frac_origin).astype(int) + 1
+        hmin, kmin, lmin = np.floor(frac_origin - frac_radius).astype(int) - 1
+        uc_mols = self.unit_cell_molecules()
+        shifts = self.to_cartesian(
+            cartesian_product(
+                np.arange(hmin, hmax), np.arange(kmin, kmax), np.arange(lmin, lmax)
+            )
+        )
+        neighbours = []
+        for uc_mol in uc_mols:
+            for shift in shifts:
+                uc_mol_t = uc_mol.translated(shift)
+                dist = mol.distance_to(uc_mol_t, method=method)
+                if (dist < radius) and (dist > 1e-2):
+                    neighbours.append(uc_mol_t)
+        return neighbours
+
 
     def symmetry_unique_molecules(self, bond_tolerance=0.4):
         """Calculate a list of connected molecules which contain
@@ -753,7 +778,15 @@ class Crystal:
             for mol in self.symmetry_unique_molecules()
         ]
 
-    def void_surface(self, **kwargs):
+    def asymmetric_unit_partial_charges(self):
+        mols = self.symmetry_unique_molecules()
+        charges = np.empty(len(self.asymmetric_unit), dtype=np.float32)
+        for mol in mols:
+            for idx, charge in zip(mol.properties["asymmetric_unit_atoms"], mol.partial_charges):
+                charges[idx] = charge
+        return charges
+
+    def void_surface(self, *args, **kwargs):
         """Calculate void surface based on promolecule electron density
         for the unit cell of this crystal
 
@@ -775,6 +808,8 @@ class Crystal:
         import trimesh
         from chmpy.mc import marching_cubes
         from scipy.spatial import cKDTree as KDTree
+
+        vertex_color = kwargs.get("color", None)
 
         atoms = self.slab()
         density = PromoleculeDensity((atoms["element"], atoms["cart_pos"]))
@@ -800,15 +835,34 @@ class Crystal:
         verts, faces, normals, _ = marching_cubes(
             values, isovalue, spacing=seps, gradient_direction="ascent"
         )
+        verts = self.to_cartesian(np.c_[verts[:, 1], verts[:, 0], verts[:, 2]])
+        vertex_colors = None
+        if vertex_color == "esp":
+            from chmpy.util.color import property_to_color
+            asym_charges = self.asymmetric_unit_partial_charges()
+            mol = Molecule.from_arrays(atoms["element"], atoms["cart_pos"])
+            partial_charges = np.empty(len(mol), dtype=np.float32)
+            partial_charges = asym_charges[atoms["asym_atom"]]
+            mol._partial_charges = partial_charges
+            prop = mol.electrostatic_potential(verts)
+            vertex_colors = property_to_color(prop, cmap=kwargs.get("cmap", "esp"))
+
         mesh = trimesh.Trimesh(
-            vertices=self.to_cartesian(verts), faces=faces, normals=normals,
+            vertices=verts, faces=faces, normals=normals, vertex_colors=vertex_colors
         )
         return mesh
 
-    def mesh_scene(self):
+    def mesh_scene(self, **kwargs):
         from trimesh.scene.scene import append_scenes
 
         meshes = [m.to_mesh() for m in self.unit_cell_molecules()]
+
+        if kwargs.get("void", False):
+            void_kwargs = kwargs.get("void_kwargs", {})
+            meshes.append(self.void_surface(**void_kwargs))
+        if kwargs.get("axes", False):
+            from trimesh.creation import axis
+            meshes.append(axis(transform=self.unit_cell.direct_homogeneous.T, axis_length=1.0))
         return append_scenes(meshes)
 
     def hirshfeld_surfaces(self, **kwargs):
@@ -1105,7 +1159,21 @@ class Crystal:
         return uc_mass / uc_vol / 0.6022
 
     @classmethod
-    def load(cls, filename):
+    def _ext_load_map(cls):
+        return {".cif": cls.from_cif_file, ".res": cls.from_shelx_file, ".vasp": cls.from_vasp_file}
+
+    def _ext_save_map(self):
+        return {".cif": self.to_cif_file, ".res": self.to_shelx_file}
+
+    @classmethod
+    def _fname_load_map(cls):
+        return {"POSCAR": cls.from_vasp_file, "CONTCAR": cls.from_vasp_file}
+
+    def _fname_save_map(self):
+        return {}
+
+    @classmethod
+    def load(cls, filename, **kwargs):
         """Load a crystal structure from file (.res, .cif)
 
         Parameters
@@ -1118,13 +1186,16 @@ class Crystal:
         :obj:`Crystal`
             the resulting crystal structure
         """
-        n = Path(filename).name
-        fname_map = {"POSCAR": cls.from_vasp_file, "CONTCAR": cls.from_vasp_file}
+        fpath = Path(filename)
+        n = fpath.name
+        fname_map = cls._fname_load_map()
         if n in fname_map:
             return fname_map[n](filename)
-        extension_map = {".cif": cls.from_cif_file, ".res": cls.from_shelx_file}
-        extension = os.path.splitext(filename)[-1].lower()
-        return extension_map[extension](filename)
+        extension_map = cls._ext_load_map()
+        extension = kwargs.pop("fmt", fpath.suffix.lower())
+        if not extension.startswith("."):
+            extension = "." + extension
+        return extension_map[extension](filename, **kwargs)
 
     @classmethod
     def from_vasp_string(cls, string, **kwargs):
@@ -1370,6 +1441,7 @@ class Crystal:
         cif_data = self.to_cif_data(**kwargs)
         return Cif(cif_data).to_string()
 
+    @classmethod
     def to_shelx_file(self, filename):
         """Write this crystal structure as a shelx .res file"""
         Path(filename).write_text(self.to_shelx_string())
@@ -1399,11 +1471,18 @@ class Crystal:
         }
         return to_res_contents(shelx_data)
 
-    def save(self, filename):
+    def save(self, filename, **kwargs):
         """Save this crystal structure to file (.cif)"""
-        extension_map = {".cif": self.to_cif_file, ".res": self.to_shelx_file}
-        extension = os.path.splitext(filename)[-1].lower()
-        return extension_map[extension](filename)
+        fpath = Path(filename)
+        n = fpath.name
+        fname_map = self._fname_save_map()
+        if n in fname_map:
+            return fname_map[n](filename, **kwargs)
+        extension_map = self._ext_save_map()
+        extension = kwargs.pop("fmt", fpath.suffix.lower())
+        if not extension.startswith("."):
+            extension = "." + extension
+        return extension_map[extension](filename, **kwargs)
 
     def choose_trigonal_lattice(self, choice="H"):
         """Change the choice of lattice for this crystal to either

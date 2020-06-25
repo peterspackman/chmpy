@@ -33,6 +33,12 @@ class UnitCell:
         "The reciprocal matrix of this unit cell i.e. vectors of the reciprocal lattice"
         return self.inverse.T
 
+    @property
+    def direct_homogeneous(self):
+        T = np.eye(4)
+        T[:3, :3] = self.direct
+        return T
+
     def to_cartesian(self, coords):
         """Transform coordinates from fractional space (a, b, c)
         to Cartesian space (x, y, z). The x-direction will be aligned
