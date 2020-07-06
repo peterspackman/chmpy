@@ -64,12 +64,7 @@ setup(
         "chmpy.subgraphs": ["*.gt"],
     },
     ext_modules=ext_modules,
-    entry_points={
-        "console_scripts": [
-            "chmpy-convert= chmpy.cmd.convert:main",
-        ]
-    },
-
+    entry_points={"console_scripts": ["chmpy-convert= chmpy.cmd.convert:main",]},
     install_requires=["numpy", "scipy", "trimesh", "matplotlib"],
     extras_require={"sht": ["shtns"], "graph": ["graph_tool"],},
     zip_safe=True,

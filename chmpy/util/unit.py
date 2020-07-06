@@ -49,7 +49,7 @@ class units:
     @classmethod
     def bohr(cls, value, unit="au"):
         unit = cls._s_unit(unit)
-        return value * cls._conversion_factors(unit, "bohr")
+        return value * cls._conversion_factor(unit, "bohr")
 
     @classmethod
     def angstrom(cls, value, unit="au"):

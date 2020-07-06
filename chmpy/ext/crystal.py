@@ -2,7 +2,7 @@ import logging
 import numpy as np
 from spglib import standardize_cell, get_symmetry_dataset
 from chmpy import Element
-from chmpy.space_group import SpaceGroup
+from chmpy.crystal.space_group import SpaceGroup
 from chmpy.crystal import Crystal, AsymmetricUnit, UnitCell
 
 LOG = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ def detect_symmetry(crystal, method="spglib", **kwargs):
     cell = lattice, positions, elements
     dataset = get_symmetry_dataset(cell, **kwargs)
     if dataset["number"] == crystal.space_group.international_tables_number:
-        LOG.warn("Could not find symmetry reduction for for crystal %s", crystal)
+        LOG.warn("Could not find additional symmetry for crystal %s", crystal)
         return None
     asym_idx = np.unique(dataset["equivalent_atoms"])
     asym_idx = asym_idx[np.argsort(asym_atoms[asym_idx])]

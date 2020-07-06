@@ -339,6 +339,8 @@ class Element(metaclass=_ElementMeta):
 
     @property
     def ball_stick_radius(self):
+        if self.symbol == "H":
+            return self.covalent_radius
         return self.cov * 0.5
 
     @property

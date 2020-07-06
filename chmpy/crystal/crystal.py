@@ -468,7 +468,6 @@ class Crystal:
                     neighbours.append(uc_mol_t)
         return neighbours
 
-
     def symmetry_unique_molecules(self, bond_tolerance=0.4):
         """Calculate a list of connected molecules which contain
         every site in the asymmetric_unit
@@ -782,7 +781,9 @@ class Crystal:
         mols = self.symmetry_unique_molecules()
         charges = np.empty(len(self.asymmetric_unit), dtype=np.float32)
         for mol in mols:
-            for idx, charge in zip(mol.properties["asymmetric_unit_atoms"], mol.partial_charges):
+            for idx, charge in zip(
+                mol.properties["asymmetric_unit_atoms"], mol.partial_charges
+            ):
                 charges[idx] = charge
         return charges
 
@@ -811,15 +812,19 @@ class Crystal:
 
         vertex_color = kwargs.get("color", None)
 
-        atoms = self.slab()
+        atoms = self.slab(bounds=((-1, -1, -1), (1, 1, 1)))
         density = PromoleculeDensity((atoms["element"], atoms["cart_pos"]))
         sep = kwargs.get("separation", kwargs.get("resolution", 0.5))
         isovalue = kwargs.get("isovalue", 3e-4)
-        seps = sep / np.array(self.unit_cell.lengths)
-        x_grid = np.arange(0, 1.0, seps[0], dtype=np.float32)
-        y_grid = np.arange(0, 1.0, seps[1], dtype=np.float32)
-        z_grid = np.arange(0, 1.0, seps[2], dtype=np.float32)
-        x, y, z = np.meshgrid(x_grid, y_grid, z_grid)
+        grid_type = kwargs.get("grid_type", "uc")
+        if grid_type == "uc":
+            seps = sep / np.array(self.unit_cell.lengths)
+            x_grid = np.arange(0, 1.0, seps[0], dtype=np.float32)
+            y_grid = np.arange(0, 1.0, seps[1], dtype=np.float32)
+            z_grid = np.arange(0, 1.0, seps[2], dtype=np.float32)
+            x, y, z = np.meshgrid(x_grid, y_grid, z_grid)
+        else:
+            raise NotImplementedError("Only uc grid supported currently")
         separations = np.array((sep, sep, sep))
         shape = x.shape
         pts = np.c_[x.ravel(), y.ravel(), z.ravel()]
@@ -837,32 +842,40 @@ class Crystal:
         )
         verts = self.to_cartesian(np.c_[verts[:, 1], verts[:, 0], verts[:, 2]])
         vertex_colors = None
+        mesh = trimesh.Trimesh(vertices=verts, faces=faces, normals=normals)
+
+        if kwargs.get("subdivide", False):
+            for i in range(int(kwargs.get("subdivide", False))):
+                mesh = mesh.subdivide()
+
         if vertex_color == "esp":
             from chmpy.util.color import property_to_color
+
             asym_charges = self.asymmetric_unit_partial_charges()
             mol = Molecule.from_arrays(atoms["element"], atoms["cart_pos"])
             partial_charges = np.empty(len(mol), dtype=np.float32)
             partial_charges = asym_charges[atoms["asym_atom"]]
             mol._partial_charges = partial_charges
-            prop = mol.electrostatic_potential(verts)
-            vertex_colors = property_to_color(prop, cmap=kwargs.get("cmap", "esp"))
-
-        mesh = trimesh.Trimesh(
-            vertices=verts, faces=faces, normals=normals, vertex_colors=vertex_colors
-        )
+            prop = mol.electrostatic_potential(mesh.vertices)
+            mesh.visual.vertex_colors = property_to_color(
+                prop, cmap=kwargs.get("cmap", "esp")
+            )
         return mesh
 
     def mesh_scene(self, **kwargs):
         from trimesh.scene.scene import append_scenes
 
-        meshes = [m.to_mesh() for m in self.unit_cell_molecules()]
+        meshes = [append_scenes(m.to_mesh()) for m in self.unit_cell_molecules()]
 
         if kwargs.get("void", False):
             void_kwargs = kwargs.get("void_kwargs", {})
             meshes.append(self.void_surface(**void_kwargs))
         if kwargs.get("axes", False):
             from trimesh.creation import axis
-            meshes.append(axis(transform=self.unit_cell.direct_homogeneous.T, axis_length=1.0))
+
+            meshes.append(
+                axis(transform=self.unit_cell.direct_homogeneous.T, axis_length=1.0)
+            )
         return append_scenes(meshes)
 
     def hirshfeld_surfaces(self, **kwargs):
@@ -1160,7 +1173,11 @@ class Crystal:
 
     @classmethod
     def _ext_load_map(cls):
-        return {".cif": cls.from_cif_file, ".res": cls.from_shelx_file, ".vasp": cls.from_vasp_file}
+        return {
+            ".cif": cls.from_cif_file,
+            ".res": cls.from_shelx_file,
+            ".vasp": cls.from_vasp_file,
+        }
 
     def _ext_save_map(self):
         return {".cif": self.to_cif_file, ".res": self.to_shelx_file}
@@ -1170,7 +1187,7 @@ class Crystal:
         return {"POSCAR": cls.from_vasp_file, "CONTCAR": cls.from_vasp_file}
 
     def _fname_save_map(self):
-        return {}
+        return {"POSCAR": self.to_poscar_file, "CONTCAR": self.to_poscar_file}
 
     @classmethod
     def load(cls, filename, **kwargs):
@@ -1352,7 +1369,7 @@ class Crystal:
             cif_data = self.properties["cif_data"]
         else:
             cif_data = {
-                "audit_creation_method": "chmpy python library version {version}",
+                "audit_creation_method": f"chmpy python library version {version}",
                 "symmetry_equiv_pos_site_id": list(
                     range(1, len(self.symmetry_operations) + 1)
                 ),
@@ -1441,7 +1458,14 @@ class Crystal:
         cif_data = self.to_cif_data(**kwargs)
         return Cif(cif_data).to_string()
 
-    @classmethod
+    def to_poscar_string(self, **kwargs):
+        from chmpy.ext.vasp import poscar_string
+
+        return poscar_string(self, name=self.titl)
+
+    def to_poscar_file(self, filename, **kwargs):
+        Path(filename).write_text(self.to_poscar_string(**kwargs))
+
     def to_shelx_file(self, filename):
         """Write this crystal structure as a shelx .res file"""
         Path(filename).write_text(self.to_shelx_string())
@@ -1553,5 +1577,5 @@ class Crystal:
             [Element[x] for x in asym_nums], sc.to_fractional(asym_pos)
         )
         new_crystal = Crystal(sc, SpaceGroup(1), asymmetric_unit)
-        new_crystal.titl = self.titl + "-P1-{}-{}-{}".format(*size)
+        new_crystal.properties["titl"] = self.titl + "-P1-{}-{}-{}".format(*size)
         return new_crystal

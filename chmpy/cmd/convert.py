@@ -5,8 +5,10 @@ import sys
 
 LOG = logging.getLogger("chmpy-convert")
 
+
 def main():
     import argparse
+
     parser = argparse.ArgumentParser()
     parser.add_argument("input")
     parser.add_argument("-o", "--output", required=True)
@@ -46,6 +48,7 @@ def main():
         sys.exit(1)
 
     LOG.debug("Saved %s to %s", x, args.output)
+
 
 if __name__ == "__main__":
     main()

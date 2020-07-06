@@ -35,29 +35,27 @@ def molecule_to_meshes(molecule, **kwargs):
     faces = []
     colors = []
     offset = 0
+    meshes = []
     for i, (el, pos) in enumerate(molecule):
-        vertices.append(base_sphere.vertices * el.ball_stick_radius + pos)
-        faces.append(offset + base_sphere.faces)
-        colors.append(np.repeat([el.color], n_points, axis=0))
-        offset += n_points
-    bond_thickness = 0.9 * Element["H"].ball_stick_radius
+        m = base_sphere.copy()
+        m.apply_scale(el.ball_stick_radius)
+        m.apply_translation(pos)
+        m.visual.vertex_colors = np.repeat([el.color], n_points, axis=0)
+        meshes.append(m)
+    bond_thickness = 0.12
     for i, (a, b, d) in enumerate(molecule.unique_bonds):
         x1 = molecule.positions[a]
         x3 = molecule.positions[b]
-        x2 = 0.5 * (x3 + x1)
-        cyl = cylinder(bond_thickness, d, segment=(x1, x2))
-        n = len(cyl.vertices)
-        vertices.append(cyl.vertices)
-        faces.append(cyl.faces + offset)
-        colors.append(np.repeat([molecule.elements[a].color], n, axis=0))
-        offset += n
-        cyl2 = cylinder(bond_thickness, d, segment=(x2, x3))
-        vertices.append(cyl2.vertices)
-        faces.append(cyl2.faces + offset)
-        colors.append(np.repeat([molecule.elements[b].color], n, axis=0))
-        offset += n
+        cyl = cylinder(bond_thickness, d, segment=(x1, x3))
+        cyl.visual.vertex_colors = np.repeat(
+            [(0, 0, 0, 255),], cyl.vertices.shape[0], axis=0
+        )
+        meshes.append(cyl)
+    return meshes
 
-    vertices = np.vstack(vertices)
-    faces = np.vstack(faces)
-    colors = np.vstack(colors)
-    return Trimesh(vertices=vertices, faces=faces, vertex_colors=colors)
+
+def color_mesh_vertices(scalar_func, mesh, cmap=None):
+    from chmpy.util.color import property_to_color
+
+    prop = scalar_func(mesh.vertices)
+    mesh.visual.vertex_colors = property_to_color(prop, cmap=cmap)

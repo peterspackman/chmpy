@@ -114,7 +114,7 @@ class Molecule:
             pass
 
     def connected_fragments(self):
-        from chmpy.util import cartesian_product
+        from chmpy.util.num import cartesian_product
         from scipy.sparse.csgraph import connected_components
 
         if self.bonds is None:
@@ -196,6 +196,7 @@ class Molecule:
 
     def electrostatic_potential(self, positions):
         from chmpy.util.unit import BOHR_TO_ANGSTROM
+
         BOHR_PER_ANGSTROM = 1 / BOHR_TO_ANGSTROM
 
         v_pot = np.zeros(positions.shape[0])
