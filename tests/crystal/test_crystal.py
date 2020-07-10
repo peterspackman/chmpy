@@ -187,13 +187,13 @@ class CrystalTestCase(unittest.TestCase):
             m2 = x.symmetry_unique_molecules()
             self.assertEqual(m1, m2)
 
-    def test_surroundings_functions(self):
+    def test_environments_functions(self):
         for c in ("ice_ii", "acetic"):
             x = getattr(self, c)
             atoms = x.atoms_in_radius(5.0)
             atoms = x.atomic_surroundings()
             atoms = x.atom_group_surroundings([0, 1, 2])
-            surroundings = x.molecule_surroundings()
+            environments = x.molecule_environments()
 
 
 class CifTestCase(unittest.TestCase):

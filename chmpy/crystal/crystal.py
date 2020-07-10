@@ -468,6 +468,16 @@ class Crystal:
                     neighbours.append(uc_mol_t)
         return neighbours
 
+    def molecule_dict(self, **kwargs):
+        result = {}
+        mols = self.symmetry_unique_molecules()
+        for m in mols:
+            f = m.molecular_formula
+            if f not in result:
+                result[f] = []
+            result[f].append(m)
+        return result
+
     def symmetry_unique_molecules(self, bond_tolerance=0.4):
         """Calculate a list of connected molecules which contain
         every site in the asymmetric_unit
@@ -648,7 +658,51 @@ class Crystal:
             (elements[keep], positions[keep]),
         )
 
-    def molecule_surroundings(self, radius=6.0):
+    def molecule_environment(self, mol, radius=6.0, threshold=1e-3):
+        """Calculate the atomic information for all
+        atoms surrounding the given molecule in this crystal
+        within the given radius. Atoms closer than `threshold`
+        to any atom in the provided molecule will be excluded and 
+        considered part of the molecule.
+
+        Parameters
+        ----------
+        radius: float, optional
+            Maximum distance in Angstroms between any atom in the molecule
+            and the resulting neighbouring atoms
+
+        Returns
+        -------
+        list of tuple
+            A list of tuples of (Molecule, elements, positions)
+            where `elements` is an :obj:`np.ndarray` of atomic numbers,
+            and `positions` is an :obj:`np.ndarray` of Cartesian atomic positions
+        """
+
+        hklmax = np.array([-np.inf, -np.inf, -np.inf])
+        hklmin = np.array([np.inf, np.inf, np.inf])
+        frac_radius = radius / np.array(self.unit_cell.lengths)
+        for pos in self.to_fractional(mol.positions):
+            hklmax = np.maximum(hklmax, np.ceil(frac_radius + pos))
+            hklmin = np.minimum(hklmin, np.floor(pos - frac_radius))
+        hmax, kmax, lmax = hklmax.astype(int)
+        hmin, kmin, lmin = hklmin.astype(int)
+        slab = self.slab(bounds=((hmin, kmin, lmin), (hmax, kmax, lmax)))
+        elements = slab["element"]
+        positions = slab["cart_pos"]
+        tree = KDTree(positions)
+        keep = np.zeros(positions.shape[0], dtype=bool)
+        this_mol = []
+        for i, (n, pos) in enumerate(zip(mol.elements, mol.positions)):
+            idxs = tree.query_ball_point(pos, radius)
+            d, nn = tree.query(pos)
+            keep[idxs] = True
+            if d < threshold:
+                this_mol.append(nn)
+                keep[this_mol] = False
+        return (mol, elements[keep], positions[keep])
+
+    def molecule_environments(self, radius=6.0):
         """Calculate the atomic information for all
         atoms surrounding each symmetry unique molecule
         in this crystal within the given radius.
@@ -666,31 +720,10 @@ class Crystal:
             where `elements` is an :obj:`np.ndarray` of atomic numbers,
             and `positions` is an :obj:`np.ndarray` of Cartesian atomic positions
         """
-        results = []
-        for mol in self.symmetry_unique_molecules():
-            hklmax = np.array([-np.inf, -np.inf, -np.inf])
-            hklmin = np.array([np.inf, np.inf, np.inf])
-            frac_radius = radius / np.array(self.unit_cell.lengths)
-            for pos in self.to_fractional(mol.positions):
-                hklmax = np.maximum(hklmax, np.ceil(frac_radius + pos))
-                hklmin = np.minimum(hklmin, np.floor(pos - frac_radius))
-            hmax, kmax, lmax = hklmax.astype(int)
-            hmin, kmin, lmin = hklmin.astype(int)
-            slab = self.slab(bounds=((hmin, kmin, lmin), (hmax, kmax, lmax)))
-            elements = slab["element"]
-            positions = slab["cart_pos"]
-            tree = KDTree(positions)
-            keep = np.zeros(positions.shape[0], dtype=bool)
-            this_mol = []
-            for i, (n, pos) in enumerate(zip(mol.elements, mol.positions)):
-                idxs = tree.query_ball_point(pos, radius)
-                d, nn = tree.query(pos)
-                keep[idxs] = True
-                if d < 1e-3:
-                    this_mol.append(nn)
-                    keep[this_mol] = False
-            results.append((mol, elements[keep], positions[keep]))
-        return results
+        return [
+            self.molecule_environment(x)
+            for x in self.symmetry_unique_molecules()
+        ]
 
     def functional_group_surroundings(self, radius=6.0, kind="carboxylic_acid"):
         """Calculate the atomic information for all
@@ -938,7 +971,7 @@ class Crystal:
                 iso = stockholder_weight_isosurface(s, isovalue=isovalue, sep=sep)
                 isos.append(iso)
         elif kind == "mol":
-            for mol, n_e, n_p in self.molecule_surroundings(radius=radius):
+            for mol, n_e, n_p in self.molecule_environments(radius=radius):
                 if vertex_color == "esp":
                     extra_props["esp"] = mol.electrostatic_potential
                 s = StockholderWeight.from_arrays(
@@ -1025,6 +1058,48 @@ class Crystal:
             )
         return np.asarray(descriptors)
 
+    def molecule_shape_descriptors(self, mol, l_max=5, radius=6.0, with_property=None):
+        """Calculate the molecular shape descriptors[1,2] for 
+        the provided molecule in the crystal.
+
+        Parameters
+        ----------
+        l_max: int, optional
+            maximum level of angular momenta to include in the spherical harmonic
+            transform of the molecular shape function.
+
+        Returns
+        -------
+        :obj:`np.ndarray`
+            shape description vector
+
+        References
+        ----------
+        [1] PR Spackman et al. Sci. Rep. 6, 22204 (2016)
+            https://dx.doi.org/10.1038/srep22204
+        [2] PR Spackman et al. Angew. Chem. 58 (47), 16780-16784 (2019)
+            https://dx.doi.org/10.1002/anie.201906602
+
+        """
+        descriptors = []
+        from chmpy.shape import SHT, stockholder_weight_descriptor
+
+        sph = SHT(l_max=l_max)
+        mol, neighbour_els, neighbour_pos = self.molecule_environment(mol, radius=radius) 
+        c = np.array(mol.centroid, dtype=np.float32)
+        dists = np.linalg.norm(mol.positions - c, axis=1)
+        bounds = np.min(dists) / 2, np.max(dists) + 10.0
+        return stockholder_weight_descriptor(
+            sph,
+            mol.atomic_numbers,
+            mol.positions,
+            neighbour_els,
+            neighbour_pos,
+            origin=c,
+            bounds=bounds,
+            with_property=with_property,
+        )
+
     def molecular_shape_descriptors(self, l_max=5, radius=6.0, with_property=None):
         """Calculate the molecular shape descriptors[1,2] for all symmetry unique
         molecules in this crystal.
@@ -1052,7 +1127,7 @@ class Crystal:
         from chmpy.shape import SHT, stockholder_weight_descriptor
 
         sph = SHT(l_max=l_max)
-        for mol, neighbour_els, neighbour_pos in self.molecule_surroundings(
+        for mol, neighbour_els, neighbour_pos in self.molecule_environments(
             radius=radius
         ):
             c = np.array(mol.centroid, dtype=np.float32)
