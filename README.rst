@@ -25,11 +25,11 @@ While the library is intended to be flexible and make it easy to build
 complex pipelines or properties, the following is a brief summary of 
 intended features:
 
-* Load crystal structures from ``.cif`` or ``.res`` files.
+* Load crystal structures from ``.cif``, ``.res``, ``POSCAR`` files.
 * Evaluate promolecule and procrystal electron densities.
 * Easily generate Hirshfeld or promolecule isosurfaces and associated properties.
 * Easily generate spherical harmonic shape descriptors for atoms, molecules, or molecular fragments.
-* Efficiently calculate crystal slabs
+* Efficiently calculate crystal slabs, periodic connectivity and more...
 
 It should also serve as a simple, easy to read library for learning
 how to represent crystal structures, molecules etc. and evaluate
@@ -64,7 +64,7 @@ Generation of surfaces with the default settings can be done with
 minimal hassle, simply by using the corresponding members of the ``Crystal``
 class:
 
-    >>> c = Crystal.load("tests/acetic_acid.cif")
+    >>> c = Crystal.load("tests/test_files/acetic_acid.cif")
     # This will generate a high resolution surface
     # for each symmetry unique molecule in the crystal
     >>> surfaces = c.hirshfeld_surfaces()
