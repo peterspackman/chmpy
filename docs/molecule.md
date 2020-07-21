@@ -1,2 +1,2 @@
-# Molecule
-::: chmpy.core.Molecule
+# chmpy.core.molecule
+::: chmpy.core.molecule

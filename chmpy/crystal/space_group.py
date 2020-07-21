@@ -41,7 +41,8 @@ LATTICE_TYPE_TRANSLATIONS = {
 
 
 def encode_symm_str(rotation, translation):
-    """Encode a rotation matrix (of -1, 0, 1s) and (rational) translation vector
+    """
+    Encode a rotation matrix (of -1, 0, 1s) and (rational) translation vector
     into string form e.g. 1/2-x,z-1/3,-y-1/6
 
     >>> encode_symm_str(((-1, 0, 0), (0, 0, 1), (0, 1, 0)), (0, 0.5, 1/3))
@@ -49,19 +50,14 @@ def encode_symm_str(rotation, translation):
     >>> encode_symm_str(((1, 1, 1), (1, 0, 1), (0, 1, 0)), (0, 0.5, 1/3))
     '+x+y+z,1/2+x+z,1/3+y'
 
-    Parameters
-    ----------
-    rotation: array_like
-        (3,3) matrix of -1, 0, or 1s encoding the rotation component
-        of the symmetry operation
-    translation: array_like
-        (3) vector of rational numbers encoding the translation component
-        of the symmetry operation
+    Parameters:
+        rotation (array_like): (3,3) matrix of -1, 0, or 1s encoding the rotation component
+            of the symmetry operation
+        translation (array_like): (3) vector of rational numbers encoding the translation component
+            of the symmetry operation
 
-    Returns
-    -------
-    str
-        the encoded symmetry operation
+    Returns:
+        str: the encoded symmetry operation
     """
     symbols = "xyz"
     res = []
@@ -81,7 +77,8 @@ def encode_symm_str(rotation, translation):
 
 
 def decode_symm_str(s):
-    """Decode a symmetry operation represented in the string
+    """
+    Decode a symmetry operation represented in the string
     form e.g. '1/2 + x, y, -z -0.25' into a rotation matrix
     and translation vector.
     
@@ -90,17 +87,11 @@ def decode_symm_str(s):
     >>> encode_symm_str(*decode_symm_str("1/2 - x,y-0.3333333,z"))
     '1/2-x,2/3+y,+z'
 
-    Parameters
-    ----------
-    s: str
-        the encoded symmetry operation string
+    Parameters:
+        s (str): the encoded symmetry operation string
 
-    Returns
-    -------
-    :obj:`np.ndarray`
-        (3,3) rotation matrix
-    :obj:`np.ndarray`
-        (3) translation vector
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: a (3,3) rotation matrix and a (3) translation vector
     """
     rotation = np.zeros((3, 3), dtype=np.float64)
     translation = np.zeros((3,), dtype=np.float64)
@@ -135,7 +126,8 @@ def decode_symm_str(s):
 
 
 def decode_symm_int(coded_integer):
-    """Decode an integer encoded symmetry operation. 
+    """
+    Decode an integer encoded symmetry operation. 
     
     A space group operation is compressed using ternary numerical system for
     rotation and duodecimal system for translation. This is achieved because
@@ -148,17 +140,11 @@ def decode_symm_int(coded_integer):
     >>> encode_symm_str(*decode_symm_int(16484))
     '+x,+y,+z'
 
-    Parameters
-    ----------
-    coded_integer: int
-        integer encoding a symmetry operation
+    Parameters:
+        coded_integer (int): integer encoding a symmetry operation
 
-    Returns
-    -------
-    :obj:`np.ndarray`
-        (3,3) rotation matrix
-    :obj:`np.ndarray`
-        (3) translation vector
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: (3,3) rotation matrix, (3) translation vector
     """
     r = coded_integer % 19683  # 19683 = 3**9
     shift = 6561  # 6561 = 3**8
@@ -180,7 +166,8 @@ def decode_symm_int(coded_integer):
 
 
 def encode_symm_int(rotation, translation):
-    """Encode an integer encoded symmetry from a rotation matrix and translation
+    """
+    Encode an integer encoded symmetry from a rotation matrix and translation
     vector.
     
     A space group operation is compressed using ternary numerical system for
@@ -195,6 +182,15 @@ def encode_symm_int(rotation, translation):
     16484
     >>> encode_symm_int(((1, 0, 0), (0, 1, 0), (0, 1, 1)), (0, 0.5, 0))
     1433663
+
+     Parameters:
+        rotation (array_like): (3,3) matrix of -1, 0, or 1s encoding the rotation component
+            of the symmetry operation
+        translation (array_like): (3) vector of rational numbers encoding the translation component
+            of the symmetry operation
+
+    Returns:
+        int: the encoded symmetry operation
     """
 
     r = 0
@@ -215,16 +211,34 @@ def encode_symm_int(rotation, translation):
 
 
 class SymmetryOperation:
-    """Class to represent a crystallographic symmetry operation,
-    composed of a rotation and a translation.
     """
+    Class to represent a crystallographic symmetry operation,
+    composed of a rotation and a translation.
+
+    Attributes:
+        rotation (np.ndarray): (3, 3) rotation matrix in fractional coordinates
+        translation (np.ndarray): (3) translation vector in fractional coordinates
+    """
+    rotation: np.ndarray
+    translation: np.ndarray
 
     def __init__(self, rotation, translation):
+        """
+        Construct a new symmetry operation from a rotation matrix and
+        a translation vector
+
+        Arguments:
+            rotation (np.ndarray): (3, 3) rotation matrix
+            translation (np.ndarray): (3) translation vector
+
+        Returns:
+            SymmetryOperation: a new SymmetryOperation
+        """
         self.rotation = rotation
         self.translation = translation % 1
 
     @property
-    def seitz_matrix(self):
+    def seitz_matrix(self) -> np.ndarray:
         "The Seitz matrix form of this SymmetryOperation"
         s = np.eye(4, dtype=np.float64)
         s[:3, :3] = self.rotation
@@ -232,7 +246,7 @@ class SymmetryOperation:
         return s
 
     @property
-    def integer_code(self):
+    def integer_code(self) -> int:
         "Represent this SymmetryOperation as a packed integer"
         if not hasattr(self, "_integer_code"):
             setattr(
@@ -241,35 +255,47 @@ class SymmetryOperation:
         return getattr(self, "_integer_code")
 
     @property
-    def cif_form(self):
+    def cif_form(self) -> str:
         "Represent this SymmetryOperation in string form e.g. '+x,+y,+z'"
         return str(self)
 
     def inverted(self):
-        "Return a copy of this symmetry operation under inversion"
+        """"
+        A copy of this symmetry operation under inversion
+
+        Returns:
+            SymmetryOperation: an inverted copy of this symmetry operation
+        """
         return SymmetryOperation(-self.rotation, -self.translation)
 
-    def __add__(self, value):
-        "Return a copy of this symmetry operation under additional translation"
+    def __add__(self, value: np.ndarray):
+        """
+        Add a vector to this symmetry operation's translation vector.
+        
+        Returns:
+            SymmetryOperation: a copy of this symmetry operation under additional translation"
+        """
         return SymmetryOperation(self.rotation, self.translation + value)
 
-    def __sub__(self, value):
-        "Return a copy of this symmetry operation under additional translation"
+    def __sub__(self, value: np.ndarray):
+        """
+        Subtract a vector from this symmetry operation's translation.
+        
+        Returns:
+            SymmetryOperation: a copy of this symmetry operation under additional translation"
+        """
         return SymmetryOperation(self.rotation, self.translation - value)
 
-    def apply(self, coordinates):
-        """Apply this symmetry operation to a set of fractional coordinates.
+    def apply(self, coordinates: np.ndarray) -> np.ndarray:
+        """
+        Apply this symmetry operation to a set of fractional coordinates.
         
-        Parameters
-        ----------
-        coordinates: :obj:`np.ndarray`
-            (N,3) or (N,4) array of fractional coordinates or homogeneous
-            fractional coordinates.
+        Parameters:
+            coordinates (np.ndarray): (N,3) or (N,4) array of fractional coordinates or homogeneous
+                fractional coordinates.
 
-        Returns
-        -------
-        :obj:`np.ndarray`
-            (N, 3) array of ransformed coordinates
+        Returns:
+            np.ndarray: (N, 3) array of transformed coordinates
         """
         if coordinates.shape[1] == 4:
             return np.dot(coordinates, self.seitz_matrix.T)
@@ -299,19 +325,18 @@ class SymmetryOperation:
         return self.apply(coordinates)
 
     @classmethod
-    def from_integer_code(cls, code):
-        """Alternative constructor from an integer-encoded
+    def from_integer_code(cls, code: int):
+        """
+        Alternative constructor from an integer-encoded
         symmetry operation e.g. 16484
 
-        See Also
-        --------
-        encode_symm_int: Encode a symmetry operation as an integer
-        decode_symm_int: Decode a symmetry operation from an integer
+        See also  the `encode_symm_int`, `decode_symm_int` methods.
 
-        Parameters
-        ----------
-        code: int
-            integer-encoded symmetry operation
+        Parameters:
+            code (int): integer-encoded symmetry operation
+
+        Returns:
+            SymmetryOperation: a new symmetry operation from the provided integer code
         """
 
         rot, trans = decode_symm_int(code)
@@ -320,26 +345,25 @@ class SymmetryOperation:
         return s
 
     @classmethod
-    def from_string_code(cls, code):
-        """Alternative constructor from a string encoded
+    def from_string_code(cls, code: str):
+        """
+        Alternative constructor from a string encoded
         symmetry operation e.g. '+x,+y,+z'.
 
-        See Also
-        --------
-        encode_symm_str: Encode a symmetry operation as a string
-        decode_symm_str: Decode a symmetry operation from a string
+        See also the `encode_symm_str`, `decode_symm_str` methods.
 
-        Parameters
-        ----------
-        code: str
-            string-encoded symmetry operation
+        Parameters:
+            code (str): string-encoded symmetry operation
+
+        Returns:
+            SymmetryOperation: a new symmetry operation from the provided string code
         """
         rot, trans = decode_symm_str(code)
         s = SymmetryOperation(rot, trans)
         setattr(s, "_string_code", code)
         return s
 
-    def is_identity(self):
+    def is_identity(self) -> bool:
         "Returns true if this is the identity symmetry operation '+x,+y,+z'"
         return self.integer_code == 16484
 
@@ -350,26 +374,24 @@ class SymmetryOperation:
 
 
 def expanded_symmetry_list(reduced_symops, lattice_type):
-    """Create an expanded list of symmetry operations from the minimum
+    """
+    Create an expanded list of symmetry operations from the minimum
     specification given a certain lattice type.
 
-    Parameters
-    ----------
-    reduced_symops: List[:obj:`SymmetryOperation`]
-        list of symmetry operations
-    lattice_type: int
-        integer encoded lattice type with SHELX conventions,
-        1: P,
-        2: I,
-        3: rhombohedral obverse on hexagonal axes,
-        4: F,
-        5: A,
-        6: B,
-        7: C
-    Returns
-    -------
-    List[:obj:`SymmetryOperation`]
-        expanded list of symmetry operations given lattice type
+    Parameters:
+        reduced_symops (List[SymmetryOperation]): reduced list of symmetry operations
+        lattice_type (int): integer encoded lattice type with SHELX conventions, i.e.
+            ```
+            1: P,
+            2: I,
+            3: rhombohedral obverse on hexagonal axes,
+            4: F,
+            5: A,
+            6: B,
+            7: C
+            ```
+    Returns:
+        List[SymmetryOperation]: an expanded list of symmetry operations given lattice type
     """
     lattice_type_value = abs(lattice_type)
     translations = LATTICE_TYPE_TRANSLATIONS[lattice_type_value]
@@ -395,26 +417,24 @@ def expanded_symmetry_list(reduced_symops, lattice_type):
 
 
 def reduced_symmetry_list(full_symops, lattice_type):
-    """Reduce an expanded list of symmetry operations to the minimum
+    """
+    Reduce an expanded list of symmetry operations to the minimum
     specification given a certain lattice type.
 
-    Parameters
-    ----------
-    full_symops: List[:obj:`SymmetryOperation`]
-        list of symmetry operations
-    lattice_type: int
-        integer encoded lattice type with SHELX conventions,
-        1: P,
-        2: I,
-        3: rhombohedral obverse on hexagonal axes,
-        4: F,
-        5: A,
-        6: B,
-        7: C
-    Returns
-    -------
-    List[:obj:`SymmetryOperation`]
-        minimal list of symmetry operations given lattice type
+    Parameters:
+        full_symops (List[SymmetryOperation]): list of symmetry operations
+        lattice_type (int): integer encoded lattice type with SHELX conventions, i.e.
+            ```
+            1: P,
+            2: I,
+            3: rhombohedral obverse on hexagonal axes,
+            4: F,
+            5: A,
+            6: B,
+            7: C
+            ```
+    Returns:
+        List[SymmetryOperation]: minimal list of symmetry operations given lattice type
     """
     lattice_type_value = abs(lattice_type)
     translations = LATTICE_TYPE_TRANSLATIONS[lattice_type_value]
@@ -444,10 +464,20 @@ def reduced_symmetry_list(full_symops, lattice_type):
 
 
 class SpaceGroup:
-    """Represent a crystallographic space group, including
+    """
+    Represent a crystallographic space group, including
     all necessary symmetry operations in fractional coordinates,
     the international tables number from 1-230, and the international
     tables symbol.
+
+    Attributes:
+        symbol (str): The international tables short space group symbol 
+        full_symbol (str): The full international tables space group symbol
+        choice (str): The space group choice (if applicable)
+        centering (str): The space group centering (if applicable)
+        schoenflies (str): The Schoenflies space group symbol
+        centrosymmetric (bool): Whether or not the space group is centrosymmetric
+        symmetry_operations (List[SymmetryOperation]): List of symmetry operations making up this space group
     """
 
     def __init__(self, international_tables_number, choice=""):
@@ -485,7 +515,8 @@ class SpaceGroup:
         )
 
     @property
-    def crystal_system(self):
+    def crystal_system(self) -> str:
+        "The crystal system of the space group e.g. triclinic, monoclinic etc."
         sg = self.international_tables_number
         if sg <= 0 or sg >= 231:
             raise ValueError("International spacegroup number must be between 1-230")
@@ -505,18 +536,22 @@ class SpaceGroup:
 
     @property
     def point_group(self):
+        "the point group of this space group"
         return self._point_group
 
     @property
     def pg(self):
+        "alias for `self.point_group`"
         return self._point_group
 
     @property
-    def sym(self):
+    def sym(self) -> str:
+        "alias for `self.symbol`"
         return self.symbol
 
     @property
-    def symbol_unicode(self):
+    def symbol_unicode(self) -> str:
+        "the space group symbol with unicode subscripts"
         symbol = deepcopy(self.symbol)
         if "_" in symbol:
             tokens = symbol.split("_")
@@ -528,14 +563,17 @@ class SpaceGroup:
 
     @property
     def symops(self):
+        "alias for `self.symmetry_operations`"
         return self.symmetry_operations
 
     @property
-    def laue_class(self):
+    def laue_class(self) -> str:
+        "the Laue class of the point group associated with this space group"
         return self._point_group.laue
 
     @property
-    def lattice_type(self):
+    def lattice_type(self) -> str:
+        "the lattice type of this space group e.g. rhombohedral, hexagonal etc."
         inum = self.international_tables_number
         if inum < 143 or inum > 194:
             return self.crystal_system
@@ -550,16 +588,34 @@ class SpaceGroup:
     @property
     def latt(self) -> int:
         """
-        >>> P1 = SpaceGroup(1)
-        >>> P21c = SpaceGroup(14)
-        >>> I41 = SpaceGroup(14)
-        >>> R3bar = SpaceGroup(148)
-        >>> P1.latt
-        -1
-        >>> P21c.latt
-        1
-        >>> R3bar.latt
-        3
+        The SHELX LATT number associated with this space group. Returns
+        a negative if there is no inversion.
+
+        Options are
+        ```
+        1: P,
+        2: I,
+        3: rhombohedral obverse on hexagonal axes,
+        4: F,
+        5: A,
+        6: B,
+        7: C
+        ```
+        
+        Examples:
+            >>> P1 = SpaceGroup(1)
+            >>> P21c = SpaceGroup(14)
+            >>> I41 = SpaceGroup(14)
+            >>> R3bar = SpaceGroup(148)
+            >>> P1.latt
+            -1
+            >>> P21c.latt
+            1
+            >>> R3bar.latt
+            3
+
+        Returns:
+            int: the SHELX LATT number of this space group
         """
         centering_to_latt = {
             "primitive": 1,  # P
@@ -578,6 +634,7 @@ class SpaceGroup:
         return len(self.symmetry_operations)
 
     def ordered_symmetry_operations(self):
+        "The symmetry operations of this space group in order (with identiy first)"
         # make sure we do the unit symop first
         unity = 0
         for i, s in enumerate(self.symmetry_operations):
@@ -594,10 +651,20 @@ class SpaceGroup:
         return [self.symmetry_operations[unity]] + other_symops
 
     def apply_all_symops(self, coordinates: np.ndarray):
-        """For a given set of coordinates, apply all symmetry
+        """
+        For a given set of coordinates, apply all symmetry
         operations in this space group, yielding a set subject
         to only translational symmetry (i.e. a unit cell).
-        Assumes the input coordinates are fractional."""
+        Assumes the input coordinates are fractional.
+
+        Parameters:
+            coordinates (np.ndarray): (N, 3) set of fractional coordinates
+
+        Returns:
+            Tuple[np.ndarray, np.ndarray]: a (MxN) array of generator symop integers
+                and an (MxN, 3) array of coordinates where M is the number of symmetry
+                operations in this space group.
+        """
         nsites = len(coordinates)
         transformed = np.empty((nsites * len(self), 3))
         generator_symop = np.empty(nsites * len(self), dtype=np.int32)
@@ -632,17 +699,29 @@ class SpaceGroup:
         return hash((self.international_tables_number, self.choice))
 
     def reduced_symmetry_operations(self):
+        "returns a reduced list of symmetry operations"
         return reduced_symmetry_list(self.symmetry_operations, self.latt)
 
-    def has_hexagonal_rhombohedral_choices(self):
+    def has_hexagonal_rhombohedral_choices(self) -> bool:
+        "returns true if this space group could be represented as hexagonal or rhombohedral"
         return self.international_tables_number in (146, 148, 155, 160, 161, 166, 167)
 
     @classmethod
     def from_symmetry_operations(cls, symops, expand_latt=None):
-        """Find a matching spacegroup for a given set of symmetry
+        """
+        Find a matching spacegroup for a given set of symmetry
         operations, optionally treating them as a reduced set of
         symmetry operations and expanding them based on the lattice
-        type."""
+        type.
+
+        Parameters:
+            symops (List[SymmetryOperation]): a reduced or full list of symmetry operations
+            expand_latt (int, optional): the SHELX LATT number to expand this list of symmetry operations
+
+        Returns:
+            SpaceGroup: the matching `SpaceGroup` for the provided symmetry operations and LATT
+        
+        """
         if expand_latt is not None:
             if not -8 < expand_latt < 8:
                 raise ValueError("expand_latt must be between [-7, 7]")

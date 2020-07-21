@@ -1,2 +1,2 @@
-# Crystal
-::: chmpy.crystal.Crystal
+# chmpy.crystal.crystal
+::: chmpy.crystal.crystal

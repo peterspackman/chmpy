@@ -6,86 +6,86 @@ LOG = logging.getLogger(__name__)
 
 
 class UnitCell:
-    """Storage class for the lattice vectors of a crystal
-    i.e. its unit cell.
+    """
+    Storage class for the lattice vectors of a crystal i.e. its unit cell.
 
-    Create a UnitCell object from a list of lattice vectors or
-    a row major direct matrix. Unless otherwise specified, length
-    units are Angstroms, and angular units are radians.
-
-    Parameters
-    ----------
-    vectors: array_like
-        (3, 3) array of lattice vectors, row major i.e. vectors[0, :] is
-        lattice vector A etc.
+    Attributes:
+        direct (np.ndarray): the direct matrix of this unit cell
+            i.e. the lattice vectors
+        reciprocal_lattice (np.ndarray): the reciprocal matrix of
+            this unit cell i.e. the reciprocal lattice vectors
+        inverse (np.ndarray): the inverse matrix of this unit
+            cell i.e. the transpose of `reciprocal_lattice`
+        lattice (np.ndarray): an alias for `direct`
     """
 
     def __init__(self, vectors):
+        """
+        Create a UnitCell object from a list of lattice vectors or
+        a row major direct matrix. Unless otherwise specified, length
+        units are Angstroms, and angular units are radians.
+
+        Parameters:
+            vectors (array_like): (3, 3) array of lattice vectors, row major i.e. vectors[0, :] is
+                lattice vector A etc.
+        """
         self.set_vectors(vectors)
 
     @property
-    def lattice(self):
+    def lattice(self) -> np.ndarray:
         "The direct matrix of this unit cell i.e. vectors of the lattice"
         return self.direct
 
     @property
-    def reciprocal_lattice(self):
+    def reciprocal_lattice(self) -> np.ndarray:
         "The reciprocal matrix of this unit cell i.e. vectors of the reciprocal lattice"
         return self.inverse.T
 
     @property
-    def direct_homogeneous(self):
+    def direct_homogeneous(self) -> np.ndarray:
+        "The direct matrix in homogeneous coordinates"
         T = np.eye(4)
         T[:3, :3] = self.direct
         return T
 
-    def to_cartesian(self, coords):
-        """Transform coordinates from fractional space (a, b, c)
+    def to_cartesian(self, coords: np.ndarray) -> np.ndarray:
+        """
+        Transform coordinates from fractional space (a, b, c)
         to Cartesian space (x, y, z). The x-direction will be aligned
         along lattice vector A.
 
-        Parameters
-        ----------
-        coords : array_like
-            (N, 3) array of fractional coordinates
+        Parameters:
+            coords (array_like): (N, 3) array of fractional coordinates
 
-        Returns
-        -------
-        :obj:`np.ndarray`
-            (N, 3) array of Cartesian coordinates
+        Returns:
+            np.ndarray: (N, 3) array of Cartesian coordinates
         """
         return np.dot(coords, self.direct)
 
-    def to_fractional(self, coords):
-        """Transform coordinates from Cartesian space (x, y, z)
+    def to_fractional(self, coords: np.ndarray) -> np.ndarray:
+        """
+        Transform coordinates from Cartesian space (x, y, z)
         to fractional space (a, b, c). The x-direction will is assumed
         be aligned along lattice vector A.
 
-        Parameters
-        ----------
-        coords : array_like
-            (N, 3) array of Cartesian coordinates
+        Parameters:
+            coords (array_like): an (N, 3) array of Cartesian coordinates
 
-        Returns
-        -------
-        :obj:`np.ndarray`
-            (N, 3) array of fractional coordinates
+        Returns:
+            np.ndarray: (N, 3) array of fractional coordinates
         """
         return np.dot(coords, self.inverse)
 
     def set_lengths_and_angles(self, lengths, angles):
-        """Modify this unit cell by setting the lattice vectors
+        """
+        Modify this unit cell by setting the lattice vectors
         according to lengths a, b, c and angles alpha, beta, gamma of
         a parallelipiped.
 
-        Parameters
-        ----------
-        lengths : array_like
-            array of (a, b, c), the unit cell side lengths in Angstroms.
-
-        angles : array_like
-            array of (alpha, beta, gamma), the unit cell angles lengths
-            in radians.
+        Parameters:
+            lengths (array_like): array of (a, b, c), the unit cell side lengths in Angstroms.
+            angles (array_like): array of (alpha, beta, gamma), the unit cell angles lengths
+                in radians.
         """
         self.lengths = lengths
         self.angles = angles
@@ -110,10 +110,11 @@ class UnitCell:
             ],
         ]
         self.inverse = np.array(r)
-        self.set_cell_type()
+        self._set_cell_type()
 
     def set_vectors(self, vectors):
-        """Modify this unit cell by setting the lattice vectors
+        """
+        Modify this unit cell by setting the lattice vectors
         according to those provided. This is performed by setting the
         lattice parameters (lengths and angles) based on the provided vectors,
         such that it results in a consistent basis without directly
@@ -122,11 +123,9 @@ class UnitCell:
         lengths/angles anyway, it is important to have these consistent.
 
 
-        Parameters
-        ----------
-        vectors : array_like
-            (3, 3) array of lattice vectors, row major i.e. vectors[0, :] is
-            lattice vector A etc.
+        Parameters:
+            vectors (array_like): (3, 3) array of lattice vectors, row major i.e. vectors[0, :] is
+                lattice vector A etc.
         """
         self.direct = vectors
         params = zeros(6)
@@ -141,9 +140,9 @@ class UnitCell:
         self.lengths = [a, b, c]
         self.angles = [alpha, beta, gamma]
         self.inverse = np.linalg.inv(self.direct)
-        self.set_cell_type()
+        self._set_cell_type()
 
-    def set_cell_type(self):
+    def _set_cell_type(self):
         if self.is_cubic:
             self.cell_type_index = 6
             self.cell_type = "cubic"
@@ -194,28 +193,32 @@ class UnitCell:
                 np.degrees(self.gamma),
             )
 
-    def volume(self):
+    def volume(self) -> float:
         """The volume of the unit cell, in cubic Angstroms"""
         a, b, c = self.lengths
         ca, cb, cg = np.cos(self.angles)
         return a * b * c * np.sqrt(1 - ca * ca - cb * cb - cg * cg + 2 * ca * cb * cg)
 
     @property
-    def abc_equal(self):
+    def abc_equal(self) -> bool:
+        "are the lengths a, b, c all equal?"
         return close(np.array(self.lengths) - self.lengths[0], zeros(3))
 
     @property
-    def abc_different(self):
+    def abc_different(self) -> bool:
+        "are all of the lengths a, b, c different?"
         return not (
             close(self.a, self.b) or close(self.a, self.c) or close(self.b, self.c)
         )
 
     @property
-    def orthogonal(self):
+    def orthogonal(self) -> bool:
+        "returns true if the lattice vectors are orthogonal"
         return close(np.abs(self.angles) - np.pi / 2, zeros(3))
 
     @property
-    def angles_different(self):
+    def angles_different(self) -> bool:
+        "are all of the angles alpha, beta, gamma different?"
         return not (
             close(self.alpha, self.beta)
             or close(self.alpha, self.gamma)
@@ -223,32 +226,32 @@ class UnitCell:
         )
 
     @property
-    def is_triclinic(self):
-        """Returns true if angles and lengths are different"""
+    def is_triclinic(self) -> bool:
+        """Returns true if and lengths are different"""
         return self.abc_different and self.angles_different
 
     @property
-    def is_monoclinic(self):
+    def is_monoclinic(self) -> bool:
         """Returns true if angles alpha and gamma are equal"""
         return close(self.alpha, self.gamma) and self.abc_different
 
     @property
-    def is_cubic(self):
+    def is_cubic(self) -> bool:
         """Returns true if all lengths are equal and all angles are 90 degrees"""
         return self.abc_equal and self.orthogonal
 
     @property
-    def is_orthorhombic(self):
+    def is_orthorhombic(self) -> bool:
         """Returns true if all angles are 90 degrees"""
         return self.orthogonal and self.abc_different
 
     @property
-    def is_tetragonal(self):
+    def is_tetragonal(self) -> bool:
         """Returns true if a, b are equal and all angles are 90 degrees"""
         return close(self.a, self.b) and (not close(self.a, self.c)) and self.orthogonal
 
     @property
-    def is_rhombohedral(self):
+    def is_rhombohedral(self) -> bool:
         """Returns true if all lengths are equal and all angles are equal"""
         return (
             self.abc_equal
@@ -257,8 +260,8 @@ class UnitCell:
         )
 
     @property
-    def is_hexagonal(self):
-        """Returns true if all lengths are equal and all angles are equal"""
+    def is_hexagonal(self) -> bool:
+        """Returns true if lengths a == b, a != c, alpha and beta == 90 and gamma == 120"""
         return (
             close(self.a, self.b)
             and (not close(self.a, self.c))
@@ -267,52 +270,52 @@ class UnitCell:
         )
 
     @property
-    def a(self):
+    def a(self) -> float:
         "Length of lattice vector a"
         return self.lengths[0]
 
     @property
-    def alpha(self):
+    def alpha(self) -> float:
         "Angle between lattice vectors b and c"
         return self.angles[0]
 
     @property
-    def b(self):
+    def b(self) -> float:
         "Length of lattice vector b"
         return self.lengths[1]
 
     @property
-    def beta(self):
+    def beta(self) -> float:
         "Angle between lattice vectors a and c"
         return self.angles[1]
 
     @property
-    def c(self):
+    def c(self) -> float:
         "Length of lattice vector c"
         return self.lengths[2]
 
     @property
-    def gamma(self):
+    def gamma(self) -> float:
         "Angle between lattice vectors a and b"
         return self.angles[2]
 
     @property
-    def alpha_deg(self):
+    def alpha_deg(self) -> float:
         "Angle between lattice vectors b and c in degrees"
         return np.degrees(self.angles[0])
 
     @property
-    def beta_deg(self):
+    def beta_deg(self) -> float:
         "Angle between lattice vectors a and c in degrees"
         return np.degrees(self.angles[1])
 
     @property
-    def gamma_deg(self):
+    def gamma_deg(self) -> float:
         "Angle between lattice vectors a and b in degrees"
         return np.degrees(self.angles[2])
 
     @property
-    def parameters(self):
+    def parameters(self) -> np.ndarray:
         "single vector of lattice side lengths and angles in degrees"
         atol = 1e-6
         l = np.array(self.lengths)
@@ -326,23 +329,16 @@ class UnitCell:
 
     @classmethod
     def from_lengths_and_angles(cls, lengths, angles, unit="radians"):
-        """Construct a new UnitCell from the provided lengths and angles.
+        """
+        Construct a new UnitCell from the provided lengths and angles.
 
-        Parameters
-        ----------
-        lengths : array_like
-            Lattice side lengths (a, b, c) in Angstroms.
+        Parameters:
+            lengths (array_like): Lattice side lengths (a, b, c) in Angstroms.
+            angles (array_like): Lattice angles (alpha, beta, gamma) in provided units (default radians)
+            unit (str, optional): Unit for angles i.e. 'radians' or 'degrees' (default radians).
 
-        angles : array_like
-            Lattice angles (alpha, beta, gamma) in provided units (default radians)
-
-        unit : str, optional
-            Unit for angles i.e. 'radians' or 'degrees' (default radians).
-
-        Returns
-        -------
-        UnitCell
-            A new unit cell object representing the provided lattice.
+        Returns:
+            UnitCell: A new unit cell object representing the provided lattice.
         """
         uc = cls(np.eye(3))
         if unit == "radians":
@@ -358,37 +354,39 @@ class UnitCell:
 
     @classmethod
     def cubic(cls, length):
-        """Construct a new cubic UnitCell from the provided side length.
+        """
+        Construct a new cubic UnitCell from the provided side length.
 
-        Parameters
-        ----------
-        length : float
-            Lattice side length a in Angstroms.
+        Parameters:
+            length (float): Lattice side length a in Angstroms.
 
-        Returns
-        -------
-        UnitCell
-            A new unit cell object representing the provided lattice.
+        Returns:
+            UnitCell: A new unit cell object representing the provided lattice.
         """
         return cls(np.eye(3) * length)
 
     @classmethod
     def from_unique_parameters(cls, params, cell_type="triclinic", **kwargs):
+        """
+        Construct a new unit cell from the unique parameters and
+        the specified cell type.
+
+        Parameters:
+            params (Tuple): tuple of floats of unique parameters
+            cell_type (str, optional): the desired cell type
+        """
         return getattr(cls, cell_type)(*params)
 
     @classmethod
     def triclinic(cls, *params, **kwargs):
-        """Construct a new UnitCell from the provided side lengths and angles.
+        """
+        Construct a new UnitCell from the provided side lengths and angles.
 
-        Parameters
-        ----------
-        params: array_like
-            Lattice side lengths and angles (a, b, c, alpha, beta, gamma)
+        Parameters:
+            params (array_like): Lattice side lengths and angles (a, b, c, alpha, beta, gamma)
 
-        Returns
-        -------
-        UnitCell
-            A new unit cell object representing the provided lattice.
+        Returns:
+            UnitCell: A new unit cell object representing the provided lattice.
         """
 
         assert len(params) == 6, "Requre three lengths and angles for Triclinic cell"
@@ -396,17 +394,14 @@ class UnitCell:
 
     @classmethod
     def monoclinic(cls, *params, **kwargs):
-        """Construct a new UnitCell from the provided side lengths and angle.
+        """
+        Construct a new UnitCell from the provided side lengths and angle.
 
-        Parameters
-        ----------
-        params: array_like
-            Lattice side lengths and angles (a, b, c, beta)
+        Parameters:
+            params (array_like): Lattice side lengths and angles (a, b, c, beta)
 
-        Returns
-        -------
-        UnitCell
-            A new unit cell object representing the provided lattice.
+        Returns:
+            UnitCell: A new unit cell object representing the provided lattice.
         """
 
         assert (
@@ -423,17 +418,14 @@ class UnitCell:
 
     @classmethod
     def tetragonal(cls, *params, **kwargs):
-        """Construct a new UnitCell from the provided side lengths and angles.
+        """
+        Construct a new UnitCell from the provided side lengths and angles.
 
-        Parameters
-        ----------
-        params: array_like
-            Lattice side lengths (a, c)
+        Parameters:
+            params (array_like): Lattice side lengths (a, c)
 
-        Returns
-        -------
-        UnitCell
-            A new unit cell object representing the provided lattice.
+        Returns:
+            UnitCell: A new unit cell object representing the provided lattice.
         """
         assert len(params) == 2, "Requre 2 lengths for Tetragonal cell"
         unit = kwargs.get("unit", "radians")
@@ -447,17 +439,14 @@ class UnitCell:
 
     @classmethod
     def hexagonal(cls, *params, **kwargs):
-        """Construct a new UnitCell from the provided side lengths and angles.
+        """
+        Construct a new UnitCell from the provided side lengths and angles.
 
-        Parameters
-        ----------
-        params: array_like
-            Lattice side lengths (a, c)
+        Parameters:
+            params (array_like): Lattice side lengths (a, c)
 
-        Returns
-        -------
-        UnitCell
-            A new unit cell object representing the provided lattice.
+        Returns:
+            UnitCell: A new unit cell object representing the provided lattice.
         """
         assert len(params) == 2, "Requre 2 lengths for Hexagonal cell"
         unit = kwargs.pop("unit", "radians")
@@ -469,34 +458,28 @@ class UnitCell:
 
     @classmethod
     def rhombohedral(cls, *params, **kwargs):
-        """Construct a new UnitCell from the provided side lengths and angles.
+        """
+        Construct a new UnitCell from the provided side lengths and angles.
 
-        Parameters
-        ----------
-        params: array_like
-            Lattice side length a and angle alpha c
+        Parameters:
+            params (array_like): Lattice side length a and angle alpha c
 
-        Returns
-        -------
-        UnitCell
-            A new unit cell object representing the provided lattice.
+        Returns:
+            UnitCell: A new unit cell object representing the provided lattice.
         """
         assert len(params) == 2, "Requre 1 length and 1 angle for Rhombohedral cell"
         return cls.from_lengths_and_angles([params[0]] * 3, [params[1]] * 3, **kwargs)
 
     @classmethod
     def orthorhombic(cls, *lengths, **kwargs):
-        """Construct a new orthorhombic UnitCell from the provided side lengths.
+        """
+        Construct a new orthorhombic UnitCell from the provided side lengths.
 
-        Parameters
-        ----------
-        lengths : array_like
-            Lattice side lengths (a, b, c) in Angstroms.
+        Parameters:
+            lengths (array_like): Lattice side lengths (a, b, c) in Angstroms.
 
-        Returns
-        -------
-        UnitCell
-            A new unit cell object representing the provided lattice.
+        Returns:
+            UnitCell: A new unit cell object representing the provided lattice.
         """
 
         assert len(lengths) == 3, "Requre three lengths for Orthorhombic cell"
