@@ -219,6 +219,7 @@ class SymmetryOperation:
         rotation (np.ndarray): (3, 3) rotation matrix in fractional coordinates
         translation (np.ndarray): (3) translation vector in fractional coordinates
     """
+
     rotation: np.ndarray
     translation: np.ndarray
 

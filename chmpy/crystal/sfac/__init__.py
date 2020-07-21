@@ -83,9 +83,14 @@ def reflections(crystal, wavelength=LAMBDA_Cu, size=10):
     h_max, k_max, l_max = size, size, size
     recip = crystal.unit_cell.reciprocal_lattice.copy()
     system = crystal.space_group.crystal_system
-    centering = "*" if system != "monoclinic" else crystal.space_group.centering
+    centering = (
+        "*" if system != "monoclinic" else crystal.space_group.choice[0] + "face"
+    )
     laue_class = crystal.space_group.laue_class
-    if crystal.unit_cell.is_rhombohedral:
+    if (
+        crystal.space_group.has_hexagonal_rhombohedral_choices()
+        and crystal.unit_cell.is_rhombohedral
+    ):
         raise NotImplementedError("Rhombohedral crystals not currently supported")
 
     apexes, bases = zip(*UNIQUE_REFLECTION_TYPES[(laue_class, centering)])

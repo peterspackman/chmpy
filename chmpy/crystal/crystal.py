@@ -104,13 +104,19 @@ class Crystal:
         properties: variable collection of named properties for
             this crystal
     """
+
     space_group: SpaceGroup
     unit_cell: UnitCell
     asymmetric_unit: AsymmetricUnit
     properties: dict
 
-    def __init__(self, unit_cell: UnitCell, space_group: SpaceGroup,
-                 asymmetric_unit: AsymmetricUnit, **kwargs):
+    def __init__(
+        self,
+        unit_cell: UnitCell,
+        space_group: SpaceGroup,
+        asymmetric_unit: AsymmetricUnit,
+        **kwargs,
+    ):
         """
         Construct a new crystal.
 
@@ -421,7 +427,9 @@ class Crystal:
         setattr(self, "_unit_cell_molecules", molecules)
         return molecules
 
-    def molecular_shell(self, mol_idx=0, radius=3.8, method="nearest_atom") -> List[Molecule]:
+    def molecular_shell(
+        self, mol_idx=0, radius=3.8, method="nearest_atom"
+    ) -> List[Molecule]:
         """
         Calculate the neighbouring molecules around the molecule with index
         `mol_idx`, within the given `radius` using the specified `method`.
@@ -737,7 +745,10 @@ class Crystal:
             where `elements` is an `np.ndarray` of atomic numbers,
             and `positions` is an `np.ndarray` of Cartesian atomic positions
         """
-        return [self.molecule_environment(x, radius=radius, threshold=threshold) for x in self.symmetry_unique_molecules()]
+        return [
+            self.molecule_environment(x, radius=radius, threshold=threshold)
+            for x in self.symmetry_unique_molecules()
+        ]
 
     def functional_group_surroundings(self, radius=6.0, kind="carboxylic_acid") -> List:
         """
@@ -1080,7 +1091,9 @@ class Crystal:
             )
         return np.asarray(descriptors)
 
-    def molecule_shape_descriptors(self, mol, l_max=5, radius=6.0, with_property=None) -> np.ndarray:
+    def molecule_shape_descriptors(
+        self, mol, l_max=5, radius=6.0, with_property=None
+    ) -> np.ndarray:
         """
         Calculate the molecular shape descriptors `[1,2]` for 
         the provided molecule in the crystal.
@@ -1124,7 +1137,9 @@ class Crystal:
             with_property=with_property,
         )
 
-    def molecular_shape_descriptors(self, l_max=5, radius=6.0, with_property=None) -> np.ndarray:
+    def molecular_shape_descriptors(
+        self, l_max=5, radius=6.0, with_property=None
+    ) -> np.ndarray:
         """
         Calculate the molecular shape descriptors[1,2] for all symmetry unique
         molecules in this crystal.
@@ -1289,7 +1304,7 @@ class Crystal:
         return {"POSCAR": self.to_poscar_file, "CONTCAR": self.to_poscar_file}
 
     @classmethod
-    def load(cls, filename, **kwargs) :
+    def load(cls, filename, **kwargs):
         """
         Load a crystal structure from file (.res, .cif)
 
@@ -1494,16 +1509,22 @@ class Crystal:
 
     def structure_factors(self, **kwargs):
         from chmpy.crystal.sfac import structure_factors
+
         return structure_factors(self, **kwargs)
 
     def unique_reflections(self, **kwargs):
         from chmpy.crystal.sfac import reflections
+
         return reflections(self, **kwargs)
 
     def powder_pattern(self, **kwargs):
         from chmpy.crystal.sfac import powder_pattern
         from chmpy.crystal.powder import PowderPattern
+
         tt, f2 = powder_pattern(self, **kwargs)
+        LOG.warn(
+            "Powder pattern calculation is a work in progress, currently values may be incorrect for many systems"
+        )
         return PowderPattern(tt, f2, **kwargs)
 
     def to_translational_symmetry(self, supercell=(1, 1, 1)):
@@ -1556,6 +1577,7 @@ class Crystal:
     def to_poscar_string(self, **kwargs):
         "save this crystal to a VASP POSCAR formatted string"
         from chmpy.ext.vasp import poscar_string
+
         return poscar_string(self, name=self.titl)
 
     def to_poscar_file(self, filename, **kwargs):

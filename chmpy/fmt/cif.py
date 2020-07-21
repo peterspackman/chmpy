@@ -176,7 +176,9 @@ class Cif:
         else:
             v = " ".join(tokens[1:])
         if v is None:
-            raise ValueError(f"Error parsing CIF data_name on line {self.line_index}, context = {k}")
+            raise ValueError(
+                f"Error parsing CIF data_name on line {self.line_index}, context = {k}"
+            )
         self.current_data_block[k] = parse_value(v)
         self.line_index += 1
         LOG.debug("Parsed data name: %s = %s", k, v)

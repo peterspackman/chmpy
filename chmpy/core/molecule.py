@@ -536,7 +536,9 @@ class Molecule:
         )
         return [list(x.a) for x in matches]
 
-    def atomic_shape_descriptors(self, l_max=5, radius=6.0, background=1e-5) -> np.ndarray:
+    def atomic_shape_descriptors(
+        self, l_max=5, radius=6.0, background=1e-5
+    ) -> np.ndarray:
         """
         Calculate the shape descriptors`[1,2]` for all
         atoms in this isolated molecule. If you wish to use
