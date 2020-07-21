@@ -376,6 +376,32 @@ class Element(metaclass=_ElementMeta):
 
 
 def chemical_formula(elements, subscript=False):
+    """Calculate the chemical formula for the given
+    list of elements.
+
+    For example:
+    >>> chemical_formula(['O', 'C', 'O'])
+    'CO2'
+    >>> chemical_formula(['C', 'H', 'O', 'B'])
+    'BCHO'
+
+    Parameters
+    ----------
+    elements: list of :obj:`Element` or str
+        a list of elements of element symbols. Note that if a
+        list of strings are provided the order of chemical symbols
+        may not match convention.
+
+    Keyword Args
+    ------------
+    subscript: bool
+        toggle to use unicode subscripts for the chemical formula string
+
+    Returns
+    -------
+    str
+        the chemical formula
+    """
     count = Counter(sorted(elements))
     if subscript:
         blocks = []
@@ -391,24 +417,68 @@ def chemical_formula(elements, subscript=False):
 
 
 def cov_radii(atomic_numbers):
+    """Return the covalent radii for the given atomic numbers
+
+    Parameters
+    ----------
+    atomic_numbers: array_like
+        the (N,) length integer array of atomic numbers
+
+    Returns
+    :obj:`np.ndarray`
+        (N,) array of floats representing covalent radii
+    """
     if np.any(atomic_numbers < 1) or np.any(atomic_numbers > 103):
         raise ValueError("All elements must be atomic numbers between [1,103]")
     return np.array([_ELEMENT_DATA[i - 1][2] for i in atomic_numbers], dtype=np.float32)
 
 
 def vdw_radii(atomic_numbers):
+    """Return the van der Waals radii for the given atomic numbers
+
+    Parameters
+    ----------
+    atomic_numbers: array_like
+        the (N,) length integer array of atomic numbers
+
+    Returns
+    :obj:`np.ndarray`
+        (N,) array of floats representing van der Waals radii
+    """
     if np.any(atomic_numbers < 1) or np.any(atomic_numbers > 103):
         raise ValueError("All elements must be atomic numbers between [1,103]")
     return np.array([_ELEMENT_DATA[i - 1][3] for i in atomic_numbers], dtype=np.float32)
 
 
 def element_names(atomic_numbers):
+    """Return the element names for the given atomic numbers
+
+    Parameters
+    ----------
+    atomic_numbers: array_like
+        the (N,) length integer array of atomic numbers
+
+    Returns
+    list of str
+        (N,) list of strings representing element names
+    """
     if np.any(atomic_numbers < 1) or np.any(atomic_numbers > 103):
         raise ValueError("All elements must be atomic numbers between [1,103]")
     return [_ELEMENT_DATA[i - 1][0] for i in atomic_numbers]
 
 
 def element_symbols(atomic_numbers):
+    """Return the element symbols for the given atomic numbers
+
+    Parameters
+    ----------
+    atomic_numbers: array_like
+        the (N,) length integer array of atomic numbers
+
+    Returns
+    list of str
+        (N,) list of strings representing element symbols 
+    """
     if np.any(atomic_numbers < 1) or np.any(atomic_numbers > 103):
         raise ValueError("All elements must be atomic numbers between [1,103]")
     return [_ELEMENT_DATA[i - 1][1] for i in atomic_numbers]

@@ -57,8 +57,7 @@ class ReturnCodeError(Exception):
 
 
 class AbstractExecutable(ABC):
-    """ Abstract base class of Job """
-
+    """ Abstract base class of an Executable"""
     _name = "job"
     _has_dependencies = False
     _working_directory = None
