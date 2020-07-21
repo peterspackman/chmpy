@@ -147,15 +147,19 @@ class Cif:
 
     def parse_quoted_block(self, delimiter=";"):
         "parse an entire quoted block, delimited by delimiter"
+        LOG.debug("Parsing quoted block at line %d", self.line_index)
         l1 = self.content_lines[self.line_index].strip()
         i = self.line_index + 1
         j = i
+        n = 1
         while ";" not in self.content_lines[j]:
             j += 1
+            n += 1
             if j >= len(self.content_lines) - 1:
                 break
         else:
             section = " ".join(x.strip() for x in self.content_lines[i - 1 : j + 1])
+            self.line_index += n
             return parse_quote(section)
         raise ValueError(f"Unmatch quotation on line {self.line_index + 1}")
 
@@ -163,6 +167,7 @@ class Cif:
         "parse a single data name i.e key for the cif_data dictionary"
         tokens = self.content_lines[self.line_index].strip()[1:].split()
         k = tokens[0]
+        v = None
         if len(tokens) == 1:
             next_line = self.content_lines[self.line_index + 1]
             if ";" in next_line:
@@ -170,6 +175,8 @@ class Cif:
                 v = self.parse_quoted_block().strip()
         else:
             v = " ".join(tokens[1:])
+        if v is None:
+            raise ValueError(f"Error parsing CIF data_name on line {self.line_index}, context = {k}")
         self.current_data_block[k] = parse_value(v)
         self.line_index += 1
         LOG.debug("Parsed data name: %s = %s", k, v)
@@ -180,7 +187,7 @@ class Cif:
         self.line_index += 1
         line = self.content_lines[self.line_index]
         keys = []
-        while line.startswith("_"):
+        while line.strip().startswith("_"):
             keys.append(line.strip()[1:])
             self.line_index += 1
             line = self.content_lines[self.line_index]
@@ -209,7 +216,7 @@ class Cif:
 
     def parse_data_block_name(self):
         "parse a data block name"
-        LOG.debug("Parsing data block name")
+        LOG.debug("Parsing data block name at line %d", self.line_index)
         line = self.content_lines[self.line_index]
         self.current_data_block_name = line[5:].strip()
         self.line_index += 1
