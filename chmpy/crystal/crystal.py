@@ -11,32 +11,39 @@ from .space_group import SpaceGroup, SymmetryOperation
 from chmpy.core.element import Element, chemical_formula
 from chmpy.core.molecule import Molecule
 from chmpy.util.num import cartesian_product
+from typing import List, Tuple
+from trimesh import Trimesh
 
 
 LOG = logging.getLogger(__name__)
 
 
 class AsymmetricUnit:
-    """Storage class for the coordinates and labels in a crystal
+    """
+    Storage class for the coordinates and labels in a crystal
     asymmetric unit
-    Create an asymmetric unit object from a list of Elements and 
-    an array of fractional coordinates.
 
-    Parameters
-    ----------
-    elements : :obj:`list` of :obj:`Element`
-        N length list of elements associated with the sites in this asymmetric
-        unit
-    positions : array_like
-        (N, 3) array of site positions in fractional coordinates
-    labels : array_like
-        N length array of string labels for each site
-    **kwargs
-        Additional properties (will populate the properties member)
-        to store in this asymmetric unit
+    Attributes:
+        elements (List[Element]): N length list of elements associated with the sites in this asymmetric
+            unit
+        positions (array_like): (N, 3) array of site positions in fractional coordinates
+        labels (array_like): N length array of string labels for each site
     """
 
     def __init__(self, elements, positions, labels=None, **kwargs):
+        """
+        Create an asymmetric unit object from a list of Elements and 
+        an array of fractional coordinates.
+
+
+        Arguments:
+            elements (List[Element]): N length list of elements associated with the sites
+            positions (array_like): (N, 3) array of site positions in fractional coordinates
+            labels (array_like, optional): labels (array_like): N length array of string labels for each site
+            **kwargs: Additional properties (will populate the properties member)
+                to store in this asymmetric unit
+        
+        """
         self.elements = elements
         self.atomic_numbers = np.asarray([x.atomic_number for x in elements])
         self.positions = np.asarray(positions)
@@ -67,11 +74,9 @@ class AsymmetricUnit:
     def from_records(cls, records):
         """Initialize an AsymmetricUnit from a list of dictionary like objects
         
-        Parameters
-        ----------
-        records : iterable
-            An iterable containing dict_like objects with `label`,
-            `element`, `position` and optionally `occupation` stored.
+        Arguments:
+            records (iterable): An iterable containing dict_like objects with `label`,
+                `element`, `position` and optionally `occupation` stored.
         """
         labels = []
         elements = []
@@ -87,32 +92,42 @@ class AsymmetricUnit:
 
 
 class Crystal:
-    """Storage class for a crystal structure, consisting of
-    an asymmetric unit, a unit cell and space group information.
-
-    Parameters
-    ----------
-    unit_cell : :obj:`UnitCell`
-        The unit cell for this crystal i.e. the translational symmetry
-        of the crystal structure.
-    space_group : :obj:`SpaceGroup`
-        The space group symmetry of this crystal i.e. the generators
-        for populating the unit cell given the asymmetric unit.
-    asymmetric_unit : :obj:`AsymmetricUnit`
-        The asymmetric unit of this crystal. The sites of this
-        combined with the space group will generate all translationally
-        equivalent positions.
-    **kwargs
-        Optional properties to (will populate the properties member) store
-        about the the crystal structure.
     """
+    Storage class for a molecular crystal structure.
 
+    Attributes:
+        unit_cell: the translational symmetry
+        space_group: the symmetry within the unit cell
+        asymmetric_unit: the symmetry unique set of sites in
+            the crystal. Contains information on atomic positions,
+            elements, labels etc.
+        properties: variable collection of named properties for
+            this crystal
+    """
     space_group: SpaceGroup
     unit_cell: UnitCell
     asymmetric_unit: AsymmetricUnit
     properties: dict
 
-    def __init__(self, unit_cell, space_group, asymmetric_unit, **kwargs):
+    def __init__(self, unit_cell: UnitCell, space_group: SpaceGroup,
+                 asymmetric_unit: AsymmetricUnit, **kwargs):
+        """
+        Construct a new crystal.
+
+
+        Arguments:
+            unit_cell: The unit cell for this crystal i.e. the 
+                translational symmetry of the crystal structure.
+            space_group: The space group symmetry of this crystal
+                i.e. the generators for populating the unit cell given the
+                asymmetric unit.
+            asymmetric_unit: The asymmetric unit of this crystal.
+                 The sites of this combined with the space group will generate all
+                 translationally equivalent positions.
+            **kwargs: Optional properties to (will populate the properties member) store
+                about the the crystal structure.
+        """
+
         self.space_group = space_group
         self.unit_cell = unit_cell
         self.asymmetric_unit = asymmetric_unit
@@ -120,98 +135,70 @@ class Crystal:
         self.properties.update(kwargs)
 
     @property
-    def sg(self):
+    def sg(self) -> SpaceGroup:
+        "short accessor for `space_group`"
         return self.space_group
 
     @property
-    def uc(self):
+    def uc(self) -> UnitCell:
+        "short accessor for `unit_cell`"
         return self.unit_cell
 
     @property
-    def asym(self):
+    def asym(self) -> AsymmetricUnit:
+        "short accessor for `asymmetric_unit`"
         return self.asymmetric_unit
 
     @property
-    def site_positions(self):
-        """Row major array of asymmetric unit atomic positions
-
-        Returns
-        -------
-        array_like
-            The positions in fractional coordinates of the asymmetric unit.
-        """
+    def site_positions(self) -> np.ndarray:
+        "Row major array of asymmetric unit atomic positions"
         return self.asymmetric_unit.positions
 
     @property
-    def site_atoms(self):
-        """Array of asymmetric unit atomic numbers
-
-        Returns
-        -------
-        array_like
-            The atomic numbers of the asymmetric unit.
-        """
+    def site_atoms(self) -> np.ndarray:
+        "Array of asymmetric unit atomic numbers"
         return self.asymmetric_unit.atomic_numbers
 
     @property
-    def nsites(self):
-        """The number of sites in the asymmetric unit.
-
-        Returns
-        -------
-        int
-            The number of sites in the asymmetric unit.
-        """
-
+    def nsites(self) -> int:
+        """The number of sites in the asymmetric unit."""
         return len(self.site_atoms)
 
     @property
-    def symmetry_operations(self):
-        """Symmetry operations that generate this crystal.
-
-        Returns
-        -------
-        list of :obj:`SymmetryOperation`
-            List of SymmetryOperation objects belonging to the space group
-            symmetry of this crystal.
-        """
+    def symmetry_operations(self) -> List[SymmetryOperation]:
+        "Symmetry operations belonging to the space group symmetry of this crystal."
         return self.space_group.symmetry_operations
 
-    def to_cartesian(self, coords):
-        """Convert coordinates (row major) from fractional to cartesian coordinates.
+    def to_cartesian(self, coords) -> np.ndarray:
+        """
+        Convert coordinates (row major) from fractional to cartesian coordinates.
 
-        Parameters
-        ----------
-        coords : array_like
-            (N, 3) array of positions assumed to be in fractional coordinates
+        Arguments:
+            coords (np.ndarray): (N, 3) array of positions assumed to be in fractional coordinates
 
-        Returns
-        -------
-        array_like
+        Returns:
             (N, 3) array of positions transformed to cartesian (orthogonal) coordinates
             by the unit cell of this crystal.
         """
         return self.unit_cell.to_cartesian(coords)
 
-    def to_fractional(self, coords):
-        """Convert coordinates (row major) from cartesian to fractional coordinates.
+    def to_fractional(self, coords) -> np.ndarray:
+        """
+        Convert coordinates (row major) from cartesian to fractional coordinates.
 
-        Parameters
-        ----------
-        coords : array_like
-            (N, 3) array of positions assumed to be in cartesian (orthogonal) coordinates
+        Parameters:
+            coords (np.ndarray): (N, 3) array of positions assumed to be in cartesian (orthogonal) coordinates
 
-        Returns
-        -------
-        array_like
+        Returns:
             (N, 3) array of positions transformed to fractional coordinates
             by the unit cell of this crystal.
         """
 
         return self.unit_cell.to_fractional(coords)
 
-    def unit_cell_atoms(self, tolerance=1e-2):
-        """Generate all atoms in the unit cell (i.e. with 
+    def unit_cell_atoms(self, tolerance=1e-2) -> dict:
+        """
+        Generate all atoms in the unit cell (i.e. with 
         fractional coordinates in [0, 1]) along with associated
         information about symmetry operations, occupation, elements
         related asymmetric_unit atom etc.
@@ -225,35 +212,24 @@ class Crystal:
         operation and is worth caching the result. Subsequent calls
         to this function will be a no-op.
 
-        Parameters
-        ----------
-        tolerance : float, optional
-            Minimum separation of sites in the unit cell, below which 
-            atoms/sites will be merged and their (partial) occupations
-            added.
+        Arguments:
+            tolerance (float, optional): Minimum separation of sites in the unit
+                cell, below which atoms/sites will be merged and their (partial)
+                occupations added.
 
-        Returns
-        -------
-        dict
+        Returns:
             A dictionary of arrays associated with all sites contained
             in the unit cell of this crystal, members are:
 
-            asym_atom: corresponding asymmetric unit atom indices for all sites.
-
-            frac_pos: (N, 3) array of fractional positions for all sites.
-
-            cart_pos: (N, 3) array of cartesian positions for all sites.
-
-            element: (N) array of atomic numbers for all sites.
-
-            symop: (N) array of indices corresponding to the generator symmetry
-            operation for each site.
-
-            label: (N) array of string labels corresponding to each site
-
-            occupation: (N) array of occupation numbers for each site. Will
-            warn if any of these are greater than 1.0
-
+                asym_atom: corresponding asymmetric unit atom indices for all sites.
+                frac_pos: (N, 3) array of fractional positions for all sites.
+                cart_pos: (N, 3) array of cartesian positions for all sites.
+                element: (N) array of atomic numbers for all sites.
+                symop: (N) array of indices corresponding to the generator symmetry
+                operation for each site.
+                label: (N) array of string labels corresponding to each site
+                occupation: (N) array of occupation numbers for each site. Will
+                    warn if any of these are greater than 1.0
         """
 
         if hasattr(self, "_unit_cell_atom_dict"):
@@ -299,8 +275,9 @@ class Crystal:
         )
         return self._unit_cell_atom_dict
 
-    def unit_cell_connectivity(self, tolerance=0.4, neighbouring_cells=1):
-        """Periodic connectiviy for the unit cell, populates _uc_graph
+    def unit_cell_connectivity(self, tolerance=0.4, neighbouring_cells=1) -> Tuple:
+        """
+        Periodic connectiviy for the unit cell, populates _uc_graph
         with a networkx.Graph object, where nodes are indices into the
         _unit_cell_atom_dict arrays and the edges contain the translation
         (cell) for the image of the corresponding unit cell atom with the
@@ -310,19 +287,17 @@ class Crystal:
         sum of covalent radii for the sites plus the tolerance (provided 
         as a parameter)
         
-        Parameters
-        ----------
-        tolerance : float, optional
-            Bonding tolerance (bonded if d < cov_a + cov_b + tolerance)
-        neighbouring_cells : int, optional
-            Number of neighbouring cells in which to look for bonded atoms.
-            We start at the (0, 0, 0) cell, so a value of 1 will look in the
-            (0, 0, 1), (0, 1, 1), (1, 1, 1) i.e. all 26 neighbouring cells.
-            1 is typically sufficient for organic systems.
+        Arguments:
+            tolerance (float, optional):
+                Bonding tolerance (bonded if d < cov_a + cov_b + tolerance)
+            neighbouring_cells (int, optional):
+                Number of neighbouring cells in which to look for bonded atoms.
+                We start at the (0, 0, 0) cell, so a value of 1 will look in the
+                (0, 0, 1), (0, 1, 1), (1, 1, 1) i.e. all 26 neighbouring cells.
+                1 is typically sufficient for organic systems.
 
-        Returns
-        -------
-        :obj:`tuple` of (sparse_matrix in dict of keys format, dict)
+        Returns:
+            A tuple of (sparse_matrix in dict of keys format, dict)
             the (i, j) value in this matrix is the bond length from i,j
             the (i, j) value in the dict is the cell translation on j which
             bonds these two sites
@@ -381,15 +356,14 @@ class Crystal:
         setattr(self, "_uc_graph", (uc_graph, properties))
         return self._uc_graph
 
-    def unit_cell_molecules(self):
-        """Calculate the molecules for all sites in the unit cell,
+    def unit_cell_molecules(self) -> List[Molecule]:
+        """
+        Calculate the molecules for all sites in the unit cell,
         where the number of molecules will be equal to number of
         symmetry unique molecules times number of symmetry operations.
         
-        Returns
-        -------
-        list of :obj:`Molecule`
-            List of all connected molecules in this crystal, which
+        Returns:
+            A list of all connected molecules in this crystal, which
             when translated by the unit cell would produce the full crystal.
             If the asymmetric is molecular, the list will be of length
             num_molecules_in_asymmetric_unit * num_symm_operations
@@ -447,7 +421,21 @@ class Crystal:
         setattr(self, "_unit_cell_molecules", molecules)
         return molecules
 
-    def molecular_shell(self, mol_idx=0, radius=3.8, method="nearest_atom"):
+    def molecular_shell(self, mol_idx=0, radius=3.8, method="nearest_atom") -> List[Molecule]:
+        """
+        Calculate the neighbouring molecules around the molecule with index
+        `mol_idx`, within the given `radius` using the specified `method`.
+
+        Arguments:
+            mol_idx (int, optional): The index (into `symmetry_unique_molecules`) of the central
+                molecule for the shell
+            radius (float, optional): The maximum distance (Angstroms) between the central
+                molecule and the neighbours.
+            method (str, optional): the method to use when determining inclusion of neighbours.
+        
+        Returns:
+            A list of neighbouring molecules using the given method.
+        """
         mol = self.symmetry_unique_molecules()[mol_idx]
         frac_origin = self.to_fractional(mol.center_of_mass)
         frac_radius = radius / np.array(self.unit_cell.lengths)
@@ -468,7 +456,15 @@ class Crystal:
                     neighbours.append(uc_mol_t)
         return neighbours
 
-    def molecule_dict(self, **kwargs):
+    def molecule_dict(self, **kwargs) -> dict:
+        """
+        A dictionary of `symmetry_unique_molecules`, grouped by 
+        their chemical formulae.
+
+        Returns:
+            the dictionary of molecules with chemical formula keys
+            and list of molecule values.
+        """
         result = {}
         mols = self.symmetry_unique_molecules()
         for m in mols:
@@ -478,24 +474,22 @@ class Crystal:
             result[f].append(m)
         return result
 
-    def symmetry_unique_molecules(self, bond_tolerance=0.4):
-        """Calculate a list of connected molecules which contain
+    def symmetry_unique_molecules(self, bond_tolerance=0.4) -> List[Molecule]:
+        """
+        Calculate a list of connected molecules which contain
         every site in the asymmetric_unit
 
         Populates the _symmetry_unique_molecules member, subsequent
         calls to this function will be a no-op.
        
-        Parameters
-        ----------
-        bond_tolerance : float, optional
-            Bonding tolerance (bonded if d < cov_a + cov_b + bond_tolerance)
+        Parameters:
+            bond_tolerance (float, optional): Bonding tolerance (bonded if d < cov_a + cov_b + bond_tolerance)
 
-        Returns
-        -------
-        list of :obj:`Molecule`
+        Returns:
             List of all connected molecules in the asymmetric_unit of this
             crystal, i.e. the minimum list of connected molecules which contain
             all sites in the asymmetric unit.
+
             If the asymmetric is molecular, the list will be of length
             num_molecules_in_asymmetric_unit and the total number of atoms
             will be equal to the number of atoms in the asymmetric_unit
@@ -520,41 +514,31 @@ class Crystal:
         setattr(self, "_symmetry_unique_molecules", molecules)
         return molecules
 
-    def slab(self, bounds=((-1, -1, -1), (1, 1, 1))):
-        """Calculate the atoms and associated information
+    def slab(self, bounds=((-1, -1, -1), (1, 1, 1))) -> dict:
+        """
+        Calculate the atoms and associated information
         for a slab consisting of multiple unit cells.
 
         If unit cell atoms have not been calculated, this calculates 
         their information and caches it.
 
-        Parameters
-        ----------
-        bounds: tuple, optional
-            Tuple of upper and lower corners (hkl) describing the bounds
-            of the slab.
+        Parameters:
+            bounds (Tuple, optional): Tuple of upper and lower corners (hkl) describing the bounds
+                of the slab.
         
-        Returns
-        -------
-        dict
+        Returns:
             A dictionary of arrays associated with all sites contained
             in the unit cell of this crystal, members are:
-
-            asym_atom: corresponding asymmetric unit atom indices for all sites.
-
-            frac_pos: (N, 3) array of fractional positions for all sites.
-
-            cart_pos: (N, 3) array of cartesian positions for all sites.
-
-            element: (N) array of atomic numbers for all sites.
-
-            symop: (N) array of indices corresponding to the generator symmetry
-            operation for each site.
-
-            label: (N) array of string labels corresponding to each site
-            occupation: (N) array of occupation numbers for each site. Will
-            warn if any of these are greater than 1.0
-
-            cell: (N,3) array of cell indices for each site
+                asym_atom: corresponding asymmetric unit atom indices for all sites.
+                frac_pos: (N, 3) array of fractional positions for all sites.
+                cart_pos: (N, 3) array of cartesian positions for all sites.
+                element: (N) array of atomic numbers for all sites.
+                symop: (N) array of indices corresponding to the generator symmetry
+                    operation for each site.
+                label: (N) array of string labels corresponding to each site
+                occupation: (N) array of occupation numbers for each site. Will
+                    warn if any of these are greater than 1.0
+                cell: (N,3) array of cell indices for each site
 
             n_uc: number of atoms in the unit cell
 
@@ -590,7 +574,19 @@ class Crystal:
         slab_dict["cart_pos"] = self.to_cartesian(pos)
         return slab_dict
 
-    def atoms_in_radius(self, radius, origin=(0, 0, 0)):
+    def atoms_in_radius(self, radius, origin=(0, 0, 0)) -> dict:
+        """
+        Calculate all (periodic) atoms within the given `radius` of the specified
+        `origin`.
+
+        Arguments:
+            radius (float): the maximum distance (Angstroms) from the origin for inclusion
+            origin (Tuple, optional): the origin in fractional coordinates
+
+        Returns:
+            A dictionary mapping (see the the `slab` method),
+            of those atoms within `radius` of the `origin`.
+        """
         frac_origin = self.to_fractional(origin)
         frac_radius = radius / np.array(self.unit_cell.lengths)
         hmax, kmax, lmax = np.ceil(frac_radius + frac_origin).astype(int)
@@ -602,7 +598,18 @@ class Crystal:
         result["uc_atom"] = np.tile(np.arange(slab["n_uc"]), slab["n_cells"])[idxs]
         return result
 
-    def atomic_surroundings(self, radius=6.0):
+    def atomic_surroundings(self, radius=6.0) -> List[Tuple]:
+        """
+        Calculate all atoms within the given `radius` of 
+        each atomic site in the asymmetric unit.
+
+        Arguments:
+            radius (float): the maximum distance (Angstroms) from the origin for inclusion
+
+        Returns:
+            A list of atomic number, Cartesian position for both the
+            atomic site in question and the surroundings (as an array)
+        """
         cart_asym = self.to_cartesian(self.asymmetric_unit.positions)
         hklmax = np.array([-np.inf, -np.inf, -np.inf])
         hklmin = np.array([np.inf, np.inf, np.inf])
@@ -624,7 +631,18 @@ class Crystal:
             results.append((n.atomic_number, pos, elements[keep], positions[keep]))
         return results
 
-    def atom_group_surroundings(self, atoms, radius=6.0):
+    def atom_group_surroundings(self, atoms, radius=6.0) -> Tuple:
+        """
+        Calculate all atoms within the given `radius` of the specified
+        group of atoms in the asymetric unit.
+
+        Arguments:
+            radius (float): the maximum distance (Angstroms) from the origin for inclusion
+
+        Returns:
+            A list of atomic number, Cartesian position for both the
+            atomic sites in question and their surroundings (as an array)
+        """
         results = []
         hklmax = np.array([-np.inf, -np.inf, -np.inf])
         hklmin = np.array([np.inf, np.inf, np.inf])
@@ -658,25 +676,25 @@ class Crystal:
             (elements[keep], positions[keep]),
         )
 
-    def molecule_environment(self, mol, radius=6.0, threshold=1e-3):
-        """Calculate the atomic information for all
+    def molecule_environment(self, mol, radius=6.0, threshold=1e-3) -> Tuple:
+        """
+        Calculate the atomic information for all
         atoms surrounding the given molecule in this crystal
         within the given radius. Atoms closer than `threshold`
         to any atom in the provided molecule will be excluded and 
         considered part of the molecule.
 
-        Parameters
-        ----------
-        radius: float, optional
-            Maximum distance in Angstroms between any atom in the molecule
-            and the resulting neighbouring atoms
+        Parameters:
+            mol (Molecule): the molecule whose environment to calculate 
+            radius (float, optional): Maximum distance in Angstroms between any atom in the molecule
+                and the resulting neighbouring atoms
+            threshold (float, optional): tolerance for detecting the neighbouring sites as part of the
+                given molecule.
 
-        Returns
-        -------
-        list of tuple
+        Returns:
             A list of tuples of (Molecule, elements, positions)
-            where `elements` is an :obj:`np.ndarray` of atomic numbers,
-            and `positions` is an :obj:`np.ndarray` of Cartesian atomic positions
+                where `elements` is an `np.ndarray` of atomic numbers,
+                and `positions` is an `np.ndarray` of Cartesian atomic positions
         """
 
         hklmax = np.array([-np.inf, -np.inf, -np.inf])
@@ -702,43 +720,40 @@ class Crystal:
                 keep[this_mol] = False
         return (mol, elements[keep], positions[keep])
 
-    def molecule_environments(self, radius=6.0):
-        """Calculate the atomic information for all
+    def molecule_environments(self, radius=6.0, threshold=1e-3) -> List[Tuple]:
+        """
+        Calculate the atomic information for all
         atoms surrounding each symmetry unique molecule
         in this crystal within the given radius.
 
-        Parameters
-        ----------
-        radius: float, optional
-            Maximum distance in Angstroms between any atom in the molecule
-            and the resulting neighbouring atoms
+        Parameters:
+            radius (float, optional): Maximum distance in Angstroms between any atom in the molecule
+                and the resulting neighbouring atoms
+            threshold (float, optional): tolerance for detecting the neighbouring sites as part of the
+                given molecule.
 
-        Returns
-        -------
-        list of tuple
+        Returns:
             A list of tuples of (Molecule, elements, positions)
-            where `elements` is an :obj:`np.ndarray` of atomic numbers,
-            and `positions` is an :obj:`np.ndarray` of Cartesian atomic positions
+            where `elements` is an `np.ndarray` of atomic numbers,
+            and `positions` is an `np.ndarray` of Cartesian atomic positions
         """
-        return [self.molecule_environment(x) for x in self.symmetry_unique_molecules()]
+        return [self.molecule_environment(x, radius=radius, threshold=threshold) for x in self.symmetry_unique_molecules()]
 
-    def functional_group_surroundings(self, radius=6.0, kind="carboxylic_acid"):
-        """Calculate the atomic information for all
+    def functional_group_surroundings(self, radius=6.0, kind="carboxylic_acid") -> List:
+        """
+        Calculate the atomic information for all
         atoms surrounding each functional group in each symmetry unique molecule
         in this crystal within the given radius.
 
-        Parameters
-        ----------
-        radius: float, optional
-            Maximum distance in Angstroms between any atom in the molecule
-            and the resulting neighbouring atoms
+        Parameters:
+            radius (float, optional): Maximum distance in Angstroms between any atom in the molecule
+                and the resulting neighbouring atoms
+            kind (str, optional): the functional group type
 
-        Returns
-        -------
-        list of tuple
+        Returns:
             A list of tuples of (func_el, func_pos, neigh_el, neigh_pos)
-            where `func_el` and `neigh_el` are :obj:`np.ndarray` of atomic numbers,
-            and `func_pos` and `neigh_pos` are :obj:`np.ndarray` of Cartesian atomic positions
+            where `func_el` and `neigh_el` are `np.ndarray` of atomic numbers,
+            and `func_pos` and `neigh_pos` are `np.ndarray` of Cartesian atomic positions
         """
         results = []
         for mol in self.symmetry_unique_molecules():
@@ -778,28 +793,26 @@ class Crystal:
                 )
         return results
 
-    def promolecule_density_isosurfaces(self, **kwargs):
-        """Calculate promolecule electron density isosurfaces
+    def promolecule_density_isosurfaces(self, **kwargs) -> List[Trimesh]:
+        """
+        Calculate promolecule electron density isosurfaces
         for each symmetry unique molecule in this crystal.
 
-        Keyword Args
-        ------------
-        isovalue: float, optional
-            level set value for the isosurface (default=0.002) in au.
-        separation: float, optional
-            separation between density grid used in the surface calculation
-            (default 0.2) in Angstroms.
-        color: str, optional
-            surface property to use for vertex coloring, one of ('d_norm_i',
-            'd_i', 'd_norm_e', 'd_e')
-        colormap: str, optional
-            matplotlib colormap to use for surface coloring (default 'viridis_r')
-        midpoint: float, optional, default 0.0 if using d_norm
-            use the midpoint norm (as is used in CrystalExplorer)
+        Args:
+            kwargs: Keyword arguments used by `Molecule.promolecule_density_isosurface`.
 
-        Returns
-        -------
-        list of :obj:`trimesh.Trimesh`
+                Options are:
+                ```
+                isovalue (float, optional): level set value for the isosurface (default=0.002) in au.
+                separation (float, optional): separation between density grid used in the surface calculation
+                    (default 0.2) in Angstroms.
+                color (str, optional): surface property to use for vertex coloring, one of ('d_norm_i',
+                    'd_i', 'd_norm_e', 'd_e')
+                colormap (str, optional): matplotlib colormap to use for surface coloring (default 'viridis_r')
+                midpoint (float, optional): midpoint of the segmented colormap (if applicable)
+                ```
+
+        Returns:
             A list of meshes representing the promolecule density isosurfaces
         """
         return [
@@ -807,7 +820,14 @@ class Crystal:
             for mol in self.symmetry_unique_molecules()
         ]
 
-    def asymmetric_unit_partial_charges(self):
+    def asymmetric_unit_partial_charges(self) -> np.ndarray:
+        """
+        Calculate the partial charges for the asymmetric unit of this
+        crystal using the EEM method.
+
+        Returns:
+            an `ndarray` of atomic partial charges.
+        """
         mols = self.symmetry_unique_molecules()
         charges = np.empty(len(self.asymmetric_unit), dtype=np.float32)
         for mol in mols:
@@ -817,21 +837,22 @@ class Crystal:
                 charges[idx] = charge
         return charges
 
-    def void_surface(self, *args, **kwargs):
-        """Calculate void surface based on promolecule electron density
+    def void_surface(self, *args, **kwargs) -> Trimesh:
+        """
+        Calculate void surface based on promolecule electron density
         for the unit cell of this crystal
 
-        Keyword Args
-        ------------
-        isovalue: float, optional
-            level set value for the isosurface (default=0.002) in au.
-        separation: float, optional
-            separation between density grid used in the surface calculation
-            (default 0.2) in Angstroms.
+        Args:
+            kwargs: Keyword arguments used in the evaluation of the surface.
+                
+                Options are:
+                ```
+                isovalue (float, optional): level set value for the isosurface (default=0.002) in au.
+                separation (float, optional): separation between density grid used in the surface calculation
+                    (default 0.2) in Angstroms.
+                ```
 
-        Returns
-        -------
-        :obj:`trimesh.Trimesh`
+        Returns:
             the mesh representing the promolecule density void isosurface
         """
 
@@ -893,6 +914,16 @@ class Crystal:
         return mesh
 
     def mesh_scene(self, **kwargs):
+        """
+        Calculate a scene of this meshes of unit cell molecules in this crystal,
+        along with optional void surface.
+
+        Args:
+            kwargs: optional arguments used in the generation of this scene.
+
+        Returns:
+            trimesh scene object.
+        """
         from trimesh.scene.scene import append_scenes
 
         meshes = [append_scenes(m.to_mesh()) for m in self.unit_cell_molecules()]
@@ -912,38 +943,37 @@ class Crystal:
         "Alias for `self.stockholder_weight_isosurfaces`"
         return self.stockholder_weight_isosurfaces(**kwargs)
 
-    def stockholder_weight_isosurfaces(self, kind="mol", **kwargs):
-        """Calculate stockholder weight isosurfaces (i.e. Hirshfeld surfaces)
+    def stockholder_weight_isosurfaces(self, kind="mol", **kwargs) -> List[Trimesh]:
+        """
+        Calculate stockholder weight isosurfaces (i.e. Hirshfeld surfaces)
         for each symmetry unique molecule or atom in this crystal.
 
-        Parameters
-        ----------
-        kind: str, optional
-            dictates whether we calculate surfaces for each unique molecule
-            or for each unique atom
+        Args:
+            kind (str, optional): dictates whether we calculate surfaces for each unique molecule
+                or for each unique atom
+            kwargs: keyword arguments passed to `stockholder_weight_isosurface`.
 
-        Keyword Args
-        ------------
-        isovalue: float, optional
-            level set value for the isosurface (default=0.5). Must be between
-            0 and 1, but values other than 0.5 probably won't make sense anyway.
-        separation: float, optional
-            separation between density grid used in the surface calculation
-            (default 0.2) in Angstroms.
-        radius: float, optional
-            maximum distance for contributing neighbours for the stockholder
-            weight calculation
-        color: str, optional
-            surface property to use for vertex coloring, one of ('d_norm_i',
-            'd_i', 'd_norm_e', 'd_e', 'd_norm')
-        colormap: str, optional
-            matplotlib colormap to use for surface coloring (default 'viridis_r')
-        midpoint: float, optional, default 0.0 if using d_norm
-            use the midpoint norm (as is used in CrystalExplorer)
+                Options include:
+                ```
+                isovalue: float, optional
+                    level set value for the isosurface (default=0.5). Must be between
+                    0 and 1, but values other than 0.5 probably won't make sense anyway.
+                separation: float, optional
+                    separation between density grid used in the surface calculation
+                    (default 0.2) in Angstroms.
+                radius: float, optional
+                    maximum distance for contributing neighbours for the stockholder
+                    weight calculation
+                color: str, optional
+                    surface property to use for vertex coloring, one of ('d_norm_i',
+                    'd_i', 'd_norm_e', 'd_e', 'd_norm')
+                colormap: str, optional
+                    matplotlib colormap to use for surface coloring (default 'viridis_r')
+                midpoint: float, optional, default 0.0 if using d_norm
+                    use the midpoint norm (as is used in CrystalExplorer)
+                ```
 
-        Returns
-        -------
-        list of :obj:`trimesh.Trimesh`
+        Returns:
             A list of meshes representing the stockholder weight isosurfaces
         """
         from chmpy import StockholderWeight
@@ -998,33 +1028,28 @@ class Crystal:
 
     def functional_group_shape_descriptors(
         self, l_max=5, radius=6.0, kind="carboxylic_acid"
-    ):
-        """Calculate the shape descriptors[1,2] for the all atoms in the functional group
+    ) -> np.ndarray:
+        """
+        Calculate the shape descriptors `[1,2]` for the all atoms in the functional group
         given for all symmetry unique molecules in this crystal.
 
-        Parameters
-        ----------
-        l_max: int, optional
-            maximum level of angular momenta to include in the spherical harmonic
-            transform of the molecular shape function. (default: 5)
-        radius: float, optional
-            maximum distance (Angstroms) of neighbouring atoms to include in 
-            stockholder weight calculation (default: 5)
-        kind: str, optional
-            Identifier for the functional group type (default: 'carboxylic_acid')
+        Parameters:
+            l_max (int, optional): maximum level of angular momenta to include in the spherical harmonic
+                transform of the molecular shape function. (default: 5)
+            radius (float, optional): maximum distance (Angstroms) of neighbouring atoms to include in 
+                stockholder weight calculation (default: 5)
+            kind (str, optional): Identifier for the functional group type (default: 'carboxylic_acid')
 
-        Returns
-        -------
-        :obj:`np.ndarray`
+        Returns:
             shape description vector
 
-        References
-        ----------
+        References:
+        ```
         [1] PR Spackman et al. Sci. Rep. 6, 22204 (2016)
             https://dx.doi.org/10.1038/srep22204
         [2] PR Spackman et al. Angew. Chem. 58 (47), 16780-16784 (2019)
             https://dx.doi.org/10.1002/anie.201906602
-
+        ```
         """
         descriptors = []
         from chmpy.shape import SHT, stockholder_weight_descriptor
@@ -1055,28 +1080,28 @@ class Crystal:
             )
         return np.asarray(descriptors)
 
-    def molecule_shape_descriptors(self, mol, l_max=5, radius=6.0, with_property=None):
-        """Calculate the molecular shape descriptors[1,2] for 
+    def molecule_shape_descriptors(self, mol, l_max=5, radius=6.0, with_property=None) -> np.ndarray:
+        """
+        Calculate the molecular shape descriptors `[1,2]` for 
         the provided molecule in the crystal.
 
-        Parameters
-        ----------
-        l_max: int, optional
-            maximum level of angular momenta to include in the spherical harmonic
-            transform of the molecular shape function.
+        Parameters:
+            l_max (int, optional): maximum level of angular momenta to include in the spherical harmonic
+                transform of the molecular shape function.
+            radius (float, optional): maximum distance (Angstroms) to include surroundings
+                in the shape description
+            with_property (str, optional): name of the surface property to include in the shape description
 
-        Returns
-        -------
-        :obj:`np.ndarray`
+        Returns:
             shape description vector
 
-        References
-        ----------
+        References:
+        ```
         [1] PR Spackman et al. Sci. Rep. 6, 22204 (2016)
             https://dx.doi.org/10.1038/srep22204
         [2] PR Spackman et al. Angew. Chem. 58 (47), 16780-16784 (2019)
             https://dx.doi.org/10.1002/anie.201906602
-
+        ```
         """
         descriptors = []
         from chmpy.shape import SHT, stockholder_weight_descriptor
@@ -1099,28 +1124,28 @@ class Crystal:
             with_property=with_property,
         )
 
-    def molecular_shape_descriptors(self, l_max=5, radius=6.0, with_property=None):
-        """Calculate the molecular shape descriptors[1,2] for all symmetry unique
+    def molecular_shape_descriptors(self, l_max=5, radius=6.0, with_property=None) -> np.ndarray:
+        """
+        Calculate the molecular shape descriptors[1,2] for all symmetry unique
         molecules in this crystal.
 
-        Parameters
-        ----------
-        l_max: int, optional
-            maximum level of angular momenta to include in the spherical harmonic
-            transform of the molecular shape function.
+        Parameters:
+            l_max (int, optional): maximum level of angular momenta to include in the spherical harmonic
+                transform of the molecular shape function.
+            radius (float, optional): maximum distance (Angstroms) to include surroundings
+                in the shape description
+            with_property (str, optional): name of the surface property to include in the shape description
 
-        Returns
-        -------
-        :obj:`np.ndarray`
+        Returns:
             shape description vector
 
-        References
-        ----------
+        References:
+        ```
         [1] PR Spackman et al. Sci. Rep. 6, 22204 (2016)
             https://dx.doi.org/10.1038/srep22204
         [2] PR Spackman et al. Angew. Chem. 58 (47), 16780-16784 (2019)
             https://dx.doi.org/10.1002/anie.201906602
-
+        ```
         """
         descriptors = []
         from chmpy.shape import SHT, stockholder_weight_descriptor
@@ -1146,27 +1171,27 @@ class Crystal:
             )
         return np.asarray(descriptors)
 
-    def atomic_shape_descriptors(self, l_max=5, radius=3.8):
-        """Calculate the shape descriptors[1,2] for all symmetry unique
+    def atomic_shape_descriptors(self, l_max=5, radius=3.8) -> np.ndarray:
+        """
+        Calculate the shape descriptors[1,2] for all symmetry unique
         atoms in this crystal.
 
-        Parameters
-        ----------
-        l_max: int, optional
-            maximum level of angular momenta to include in the spherical harmonic
-            transform of the shape function.
+        Parameters:
+            l_max (int, optional): maximum level of angular momenta to include in the spherical harmonic
+                transform of the molecular shape function.
+            radius (float, optional): maximum distance (Angstroms) to include surroundings
+                in the shape description
 
-        Returns
-        -------
-        :obj:`np.ndarray`
+        Returns:
             shape description vector
 
-        References
-        ----------
+        References:
+        ```
         [1] PR Spackman et al. Sci. Rep. 6, 22204 (2016)
             https://dx.doi.org/10.1038/srep22204
         [2] PR Spackman et al. Angew. Chem. 58 (47), 16780-16784 (2019)
             https://dx.doi.org/10.1002/anie.201906602
+        ```
         """
         descriptors = []
         from chmpy.shape import SHT, stockholder_weight_descriptor
@@ -1183,27 +1208,27 @@ class Crystal:
             )
         return np.asarray(descriptors)
 
-    def atom_group_shape_descriptors(self, atoms, l_max=5, radius=3.8):
+    def atom_group_shape_descriptors(self, atoms, l_max=5, radius=3.8) -> np.ndarray:
         """Calculate the shape descriptors[1,2] for the given atomic
         group in this crystal.
 
-        Parameters
-        ----------
-        l_max: int, optional
-            maximum level of angular momenta to include in the spherical harmonic
-            transform of the shape function.
+        Parameters:
+            atoms (Tuple): atoms to include in the as the 'inside' of the shape description.
+            l_max (int, optional): maximum level of angular momenta to include in the spherical harmonic
+                transform of the molecular shape function.
+            radius (float, optional): maximum distance (Angstroms) to include surroundings
+                in the shape description
 
-        Returns
-        -------
-        :obj:`np.ndarray`
+        Returns:
             shape description vector
 
-        References
-        ----------
+        References:
+        ```
         [1] PR Spackman et al. Sci. Rep. 6, 22204 (2016)
             https://dx.doi.org/10.1038/srep22204
         [2] PR Spackman et al. Angew. Chem. 58 (47), 16780-16784 (2019)
             https://dx.doi.org/10.1002/anie.201906602
+        ```
         """
         from chmpy.shape import SHT, stockholder_weight_descriptor
 
@@ -1221,7 +1246,7 @@ class Crystal:
 
     @property
     def site_labels(self):
-        "array of labels for sites in the asymmetric_unit"
+        "array of labels for sites in the `asymmetric_unit`"
         return self.asymmetric_unit.labels
 
     def __repr__(self):
@@ -1264,18 +1289,15 @@ class Crystal:
         return {"POSCAR": self.to_poscar_file, "CONTCAR": self.to_poscar_file}
 
     @classmethod
-    def load(cls, filename, **kwargs):
-        """Load a crystal structure from file (.res, .cif)
+    def load(cls, filename, **kwargs) :
+        """
+        Load a crystal structure from file (.res, .cif)
 
-        Parameters
-        ----------
-        filename: str
-            the path to the crystal structure file
+        Parameters:
+            filename (str): the path to the crystal structure file
 
-        Returns
-        -------
-        :obj:`Crystal`
-            the resulting crystal structure
+        Returns:
+            the resulting crystal structure or dictionary of crystal structures
         """
         fpath = Path(filename)
         n = fpath.name
@@ -1290,6 +1312,7 @@ class Crystal:
 
     @classmethod
     def from_vasp_string(cls, string, **kwargs):
+        "Initialize a crystal structure from a VASP POSCAR string"
         from chmpy.fmt.vasp import parse_poscar
 
         vasp_data = parse_poscar(string)
@@ -1303,6 +1326,7 @@ class Crystal:
 
     @classmethod
     def from_vasp_file(cls, filename, **kwargs):
+        "Initialize a crystal structure from a VASP POSCAR file"
         return cls.from_vasp_string(Path(filename).read_text(), **kwargs)
 
     @classmethod
@@ -1420,22 +1444,23 @@ class Crystal:
         return cls(unit_cell, space_group, asymmetric_unit, **kwargs)
 
     @property
-    def name(self):
+    def name(self) -> str:
         "synonym for titl"
         return self.titl
 
     @property
-    def id(self):
+    def id(self) -> str:
         "synonym for titl"
         return self.titl
 
     @property
-    def titl(self):
+    def titl(self) -> str:
         if "titl" in self.properties:
             return self.properties["titl"]
         return self.asymmetric_unit.formula
 
-    def to_cif_data(self, data_block_name=None):
+    def to_cif_data(self, data_block_name=None) -> dict:
+        "Convert this crystal structure to cif data dict"
         version = "1.0a1"
         if data_block_name is None:
             data_block_name = self.titl
@@ -1469,32 +1494,26 @@ class Crystal:
 
     def structure_factors(self, **kwargs):
         from chmpy.crystal.sfac import structure_factors
-
         return structure_factors(self, **kwargs)
 
     def unique_reflections(self, **kwargs):
         from chmpy.crystal.sfac import reflections
-
         return reflections(self, **kwargs)
 
     def powder_pattern(self, **kwargs):
         from chmpy.crystal.sfac import powder_pattern
         from chmpy.crystal.powder import PowderPattern
-
         tt, f2 = powder_pattern(self, **kwargs)
         return PowderPattern(tt, f2, **kwargs)
 
     def to_translational_symmetry(self, supercell=(1, 1, 1)):
-        """Create a supercell of this crystal in space group P 1.
+        """
+        Create a supercell of this crystal in space group P 1.
 
-        Parameters
-        ----------
-        supercell: tuple of int
-            size of the supercell to be created
+        Parameters:
+            supercell (Tuple[int]): size of the supercell to be created
 
-        Returns
-        -------
-        :obj: Crystal
+        Returns:
             Crystal object of a supercell in space group P 1
         """
         from itertools import product
@@ -1525,27 +1544,30 @@ class Crystal:
         return new_crystal
 
     def to_cif_file(self, filename, **kwargs):
+        "save this crystal to a CIF formatted file"
         cif_data = self.to_cif_data(**kwargs)
         return Cif(cif_data).to_file(filename)
 
     def to_cif_string(self, **kwargs):
+        "save this crystal to a CIF formatted string"
         cif_data = self.to_cif_data(**kwargs)
         return Cif(cif_data).to_string()
 
     def to_poscar_string(self, **kwargs):
+        "save this crystal to a VASP POSCAR formatted string"
         from chmpy.ext.vasp import poscar_string
-
         return poscar_string(self, name=self.titl)
 
     def to_poscar_file(self, filename, **kwargs):
+        "save this crystal to a VASP POSCAR formatted file"
         Path(filename).write_text(self.to_poscar_string(**kwargs))
 
     def to_shelx_file(self, filename):
-        """Write this crystal structure as a shelx .res file"""
+        """Write this crystal structure as a shelx .res formatted file"""
         Path(filename).write_text(self.to_shelx_string())
 
     def to_shelx_string(self, titl=None):
-        """Represent this crystal structure as a shelx .res string"""
+        """Represent this crystal structure as a shelx .res formatted string"""
         from chmpy.fmt.shelx import to_res_contents
 
         sfac = list(np.unique(self.site_atoms))
@@ -1570,7 +1592,7 @@ class Crystal:
         return to_res_contents(shelx_data)
 
     def save(self, filename, **kwargs):
-        """Save this crystal structure to file (.cif)"""
+        """Save this crystal structure to file (.cif, .res, POSCAR)"""
         fpath = Path(filename)
         n = fpath.name
         fname_map = self._fname_save_map()
@@ -1583,14 +1605,13 @@ class Crystal:
         return extension_map[extension](filename, **kwargs)
 
     def choose_trigonal_lattice(self, choice="H"):
-        """Change the choice of lattice for this crystal to either
+        """
+        Change the choice of lattice for this crystal to either
         rhombohedral or hexagonal cell
 
-        Parameters
-        ----------
-        choice: str, optional
-            The choice of the resulting lattice, either 'H' for hexagonal
-            or 'R' for rhombohedral (default 'H').
+        Parameters:
+            choice (str, optional): The choice of the resulting lattice, either 'H' for hexagonal
+                or 'R' for rhombohedral (default 'H').
         """
         if not self.space_group.has_hexagonal_rhombohedral_choices():
             raise ValueError("Invalid space group for choose_trigonal_lattice")
@@ -1615,16 +1636,13 @@ class Crystal:
         return self.as_P1_supercell((1, 1, 1))
 
     def as_P1_supercell(self, size):
-        """Create a supercell of this crystal in space group P 1.
+        """
+        Create a supercell of this crystal in space group P 1.
 
-        Parameters
-        ----------
-        size: tuple of int
-            size of the P 1 supercell to be created
+        Parameters:
+            size (Tuple[int]): size of the P 1 supercell to be created
 
-        Returns
-        -------
-        :obj: Crystal
+        Returns:
             Crystal object of a supercell in space group P 1
         """
         import itertools as it

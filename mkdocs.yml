@@ -1,0 +1,8 @@
+site_name: chmpy
+
+theme:
+    name: "material"
+
+plugins:
+    - search
+    - mkdocstrings

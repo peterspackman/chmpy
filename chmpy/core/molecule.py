@@ -6,6 +6,7 @@ from scipy.sparse import dok_matrix
 from pathlib import Path
 import numpy as np
 from .element import Element
+from typing import Tuple, List
 
 
 _FUNCTIONAL_GROUP_SUBGRAPHS = {}
@@ -13,36 +14,43 @@ LOG = logging.getLogger(__name__)
 
 
 class Molecule:
-    """class to represent information about a
+    """
+    Class to represent information about a
     molecule i.e. a set of atoms with 3D coordinates
     joined by covalent bonds
 
     e.g. int, float, str etc. Will handle uncertainty values
     contained in parentheses.
 
-    Parameters
-    ----------
-    elements: list of :obj:`Element`
-        list of element information for each atom in this molecule
-    positions: :obj:`np.ndarray`
-        (N, 3) array of Cartesian coordinates for each atom in this molecule (Angstroms)
-    bonds: :obj:`np.ndarray`
-        (N, N) adjacency matrix of bond lengths for connected atoms, 0 otherwise.
-        If not provided this will be calculated.
-    labels: :obj:`np.ndarray`
-        (N,) vector of string labels for each atom in this molecule
-        If not provided this will assigned default labels i.e. numbered in order.
-
-    Additional keyword arguments will be stored in the `properties` member, and
-    some may be utilized in methods, raising an exception if they are not set.
+    Attributes:
+        elements: list of element information for each atom in this molecule
+        positions: (N, 3) array of Cartesian coordinates for each atom in this molecule (Angstroms)
+        bonds: (N, N) adjacency matrix of bond lengths for connected atoms, 0 otherwise.
+            If not provided this will be calculated.
+        labels: (N,) vector of string labels for each atom in this molecule
+            If not provided this will assigned default labels i.e. numbered in order.
+        proerties: Additional keyword arguments will be stored in the `properties` member, and
+            some may be utilized in methods, raising an exception if they are not set.
     """
 
     positions: np.ndarray
     elements: np.ndarray
     labels: np.ndarray
     properties: dict
+    bonds: dok_matrix
 
     def __init__(self, elements, positions, bonds=None, labels=None, **kwargs):
+        """
+        Initialize a new molecule.
+
+        Arguments:
+            elements (List[Element]): N length list of elements associated with the sites
+            positions (array_like): (N, 3) array of site positions in Cartesian coordinates
+            bonds (dok_matrix, optional): if bonds are already calculated provide them here
+            labels (array_like, optional): labels (array_like): N length array of string labels for each site
+            kwargs: Additional properties (will populate the properties member)
+                to store in this molecule
+        """
         self.positions = positions
         self.elements = elements
         self.properties = {}
@@ -71,12 +79,12 @@ class Molecule:
         return len(self.elements)
 
     @property
-    def distance_matrix(self):
+    def distance_matrix(self) -> np.ndarray:
         "The (dense) pairwise distance matrix for this molecule"
         return cdist(self.positions, self.positions)
 
     @property
-    def unique_bonds(self):
+    def unique_bonds(self) -> List:
         """The unique bonds for this molecule. If bonds are not assigned,
         this will `None`"""
         if self.bonds is None:
@@ -87,21 +95,22 @@ class Molecule:
         )
 
     def guess_bonds(self, tolerance=0.40):
-        """Use geometric distances and covalent radii
+        """
+        Use geometric distances and covalent radii
         to determine bonding information for this molecule.
-        Will set the bonds member.
 
         Bonding is determined by the distance between
         sites being closer than the sum of covalent radii + `tolerance`
 
+        Will set the `bonds` member.
+
         If the `graph_tool` library is available, this will call the
         `bond_graph` method to populate the connectivity graph.
 
-        Parameters
-        ----------
-        tolerance: float, optional
-            Additional tolerance for attributing two sites as 'bonded'.
-            The default is 0.4 angstroms, which is recommended by the CCDC
+
+        Parameters:
+            tolerance (float, optional): Additional tolerance for attributing two sites as 'bonded'.
+                The default is 0.4 angstroms, which is recommended by the CCDC
         """
         tree = KDTree(self.positions)
         covalent_radii = np.array([x.cov for x in self.elements])
@@ -122,13 +131,13 @@ class Molecule:
         except ImportError as e:
             pass
 
-    def connected_fragments(self):
-        """Separate this molecule into fragments/molecules based
+    def connected_fragments(self) -> List:
+        """
+        Separate this molecule into fragments/molecules based
         on covalent bonding criteria.
 
-        Returns
-        ---------
-        a list of connected :obj:`Molecule` objects
+        Returns:
+            a list of connected `Molecule` objects
         """
         from chmpy.util.num import cartesian_product
         from scipy.sparse.csgraph import connected_components
@@ -162,16 +171,14 @@ class Molecule:
         self.labels = np.asarray(labels)
 
     def distance_to(self, other, method="centroid"):
-        """Calculate the euclidean distance between this
+        """
+        Calculate the euclidean distance between this
         molecule and another. May use the distance between
         centres-of-mass, centroids, or nearest atoms.
 
         Parameters
-        ----------
-        other: :obj:`Molecule`
-            the molecule to calculate distance to
-        method: str, optional
-            one of 'centroid', 'center_of_mass', 'nearest_atom'
+            other (Molecule): the molecule to calculate distance to
+            method (str, optional): one of 'centroid', 'center_of_mass', 'nearest_atom'
         """
         method = method.lower()
         if method == "centroid":
@@ -184,17 +191,17 @@ class Molecule:
             raise ValueError(f"Unknown method={method}")
 
     @property
-    def atomic_numbers(self):
+    def atomic_numbers(self) -> np.ndarray:
         "Atomic numbers for each atom in this molecule"
         return np.array([e.atomic_number for e in self.elements])
 
     @property
-    def centroid(self):
+    def centroid(self) -> np.ndarray:
         "Mean cartesian position of atoms in this molecule"
         return np.mean(self.positions, axis=0)
 
     @property
-    def center_of_mass(self):
+    def center_of_mass(self) -> np.ndarray:
         "Mean cartesian position of atoms in this molecule, weighted by atomic mass"
         if len(self) > 0:
             masses = np.asarray([x.mass for x in self.elements])
@@ -204,7 +211,7 @@ class Molecule:
         return np.zeros(3)
 
     @property
-    def partial_charges(self):
+    def partial_charges(self) -> np.ndarray:
         """The partial charges associated with atoms in this molecule.
         If `self._partial_charges` is not set, the charges will be 
         assigned based on EEM method."""
@@ -216,21 +223,18 @@ class Molecule:
             self._partial_charges = charges.astype(np.float32)
         return self._partial_charges
 
-    def electrostatic_potential(self, positions):
-        """Calculate the electrostatic potential based on the partial
+    def electrostatic_potential(self, positions) -> np.ndarray:
+        """
+        Calculate the electrostatic potential based on the partial
         charges associated with this molecule. The potential will be
         in atomic units.
 
-        Parameters
-        ----------
-        positions: :obj:`np.ndarray`
-            (N, 3) array of locations where the molecular ESP should
-            be calculated. Assumed to be in Angstroms.
+        Parameters:
+            positions (np.ndarray): (N, 3) array of locations where the molecular ESP should
+                be calculated. Assumed to be in Angstroms.
 
-        Returns
-        -------
-        :obj:`np.ndarray`
-            (N,) array of electrostatic potential values (atomic units) at the given
+        Returns:
+            np.ndarray: (N,) array of electrostatic potential values (atomic units) at the given
             positions.
         """
         from chmpy.util.unit import BOHR_TO_ANGSTROM
@@ -246,7 +250,7 @@ class Molecule:
         return v_pot
 
     @property
-    def molecular_formula(self):
+    def molecular_formula(self) -> str:
         "string of the molecular formula for this molecule"
         from .element import chemical_formula
 
@@ -262,13 +266,16 @@ class Molecule:
 
     @classmethod
     def from_xyz_string(cls, contents, **kwargs):
-        """construct a molecule from the provided xmol .xyz file. kwargs
+        """
+        Construct a molecule from the provided xmol .xyz file. kwargs
         will be passed through to the Molecule constructor.
 
-        Parameters
-        ----------
-        contents: str
-            contents of the .xyz file to read
+        Parameters:
+            contents (str): the contents of the .xyz file to read
+            kwargs: keyword arguments passed ot the `Molecule` constructor
+
+        Returns:
+            Molecule: A new `Molecule` object
         """
         from chmpy.fmt.xyz_file import parse_xyz_string
 
@@ -277,13 +284,16 @@ class Molecule:
 
     @classmethod
     def from_xyz_file(cls, filename, **kwargs):
-        """construct a molecule from the provided xmol .xyz file. kwargs
+        """
+        Construct a molecule from the provided xmol .xyz file. kwargs
         will be passed through to the Molecule constructor.
 
-        Parameters
-        ----------
-        filename: str
-            path to the .xyz file
+        Parameters:
+            filename (str): the path to the .xyz file
+            kwargs: keyword arguments passed ot the `Molecule` constructor
+
+        Returns:
+            Molecule: A new `Molecule` object
         """
 
         return cls.from_xyz_string(Path(filename).read_text(), **kwargs)
@@ -304,13 +314,15 @@ class Molecule:
 
     @classmethod
     def load(cls, filename, **kwargs):
-        """construct a molecule from the provided file. kwargs
-        will be passed through to the Molecule constructor.
+        """
+        Construct a molecule from the provided file. 
 
-        Parameters
-        ----------
-        filename: str
-            path to the file (in xyz format or sdf)
+        Parameters:
+            filename (str): the path to the (xyz or SDF) file
+            kwargs: keyword arguments passed ot the `Molecule` constructor
+
+        Returns:
+            Molecule: A new `Molecule` object
         """
         fpath = Path(filename)
         n = fpath.name
@@ -323,23 +335,18 @@ class Molecule:
             extension = "." + extension
         return extension_map[extension](filename, **kwargs)
 
-    def to_xyz_string(self, header=True):
-        """Represent this molecule as a string in the format
+    def to_xyz_string(self, header=True) -> str:
+        """
+        Represent this molecule as a string in the format
         of an xmol .xyz file. 
 
-        Keyword Args
-        ------------
-        header: bool
-            toggle whether or not to return the 'header' of the
-            xyz file i.e. the number of atoms line and the
-            comment line
+        Args:
+            header (bool, optional):toggle whether or not to return the 'header' of the
+                xyz file i.e. the number of atoms line and the comment line
 
-        Result
-        ------
-        contents: str
-            contents of the .xyz file
+        Returns:
+            contents (str) the contents of the .xyz file
         """
-
         if header:
             lines = [
                 f"{len(self)}",
@@ -352,28 +359,26 @@ class Molecule:
         return "\n".join(lines)
 
     def to_xyz_file(self, filename, **kwargs):
-        """Represent this molecule as an
+        """
+        Represent this molecule as an
         of an xmol .xyz file. Keyword arguments are
         passed to `self.to_xyz_string`.
 
-        Parameters
-        ----------
-        filename: str
-            The path in which store this molecule
+        Parameters:
+            filename (str): The path in which store this molecule
+            kwargs: Keyword arguments to be passed to `self.to_xyz_string`
         """
 
         Path(filename).write_text(self.to_xyz_string(**kwargs))
 
     def save(self, filename, **kwargs):
-        """save this molecule to the destination file in xyz format,
+        """
+        Save this molecule to the destination file in xyz format,
         optionally discarding the typical header.
 
-        Parameters
-        ----------
-        filename: str
-            path to the destination file
-        header: bool, optional
-            optionally disable writing of the header (no. of atoms and a comment line)
+        Parameters:
+            filename (str): path to the destination file
+            kwargs: keyword arguments passed to the relevant method
         """
         fpath = Path(filename)
         n = fpath.name
@@ -387,27 +392,26 @@ class Molecule:
         return extension_map[extension](filename, **kwargs)
 
     @property
-    def bbox_corners(self):
+    def bbox_corners(self) -> Tuple:
         "the lower, upper corners of a axis-aligned bounding box for this molecule"
         b_min = np.min(self.positions, axis=0)
         b_max = np.max(self.positions, axis=0)
         return (b_min, b_max)
 
     @property
-    def bbox_size(self):
+    def bbox_size(self) -> np.ndarray:
         "the dimensions of the axis-aligned bounding box for this molecule"
         b_min, b_max = self.bbox_corners
         return np.abs(b_max - b_min)
 
     def bond_graph(self):
-        """Calculate the graph_tool.Graph object corresponding
+        """
+        Calculate the `graph_tool.Graph` object corresponding
         to this molecule. Requires the graph_tool library to be
         installed
 
-        Returns
-        -------
-        :obj:`graph_tool.Graph`
-            the (undirected) graph of this molecule
+        Returns:
+            graph_tool.Graph: the (undirected) graph of this molecule
         """
 
         if hasattr(self, "_bond_graph"):
@@ -432,18 +436,15 @@ class Molecule:
         return g
 
     def functional_groups(self, kind=None):
-        """Find all indices of atom groups which constitute
+        """
+        Find all indices of atom groups which constitute
         subgraph isomorphisms with stored functional group data
 
-        Parameters
-        ----------
-        kind: str, optional
-            Find only matches of the given kind
+        Parameters:
+            kind (str, optional):Find only matches of the given kind
 
-        Returns
-        -------
-        Either
-            a dict with keys as functional group type and values as list of
+        Returns:
+            Either a dict with keys as functional group type and values as list of
             lists of indices, or a list of lists of indices if kind is specified.
         """
         global _FUNCTIONAL_GROUP_SUBGRAPHS
@@ -474,18 +475,15 @@ class Molecule:
         return matches
 
     def matching_subgraph(self, sub):
-        """Find all indices of atoms which match the given graph
+        """
+        Find all indices of atoms which match the given graph
 
-        Parameters
-        ----------
-        sub: :obj:`graph_tool.Graph`
-            the subgraph
+        Parameters:
+            sub (graph_tool.Graph): the subgraph
 
-        Returns
-        -------
-        list
-            list of lists of atomic indices matching the atoms in sub
-            to those in this molecule
+        Returns:
+            List: list of lists of atomic indices matching the atoms in sub
+                to those in this molecule
         """
 
         try:
@@ -507,19 +505,17 @@ class Molecule:
         return [tuple(x.a) for x in matches]
 
     def matching_fragments(self, fragment, method="connectivity"):
-        """Find the indices of a matching fragment to the given
+        """
+        Find the indices of a matching fragment to the given
         molecular fragment
 
-        Parameters
-        ----------
-        fragment: :obj:`Molecule`
-            Molecule object containing the desired fragment
+        Parameters:
+            fragment (Molecule): Molecule object containing the desired fragment
+            method (str, optional): the method for matching
 
-        Returns
-        -------
-        list of dict
-            List of maps between matching indices in this molecule and those
-            in the fragment
+        Returns:
+            List[dict]: List of maps between matching indices in this molecule and those
+                in the fragment
         """
         try:
             import graph_tool.topology as top
@@ -540,35 +536,31 @@ class Molecule:
         )
         return [list(x.a) for x in matches]
 
-    def atomic_shape_descriptors(self, l_max=5, radius=6.0, background=1e-5):
-        """Calculate the shape descriptors[1,2] for all
+    def atomic_shape_descriptors(self, l_max=5, radius=6.0, background=1e-5) -> np.ndarray:
+        """
+        Calculate the shape descriptors`[1,2]` for all
         atoms in this isolated molecule. If you wish to use
         the crystal environment please see the corresponding method
         in :obj:`chmpy.crystal.Crystal`.
 
-        Parameters
-        ----------
-        l_max: int, optional
-            maximum level of angular momenta to include in the spherical harmonic
-            transform of the shape function. (default=5)
-        radius: float, optional
-            Maximum distance in Angstroms between any atom in the molecule
-            and the resulting neighbouring atoms (default=6.0)
-        background: float, optional
-            'background' density to ensure closed surfaces for isolated atoms
-            (default=1e-5)
+        Parameters:
+            l_max (int, optional): maximum level of angular momenta to include in the spherical harmonic
+                transform of the shape function. (default=5)
+            radius (float, optional): Maximum distance in Angstroms between any atom in the molecule
+                and the resulting neighbouring atoms (default=6.0)
+            background (float, optional): 'background' density to ensure closed surfaces for isolated atoms
+                (default=1e-5)
 
-        Returns
-        -------
-        :obj:`np.ndarray`
+        Returns:
             shape description vector
 
         References
-        ----------
+        ```
         [1] PR Spackman et al. Sci. Rep. 6, 22204 (2016)
             https://dx.doi.org/10.1038/srep22204
         [2] PR Spackman et al. Angew. Chem. 58 (47), 16780-16784 (2019)
             https://dx.doi.org/10.1002/anie.201906602
+        ```
         """
         descriptors = []
         from chmpy.shape import SHT, stockholder_weight_descriptor
@@ -599,35 +591,39 @@ class Molecule:
         return np.asarray(descriptors)
 
     def atomic_stockholder_weight_isosurfaces(self, **kwargs):
-        """Calculate the stockholder weight isosurfaces for the atoms
+        """
+        Calculate the stockholder weight isosurfaces for the atoms
         in this molecule, with the provided background density.
 
-        Keyword Args
-        ------------
-        background: float, optional
-            'background' density to ensure closed surfaces for isolated atoms
-            (default=1e-5)
-        isovalue: float, optional
-            level set value for the isosurface (default=0.5). Must be between
-            0 and 1, but values other than 0.5 probably won't make sense anyway.
-        separation: float, optional
-            separation between density grid used in the surface calculation
-            (default 0.2) in Angstroms.
-        radius: float, optional
-            maximum distance for contributing neighbours for the stockholder
-            weight calculation
-        color: str, optional
-            surface property to use for vertex coloring, one of ('d_norm_i',
-            'd_i', 'd_norm_e', 'd_e', 'd_norm')
-        colormap: str, optional
-            matplotlib colormap to use for surface coloring (default 'viridis_r')
-        midpoint: float, optional, default 0.0 if using d_norm
-            use the midpoint norm (as is used in CrystalExplorer)
+        Args:
+            kwargs (dict): keyword arguments to be passed to isosurface
+                generation code
+                
+                Options are:
+                ```
+                background: float, optional
+                    'background' density to ensure closed surfaces for isolated atoms
+                    (default=1e-5)
+                isovalue: float, optional
+                    level set value for the isosurface (default=0.5). Must be between
+                    0 and 1, but values other than 0.5 probably won't make sense anyway.
+                separation: float, optional
+                    separation between density grid used in the surface calculation
+                    (default 0.2) in Angstroms.
+                radius: float, optional
+                    maximum distance for contributing neighbours for the stockholder
+                    weight calculation
+                color: str, optional
+                    surface property to use for vertex coloring, one of ('d_norm_i',
+                    'd_i', 'd_norm_e', 'd_e', 'd_norm')
+                colormap: str, optional
+                    matplotlib colormap to use for surface coloring (default 'viridis_r')
+                midpoint: float, optional, default 0.0 if using d_norm
+                    use the midpoint norm (as is used in CrystalExplorer)
+                ```
 
-        Returns
-        -------
-        list of :obj:`trimesh.Trimesh`
-            A list of meshes representing the stockholder weight isosurfaces
+        Returns:
+            List[trimesh.Trimesh]: A list of meshes representing the stockholder weight isosurfaces
         """
 
         from chmpy import StockholderWeight
@@ -681,34 +677,32 @@ class Molecule:
             meshes.append(mesh)
         return meshes
 
-    def shape_descriptors(self, l_max=5, **kwargs):
-        """Calculate the molecular shape descriptors[1,2] for all symmetry unique
-        molecules in this crystal using promolecule density.
+    def shape_descriptors(self, l_max=5, **kwargs) -> np.ndarray:
+        """
+        Calculate the molecular shape descriptors`[1,2]` for 
+        this molecule using the promolecule density.
 
-        Parameters
-        ----------
-        l_max: int, optional
-            maximum level of angular momenta to include in the spherical harmonic
-            transform of the molecular shape function.
+        Parameters:
+            kwargs: keyword arguments passed to `promolecule_density_descriptor`
+                Options are:
+                ```
+                l_max (int, optional): maximum level of angular momenta to include in the spherical harmonic
+                    transform of the molecular shape function.
+                with_property (str, optional): describe the combination of the radial shape function and a surface
+                    property in the real, imaginary channels of a complex function
+                isovalue (float, optional): the isovalue for the promolecule density surface (default 0.0002 au)
+                ```
 
-        with_property: str, optional
-            describe the combination of the radial shape function and a surface
-            property in the real, imaginary channels of a complex function
-        isovalue: float, optional
-            the isovalue for the promolecule density surface (default 0.0002 au)
-
-        Returns
-        -------
-        :obj:`np.ndarray`
+        Returns:
             shape description vector
 
-        References
-        ----------
+        References:
+        ```
         [1] PR Spackman et al. Sci. Rep. 6, 22204 (2016)
             https://dx.doi.org/10.1038/srep22204
         [2] PR Spackman et al. Angew. Chem. 58 (47), 16780-16784 (2019)
             https://dx.doi.org/10.1002/anie.201906602
-
+        ```
         """
         descriptors = []
         from chmpy.shape import SHT, promolecule_density_descriptor
@@ -719,28 +713,29 @@ class Molecule:
         )
 
     def promolecule_density_isosurface(self, **kwargs):
-        """Calculate promolecule electron density isosurface
+        """
+        Calculate promolecule electron density isosurface
         for this molecule.
+        Parameters:
+            kwargs: keyword arguments passed to `promolecule_density_isosurface`
+                Options are:
+                ```
+                isovalue: float, optional
+                    level set value for the isosurface (default=0.002) in au.
+                separation: float, optional
+                    separation between density grid used in the surface calculation
+                    (default 0.2) in Angstroms.
+                color: str, optional
+                    surface property to use for vertex coloring, one of ('d_norm_i',
+                    'd_i', 'd_norm_e', 'd_e')
+                colormap: str, optional
+                    matplotlib colormap to use for surface coloring (default 'viridis_r')
+                midpoint: float, optional, default 0.0 if using d_norm
+                    use the midpoint norm (as is used in CrystalExplorer)
+                ```
 
-        Keyword Args
-        ------------
-        isovalue: float, optional
-            level set value for the isosurface (default=0.002) in au.
-        separation: float, optional
-            separation between density grid used in the surface calculation
-            (default 0.2) in Angstroms.
-        color: str, optional
-            surface property to use for vertex coloring, one of ('d_norm_i',
-            'd_i', 'd_norm_e', 'd_e')
-        colormap: str, optional
-            matplotlib colormap to use for surface coloring (default 'viridis_r')
-        midpoint: float, optional, default 0.0 if using d_norm
-            use the midpoint norm (as is used in CrystalExplorer)
-
-        Returns
-        -------
-        :obj:`trimesh.Trimesh`
-            A mesh representing the promolecule density isosurface
+        Returns:
+            trimesh.Trimesh: A mesh representing the promolecule density isosurface
         """
         from chmpy import PromoleculeDensity
         from chmpy.surface import promolecule_density_isosurface
@@ -769,15 +764,14 @@ class Molecule:
         return mesh
 
     def to_mesh(self):
-        """Convert this molecule to a mesh of spheres and
+        """
+        Convert this molecule to a mesh of spheres and
         cylinders, colored by element. The origins of the spheres
         will be at the corresponding atomic position, and all units
         will be Angstroms.
         
-        Returns
-        -------
-        :obj:`trimesh.Trimesh`
-            a mesh representing this molecule.
+        Returns:
+            trimesh.Trimesh: a mesh representing this molecule.
         """
         from chmpy.util.mesh import molecule_to_meshes
 
@@ -797,58 +791,54 @@ class Molecule:
 
     @classmethod
     def from_arrays(cls, elements, positions, **kwargs):
-        """construct a molecule from the provided arrays. kwargs
+        """
+        Construct a molecule from the provided arrays. kwargs
         will be passed through to the Molecule constructor.
 
-        Parameters
-        ----------
-        elements: :obj:`np.ndarray`
-            (N,) array of atomic numbers for each atom in this molecule
-        positions: :obj:`np.ndarray`
-            (N, 3) array of Cartesian coordinates for each atom in this molecule (Angstroms)
+        Parameters:
+            elements (np.ndarray): (N,) array of atomic numbers for each atom in this molecule
+            positions (np.ndarray): (N, 3) array of Cartesian coordinates for each atom in this molecule (Angstroms)
+
+        Returns:
+            Molecule: a new molecule object
         """
         return cls([Element[x] for x in elements], np.array(positions), **kwargs)
 
     def mask(self, mask, **kwargs):
-        """Convenience method to construct a new molecule from this molecule with the given mask
+        """
+        Convenience method to construct a new molecule from this molecule with the given mask
         array.
 
-        Parameters
-        ----------
-        mask: :obj:`np.ndarray`
-            a numpy mask array used to filter which atoms to keep in the new molecule.
+        Parameters:
+            mask (np.ndarray): a numpy mask array used to filter which atoms to keep in the new molecule.
 
-        Returns
-        -------
-        a new :obj:`Molecule`, with atoms filtered by the mask.
+        Returns:
+            Molecule: a new `Molecule`, with atoms filtered by the mask.
         """
         return Molecule.from_arrays(
             self.atomic_numbers[mask], self.positions[mask], **kwargs
         )
 
     def translate(self, translation):
-        """Convenience method to translate this molecule by a given 
+        """
+        Convenience method to translate this molecule by a given 
         translation vector
         
-        Parameters
-        ----------
-        translation: :obj:`np.ndarray`
-            A (3,) vector of x, y, z coordinates of the translation
+        Parameters:
+            translation (np.ndarray): A (3,) vector of x, y, z coordinates of the translation
         """
         self.positions += translation
 
     def translated(self, translation):
-        """Convenience method to construct a new copy of this molecule
+        """
+        Convenience method to construct a new copy of this molecule
         translated by a given translation vector
         
-        Parameters
-        ----------
-        translation: :obj:`np.ndarray`
-            A (3,) vector of x, y, z coordinates of the translation
+        Parameters:
+            translation (np.ndarray): A (3,) vector of x, y, z coordinates of the translation
 
-        Returns
-        -------
-        a new copy of this :obj:`Molecule` translated by the given vector.
+        Returns:
+            Molecule: a new copy of this `Molecule` translated by the given vector.
         """
         import copy
 
@@ -858,19 +848,17 @@ class Molecule:
 
     @classmethod
     def from_sdf_dict(cls, sdf_dict, **kwargs):
-        """Construct a molecule from the provided dictionary of
+        """
+        Construct a molecule from the provided dictionary of
         sdf terms. Not intended for typical use cases, but as a
         helper method for `Molecule.from_sdf_file`
 
-        Parameters
-        ----------
-        sdf_dict: dict
-            a dictionary containing the 'atoms', 'x', 'y', 'z',
+        Parameters:
+        sdf_dict (dict): a dictionary containing the 'atoms', 'x', 'y', 'z',
             'symbol', 'bonds' members.
 
-        Returns
-        -------
-        a new :obj:`Molecule` from the provided data
+        Returns:
+            Molecule: a new `Molecule` from the provided data
         """
         atoms = sdf_dict["atoms"]
         positions = np.c_[atoms["x"], atoms["y"], atoms["z"]]
@@ -883,20 +871,18 @@ class Molecule:
 
     @classmethod
     def from_sdf_file(cls, filename, **kwargs):
-        """Construct a molecule from the provided SDF file.
+        """
+        Construct a molecule from the provided SDF file.
         Because an SDF file can have multiple molecules,
         an optional keyword argument 'progress' may be provided
         to track the loading of many molecules.
 
-        Parameters
-        ----------
-        filename: str
-            the path of the SDF file to read.
+        Parameters:
+            filename (str): the path of the SDF file to read.
 
-        Returns
-        -------
-        a new :obj:`Molecule` or list of :obj:`Molecule` objects
-        from the provided SDF file.
+        Returns:
+            Molecule: a new `Molecule` or list of :obj:`Molecule` objects
+            from the provided SDF file.
         """
 
         from chmpy.fmt.sdf import parse_sdf_file
