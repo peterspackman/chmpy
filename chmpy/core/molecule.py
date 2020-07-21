@@ -33,7 +33,8 @@ class Molecule:
         (N,) vector of string labels for each atom in this molecule
         If not provided this will assigned default labels i.e. numbered in order.
 
-    Keyword arguments will be stored in the `properties` member.
+    Additional keyword arguments will be stored in the `properties` member, and
+    some may be utilized in methods, raising an exception if they are not set.
     """
 
     positions: np.ndarray
@@ -71,10 +72,15 @@ class Molecule:
 
     @property
     def distance_matrix(self):
+        "The (dense) pairwise distance matrix for this molecule"
         return cdist(self.positions, self.positions)
 
     @property
     def unique_bonds(self):
+        """The unique bonds for this molecule. If bonds are not assigned,
+        this will `None`"""
+        if self.bonds is None:
+            return None
         return tuple(
             (a, b, self.bonds[a, b])
             for a, b in set(tuple(sorted(x)) for x in self.bonds.keys())
@@ -87,6 +93,9 @@ class Molecule:
 
         Bonding is determined by the distance between
         sites being closer than the sum of covalent radii + `tolerance`
+
+        If the `graph_tool` library is available, this will call the
+        `bond_graph` method to populate the connectivity graph.
 
         Parameters
         ----------
@@ -114,6 +123,13 @@ class Molecule:
             pass
 
     def connected_fragments(self):
+        """Separate this molecule into fragments/molecules based
+        on covalent bonding criteria.
+
+        Returns
+        ---------
+        a list of connected :obj:`Molecule` objects
+        """
         from chmpy.util.num import cartesian_product
         from scipy.sparse.csgraph import connected_components
 
@@ -180,12 +196,18 @@ class Molecule:
     @property
     def center_of_mass(self):
         "Mean cartesian position of atoms in this molecule, weighted by atomic mass"
-        masses = np.asarray([x.mass for x in self.elements])
-        return np.sum(self.positions * masses[:, np.newaxis] / np.sum(masses), axis=0)
+        if len(self) > 0:
+            masses = np.asarray([x.mass for x in self.elements])
+            return np.sum(
+                self.positions * masses[:, np.newaxis] / np.sum(masses), axis=0
+            )
+        return np.zeros(3)
 
     @property
     def partial_charges(self):
-        "partial charges assigned based on EEM method"
+        """The partial charges associated with atoms in this molecule.
+        If `self._partial_charges` is not set, the charges will be 
+        assigned based on EEM method."""
         assert len(self) > 0, "Must have at least one atom to calculate partial charges"
         if not hasattr(self, "_partial_charges"):
             from chmpy.ext.charges import EEM
@@ -195,6 +217,22 @@ class Molecule:
         return self._partial_charges
 
     def electrostatic_potential(self, positions):
+        """Calculate the electrostatic potential based on the partial
+        charges associated with this molecule. The potential will be
+        in atomic units.
+
+        Parameters
+        ----------
+        positions: :obj:`np.ndarray`
+            (N, 3) array of locations where the molecular ESP should
+            be calculated. Assumed to be in Angstroms.
+
+        Returns
+        -------
+        :obj:`np.ndarray`
+            (N,) array of electrostatic potential values (atomic units) at the given
+            positions.
+        """
         from chmpy.util.unit import BOHR_TO_ANGSTROM
 
         BOHR_PER_ANGSTROM = 1 / BOHR_TO_ANGSTROM
@@ -212,11 +250,14 @@ class Molecule:
         "string of the molecular formula for this molecule"
         from .element import chemical_formula
 
-        return chemical_formula(self.elements, subscript=False)
+        if len(self) > 0:
+            return chemical_formula(self.elements, subscript=False)
+        return "empty"
 
     def __repr__(self):
-        return "<{} ({})[{:.2f} {:.2f} {:.2f}]>".format(
-            self.name, self.molecular_formula, *self.center_of_mass
+        x, y, z = self.center_of_mass
+        return "<{name} ({formula})[{x:.2f} {y:.2f} {z:.2f}]>".format(
+            name=self.name, formula=self.molecular_formula, x=x, y=y, z=z
         )
 
     @classmethod
@@ -269,7 +310,7 @@ class Molecule:
         Parameters
         ----------
         filename: str
-            path to the file (in xyz format)
+            path to the file (in xyz format or sdf)
         """
         fpath = Path(filename)
         n = fpath.name
@@ -283,6 +324,22 @@ class Molecule:
         return extension_map[extension](filename, **kwargs)
 
     def to_xyz_string(self, header=True):
+        """Represent this molecule as a string in the format
+        of an xmol .xyz file. 
+
+        Keyword Args
+        ------------
+        header: bool
+            toggle whether or not to return the 'header' of the
+            xyz file i.e. the number of atoms line and the
+            comment line
+
+        Result
+        ------
+        contents: str
+            contents of the .xyz file
+        """
+
         if header:
             lines = [
                 f"{len(self)}",
@@ -295,6 +352,16 @@ class Molecule:
         return "\n".join(lines)
 
     def to_xyz_file(self, filename, **kwargs):
+        """Represent this molecule as an
+        of an xmol .xyz file. Keyword arguments are
+        passed to `self.to_xyz_string`.
+
+        Parameters
+        ----------
+        filename: str
+            The path in which store this molecule
+        """
+
         Path(filename).write_text(self.to_xyz_string(**kwargs))
 
     def save(self, filename, **kwargs):
@@ -702,12 +769,23 @@ class Molecule:
         return mesh
 
     def to_mesh(self):
+        """Convert this molecule to a mesh of spheres and
+        cylinders, colored by element. The origins of the spheres
+        will be at the corresponding atomic position, and all units
+        will be Angstroms.
+        
+        Returns
+        -------
+        :obj:`trimesh.Trimesh`
+            a mesh representing this molecule.
+        """
         from chmpy.util.mesh import molecule_to_meshes
 
         return molecule_to_meshes(self)
 
     @property
     def name(self):
+        "The name of this molecule, checks 'GENERIC_NAME' and 'name' keys in `self.properties`"
         return self.properties.get(
             "GENERIC_NAME", self.properties.get("name", self.__class__.__name__)
         )
@@ -732,14 +810,46 @@ class Molecule:
         return cls([Element[x] for x in elements], np.array(positions), **kwargs)
 
     def mask(self, mask, **kwargs):
+        """Convenience method to construct a new molecule from this molecule with the given mask
+        array.
+
+        Parameters
+        ----------
+        mask: :obj:`np.ndarray`
+            a numpy mask array used to filter which atoms to keep in the new molecule.
+
+        Returns
+        -------
+        a new :obj:`Molecule`, with atoms filtered by the mask.
+        """
         return Molecule.from_arrays(
             self.atomic_numbers[mask], self.positions[mask], **kwargs
         )
 
     def translate(self, translation):
+        """Convenience method to translate this molecule by a given 
+        translation vector
+        
+        Parameters
+        ----------
+        translation: :obj:`np.ndarray`
+            A (3,) vector of x, y, z coordinates of the translation
+        """
         self.positions += translation
 
     def translated(self, translation):
+        """Convenience method to construct a new copy of this molecule
+        translated by a given translation vector
+        
+        Parameters
+        ----------
+        translation: :obj:`np.ndarray`
+            A (3,) vector of x, y, z coordinates of the translation
+
+        Returns
+        -------
+        a new copy of this :obj:`Molecule` translated by the given vector.
+        """
         import copy
 
         result = copy.deepcopy(self)
@@ -748,6 +858,20 @@ class Molecule:
 
     @classmethod
     def from_sdf_dict(cls, sdf_dict, **kwargs):
+        """Construct a molecule from the provided dictionary of
+        sdf terms. Not intended for typical use cases, but as a
+        helper method for `Molecule.from_sdf_file`
+
+        Parameters
+        ----------
+        sdf_dict: dict
+            a dictionary containing the 'atoms', 'x', 'y', 'z',
+            'symbol', 'bonds' members.
+
+        Returns
+        -------
+        a new :obj:`Molecule` from the provided data
+        """
         atoms = sdf_dict["atoms"]
         positions = np.c_[atoms["x"], atoms["y"], atoms["z"]]
         elements = [Element[x] for x in atoms["symbol"]]
@@ -759,6 +883,22 @@ class Molecule:
 
     @classmethod
     def from_sdf_file(cls, filename, **kwargs):
+        """Construct a molecule from the provided SDF file.
+        Because an SDF file can have multiple molecules,
+        an optional keyword argument 'progress' may be provided
+        to track the loading of many molecules.
+
+        Parameters
+        ----------
+        filename: str
+            the path of the SDF file to read.
+
+        Returns
+        -------
+        a new :obj:`Molecule` or list of :obj:`Molecule` objects
+        from the provided SDF file.
+        """
+
         from chmpy.fmt.sdf import parse_sdf_file
 
         sdf_data = parse_sdf_file(filename, **kwargs)

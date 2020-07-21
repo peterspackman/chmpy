@@ -40,6 +40,7 @@ def parse_xyz_string(contents, filename=None):
     )
     return elements, np.asarray(positions)
 
+
 def parse_traj_string(contents, filename=None):
     """Convert provided xmol .xyz file contents into list of arrays of
     atomic numbers and cartesian positions
@@ -65,7 +66,7 @@ def parse_traj_string(contents, filename=None):
         i += 1
         comment = lines[i]
         i += 1
-        for line in lines[i:i+natom]:
+        for line in lines[i : i + natom]:
             if not line.strip():
                 continue
             tokens = line.strip().split()

@@ -2,17 +2,15 @@ from chmpy.crystal import Crystal, AsymmetricUnit, SpaceGroup
 from chmpy.fmt.xyz_file import parse_traj_file
 from pathlib import Path
 
+
 def to_xyz_string(elements, positions, comment=""):
-    lines = [
-        f"{len(elements)}",
-        comment
-    ]
+    lines = [f"{len(elements)}", comment]
     for el, (x, y, z) in zip(elements, positions):
         lines.append(f"{el} {x: 20.12f} {y: 20.12f} {z: 20.12f}")
     return "\n".join(lines)
 
 
-def expand_periodic_images(cell, filename, dest=None, supercell=(1,1,1)):
+def expand_periodic_images(cell, filename, dest=None, supercell=(1, 1, 1)):
     frames = parse_traj_file(filename)
     sg = SpaceGroup(1)
     xyz_strings = []
@@ -26,4 +24,3 @@ def expand_periodic_images(cell, filename, dest=None, supercell=(1,1,1)):
         Path(dest).write_text("\n".join(xyz_strings))
     else:
         return "\n".join(xyz_strings)
-

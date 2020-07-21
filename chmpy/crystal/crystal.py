@@ -720,10 +720,7 @@ class Crystal:
             where `elements` is an :obj:`np.ndarray` of atomic numbers,
             and `positions` is an :obj:`np.ndarray` of Cartesian atomic positions
         """
-        return [
-            self.molecule_environment(x)
-            for x in self.symmetry_unique_molecules()
-        ]
+        return [self.molecule_environment(x) for x in self.symmetry_unique_molecules()]
 
     def functional_group_surroundings(self, radius=6.0, kind="carboxylic_acid"):
         """Calculate the atomic information for all
@@ -1085,7 +1082,9 @@ class Crystal:
         from chmpy.shape import SHT, stockholder_weight_descriptor
 
         sph = SHT(l_max=l_max)
-        mol, neighbour_els, neighbour_pos = self.molecule_environment(mol, radius=radius) 
+        mol, neighbour_els, neighbour_pos = self.molecule_environment(
+            mol, radius=radius
+        )
         c = np.array(mol.centroid, dtype=np.float32)
         dists = np.linalg.norm(mol.positions - c, axis=1)
         bounds = np.min(dists) / 2, np.max(dists) + 10.0
