@@ -13,12 +13,16 @@ LOG = logging.getLogger(__name__)
 _HAVE_WARNED_ABOUT_LMAX_P = False
 
 
-def make_N_invariants(coefficients, kind="real"):
-    """Construct the 'N' type invariants from sht coefficients.
+def make_N_invariants(coefficients, kind="real") -> np.ndarray:
+    """
+    Construct the `N` type invariants from SHT coefficients.
     If coefficients is of length n, the size of the result will be sqrt(n)
 
     Arguments:
-    coefficients -- the set of spherical harmonic coefficients
+        coefficients (np.ndarray): the set of spherical harmonic coefficients
+
+    Returns:
+        np.ndarray the `N` type rotational invariants based on these coefficients
     """
     if kind == "complex":
         size = int(np.sqrt(len(coefficients)))
@@ -47,7 +51,19 @@ def make_N_invariants(coefficients, kind="real"):
         return np.sqrt(invariants)
 
 
-def make_invariants(l_max, coefficients, kinds="NP"):
+def make_invariants(l_max, coefficients, kinds="NP") -> np.ndarray:
+    """
+    Construct the `N` and/or `P` type invariants from SHT coefficients.
+
+    Arguments:
+        l_max (int): the maximum angular momentum of the coefficients
+        coefficients (np.ndarray): the set of spherical harmonic coefficients
+        kinds (str, optional): which kinds of invariants to include
+
+    Returns:
+        np.ndarray the `N` and/or `P` type rotational invariants based on these coefficients
+    """
+
     global _HAVE_WARNED_ABOUT_LMAX_P
     invariants = []
     if "N" in kinds:
@@ -71,6 +87,35 @@ def make_invariants(l_max, coefficients, kinds="NP"):
 
 
 def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
+    """
+    Calculate the 'stockholder weight' shape descriptors based on the
+    Hirshfeld weight i.e. ratio of electron density from the 'interior'
+    to the total electron density.
+
+    Parameters:
+        sht (SHT): the spherical harmonic transform object handle
+        n_i (np.ndarray): atomic numbers of the interior atoms
+        p_i (np.ndarray): Cartesian coordinates of the interior atoms
+        n_e (np.ndarray): atomic numbers of the exterior atoms
+        p_e (np.ndarray): Cartesian coordinates of the exterior atoms
+        kwargs (dict): keyword arguments for optional settings.
+            Options include:
+            ```
+            isovalue (float): change the Hirshfeld weight value (default 0.5)
+            background (float): include an optional 'background' electron
+                density (default 0.0)
+            with_property (str): calculate the combined shape + surface
+                property descriptor using the specified property on the
+                surface (e.g. d_norm, esp)
+            bounds (Tuple): modify the lower/upper bounds on the search for
+                the isovalue (default 0.1, 20.0)
+            coefficients (bool): also return the coefficients of the SHT
+            origin (np.ndarray): specify the center of the surface
+                (default is the geometric centroid of the interior atoms)
+            ```
+    Returns:
+        np.ndarray: the rotation invariant descriptors of the Hirshfeld surface shape
+    """
     isovalue = kwargs.get("isovalue", 0.5)
     background = kwargs.get("background", 0.0)
     property_function = kwargs.get("with_property", None)
@@ -106,6 +151,29 @@ def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
 
 
 def promolecule_density_descriptor(sht, n_i, p_i, **kwargs):
+    """
+    Calculate the shape description of the promolecule density isosurface.
+
+    Parameters:
+        sht (SHT): the spherical harmonic transform object handle
+        n_i (np.ndarray): atomic numbers of the atoms
+        p_i (np.ndarray): Cartesian coordinates of the atoms
+        kwargs (dict): keyword arguments for optional settings.
+            Options include:
+            ```
+            isovalue (float): change the Hirshfeld weight value (default 0.5)
+            with_property (str): calculate the combined shape + surface 
+                property descriptor using the specified property on the 
+                surface (e.g. d_norm, esp)
+            bounds (Tuple): modify the lower/upper bounds on the search for
+                the isovalue (default 0.1, 20.0)
+            coefficients (bool): also return the coefficients of the SHT
+            origin (np.ndarray): specify the center of the surface 
+                (default is the geometric centroid of the atoms)
+            ```
+    Returns:
+        np.ndarray: the rotation invariant descriptors of the promolecule surface shape
+    """
     isovalue = kwargs.get("isovalue", 0.0002)
     property_function = kwargs.get("with_property", None)
     r_min, r_max = kwargs.get("bounds", (0.4, 20.0))

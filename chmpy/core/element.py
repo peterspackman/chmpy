@@ -275,7 +275,7 @@ class Element(metaclass=_ElementMeta):
         self.mass = mass
 
     @staticmethod
-    def from_string(s):
+    def from_string(s: str) -> 'Element':
         """
         Create an element from a given element symbol
 
@@ -307,12 +307,12 @@ class Element(metaclass=_ElementMeta):
         return Element(*_EL_FROM_SYM[symbol])
 
     @staticmethod
-    def from_label(l):
+    def from_label(l: str) -> 'Element':
         """
         Create an element from a label e.g. 'C1', 'H2_F2___i' etc.
 
         Parameters:
-            s (str): a string representation of an element in the periodic table
+            l (str): a string representation of an element in the periodic table
 
         Returns:
             Element: an Element object if the conversion was successful, otherwise an exception is raised
@@ -338,7 +338,7 @@ class Element(metaclass=_ElementMeta):
         return Element(*_EL_FROM_SYM[sym])
 
     @staticmethod
-    def from_atomic_number(n):
+    def from_atomic_number(n: int) -> 'Element':
         """
         Create an element from a given atomic number
 
@@ -348,10 +348,11 @@ class Element(metaclass=_ElementMeta):
         Returns:
             Element: an Element object if atomic number was valid, otherwise an exception is raised
 
-        >>> Element.from_atomic_number(2)
-        He
-        >>> Element[79].name
-        'gold'
+        Examples:
+            >>> Element.from_atomic_number(2)
+            He
+            >>> Element[79].name
+            'gold'
         """
         return Element(n, *_ELEMENT_DATA[n - 1])
 
