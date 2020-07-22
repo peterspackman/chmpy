@@ -30,6 +30,7 @@ intended features:
 * Easily generate Hirshfeld or promolecule isosurfaces and associated properties.
 * Easily generate spherical harmonic shape descriptors for atoms, molecules, or molecular fragments.
 * Efficiently calculate crystal slabs, periodic connectivity and more...
+* Automatic parallelization of some calculations using OpenMP (set the `OMP_NUM_THREADS` environment variable)
 
 It should also serve as a simple, easy to read library for learning
 how to represent crystal structures, molecules etc. and evaluate
