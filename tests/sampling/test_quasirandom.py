@@ -6,20 +6,18 @@ from chmpy.sampling import (
     quasirandom_kgf as kgf,
     quasirandom_sobol as sobol,
     quasirandom_kgf_batch as kgf_b,
-    quasirandom_sobol_batch as sobol_b
+    quasirandom_sobol_batch as sobol_b,
 )
 
 
 class QuasirandomTestCase(unittest.TestCase):
-
     def test_batch_single_equivalent(self):
         start, end = 1, 1000
         for dims in range(1, 10):
             for single, batch in ((kgf, kgf_b), (sobol, sobol_b)):
-                pts_single = np.vstack([
-                    single(seed, dims)
-                    for seed in range(start, end + 1)
-                ])
+                pts_single = np.vstack(
+                    [single(seed, dims) for seed in range(start, end + 1)]
+                )
                 pts_batch = batch(start, end, dims)
                 np.testing.assert_allclose(pts_single, pts_batch)
 
@@ -31,4 +29,3 @@ class QuasirandomTestCase(unittest.TestCase):
             ratio_inside = np.sum(norms <= 1.0) / norms.shape[0]
             estimated_area = 4 * ratio_inside
             self.assertAlmostEqual(estimated_area, np.pi, places=2)
-

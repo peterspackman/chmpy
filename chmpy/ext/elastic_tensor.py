@@ -180,28 +180,19 @@ class ElasticTensor:
         GH = (GV + GR) / 2
 
         return {
-            "bulk_modulus_avg": {
-                "voigt": KV,
-                "reuss": KR,
-                "hill": KH,
-            },
-            "shear_modulus_avg": {
-                "voigt": GV,
-                "reuss": GR,
-                "hill": GH
-            },
+            "bulk_modulus_avg": {"voigt": KV, "reuss": KR, "hill": KH,},
+            "shear_modulus_avg": {"voigt": GV, "reuss": GR, "hill": GH},
             "youngs_modulus_avg": {
                 "voigt": 1 / (1 / (3 * GV) + 1 / (9 * KV)),
-                "reuss": 1 / (1 / (3 * GR) + 1 / (9 * KR)), 
-                "hill": 1 / (1 / (3 * GH) + 1 / (9 * KH)), 
+                "reuss": 1 / (1 / (3 * GR) + 1 / (9 * KR)),
+                "hill": 1 / (1 / (3 * GH) + 1 / (9 * KH)),
                 "spackman": self.spackman_average(kind="youngs_modulus"),
             },
             "poissons_ratio_avg": {
                 "voigt": (1 - 3 * GV / (3 * KV + GV)) / 2,
                 "reuss": (1 - 3 * GR / (3 * KR + GR)) / 2,
                 "hill": (1 - 3 * GH / (3 * KH + GH)) / 2,
-            }
-
+            },
         }
 
     def plot2d(self, kind="youngs_modulus", axis="xy", npoints=100, **kwargs):
