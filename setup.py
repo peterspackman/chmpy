@@ -40,6 +40,21 @@ ext_modules_cython = cythonize(
             sources=["chmpy/mc/_mc_lewiner.pyx"],
             include_dirs=[get_include()],
         ),
+        Ext(
+            "chmpy.sampling._lds",
+            sources=["chmpy/sampling/_lds.pyx"],
+            extra_compile_args=["-fopenmp"],
+            extra_link_args=["-fopenmp"],
+            include_dirs=[get_include()],
+        ),
+        Ext(
+            "chmpy.sampling._sobol",
+            sources=["chmpy/sampling/_sobol.pyx"],
+            extra_compile_args=["-fopenmp"],
+            extra_link_args=["-fopenmp"],
+            include_dirs=[get_include()],
+        )
+
     ]
 )
 
@@ -67,6 +82,7 @@ setup(
         "chmpy.subgraphs": ["*.gt"],
         "chmpy.templates": ["*.jinja2"],
         "chmpy.subgraphs": ["*.gt"],
+        "chmpy.sampling": ["*.npz"],
     },
     ext_modules=ext_modules,
     entry_points={"console_scripts": ["chmpy-convert= chmpy.cmd.convert:main",]},
