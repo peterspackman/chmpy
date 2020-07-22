@@ -100,6 +100,8 @@ class StockholderWeight:
         return np.r_[self.dens_a.vdw_radii, self.dens_b.vdw_radii]
 
     def weights(self, positions):
+        pos = positions.astype(np.float32)
+        results = []
         return self.s.weights(positions.astype(np.float32))
 
     def d_norm(self, positions):

@@ -26,42 +26,55 @@ cdef class PromoleculeDensity:
         self.rho_data = rho_data
 
     cpdef rho(self, const float[:, ::1] pts):
-        cdef int i, j
+        cdef int i, j, col
         cdef float diff
-        cdef float[::1] pos
+        cdef float[3] pos
         cdef np.ndarray[np.float32_t, ndim=1] r = np.empty(pts.shape[0], dtype=np.float32)
         cdef np.ndarray[np.float32_t, ndim=1] rho = np.zeros(pts.shape[0], dtype=np.float32)
         cdef np.ndarray[np.float32_t, ndim=1] tmp = np.empty(pts.shape[0], dtype=np.float32)
         cdef float[::1] rho_view = rho
-        for i in range(self.positions.shape[0]):
-            pos = self.positions[i]
-            for j in range(pts.shape[0]):
-                r[j] = 0.0
-                tmp[j] = 0.0
-                for col in range(3):
-                    diff = pts[j, col] - pos[col]
-                    r[j] += diff*diff
-                r[j] = sqrt(r[j]) / 0.5291772108 # bohr_per_angstrom
-            log_interp_f(r, self.domain, self.rho_data[i], tmp)
-            rho += tmp
+        cdef float[::1] tmp_view = tmp
+        cdef float[::1] r_view = r
+        cdef const float[:, ::1] pos_view = self.positions
+        cdef const float[:, ::1] rho_data_view = self.rho_data
+        cdef const float[::1] domain_view = self.domain
+        cdef int npos = self.positions.shape[0]
+        cdef int npts = pts.shape[0]
+        with nogil:
+            for i in range(npos):
+                pos[0] = pos_view[i, 0]
+                pos[1] = pos_view[i, 1]
+                pos[2] = pos_view[i, 2]
+                for j in range(npts):
+                    tmp_view[j] = 0.0
+                    r_view[j] = (
+                        (pts[j, 0] - pos[0]) * (pts[j, 0] - pos[0]) + 
+                        (pts[j, 1] - pos[1]) * (pts[j, 1] - pos[1]) + 
+                        (pts[j, 2] - pos[2]) * (pts[j, 2] - pos[2])
+                    )
+                    r_view[j] = sqrt(r_view[j]) / 0.5291772108 # bohr_per_angstrom
+                log_interp_f(r_view, domain_view, rho_data_view[i], tmp_view)
+                for j in range(pts.shape[0]):
+                    rho_view[j] += tmp_view[j]
         return rho
 
     cdef float one_rho(self, const float position[3]) nogil:
         cdef int i
+        cdef int N = self.positions.shape[0]
         cdef float diff, r
         cdef const float[::1] pos
         cdef const float[::1] xi = self.domain
         cdef const float[::1] yi
+        cdef const float[:, ::1] pos_view = self.positions
+        cdef const float[:, ::1] rho_data_view = self.rho_data
         cdef float rho = 0.0
-        for i in range(self.positions.shape[0]):
-            pos = self.positions[i]
-            yi = self.rho_data[i]
+        for i in range(N):
             r = 0.0
             for col in range(3):
-                diff = position[col] - pos[col]
+                diff = position[col] - pos_view[i, col]
                 r += diff*diff
             r = sqrt(r) / 0.5291772108 # bohr_per_angstrom
-            rho += log_interp_f_one(r, xi, yi)
+            rho += log_interp_f_one(r, xi, rho_data_view[i])
         return rho
 
 @cython.final
@@ -80,7 +93,8 @@ cdef class StockholderWeight:
         )
         rho_a = self.dens_a.rho(positions)
         rho_b = self.dens_b.rho(positions)
-        return rho_a / (rho_a + rho_b + self.background)
+        result = rho_a / (rho_a + rho_b + self.background)
+        return result
     
     cdef float one_weight(self, const float position[3]) nogil:
         cdef float rho_a = self.dens_a.one_rho(position)
@@ -88,6 +102,7 @@ cdef class StockholderWeight:
         return rho_a / (rho_b + rho_a + self.background)
 
 
+@cython.cdivision(True)
 cdef void log_interp_d(const double[::1] x, const double[::1] xi,
                        const double[::1] yi, double[::1] y) nogil:
     cdef double xval, lxval, guess
@@ -97,7 +112,7 @@ cdef void log_interp_d(const double[::1] x, const double[::1] xi,
     cdef double lrange = ubound - lbound
     cdef double lfill = yi[0], rfill = yi[ni - 1]
     cdef int i, j
-    for i in range(x.shape[0]):
+    for i in prange(x.shape[0]):
         xval = x[i]
         lxval = log(xval)
         guess = ni * (lxval - lbound) / lrange
@@ -110,21 +125,23 @@ cdef void log_interp_d(const double[::1] x, const double[::1] xi,
             continue
 
         while xi[j] < xval:
-            j += 1
+            j = j + 1
 
         slope = (yi[j] - yi[j-1]) / (xi[j] - xi[j-1])
         y[i] += yi[j-1] + (xval - xi[j-1]) * slope
 
+@cython.cdivision(True)
 cdef void log_interp_f(const float[::1] x, const float[::1] xi,
                        const float[::1] yi, float[::1] y) nogil:
     cdef float xval, lxval, guess
     cdef float slope
     cdef int ni = xi.shape[0]
-    cdef float lbound = log(xi[0]), ubound = log(xi[ni - 1])
+    cdef float lbound = log(xi[0])
+    cdef float ubound = log(xi[ni - 1])
     cdef float lrange = ubound - lbound
     cdef float lfill = yi[0], rfill = 0.0
     cdef int i, j
-    for i in range(x.shape[0]):
+    for i in prange(x.shape[0]):
         xval = x[i]
         lxval = log(xval)
         guess = ni * (lxval - lbound) / lrange
@@ -132,17 +149,18 @@ cdef void log_interp_f(const float[::1] x, const float[::1] xi,
         if j <= 0:
             y[i] = lfill
             continue
-        if j >= ni - 1:
+        elif j >= ni - 1:
             y[i] = rfill
             continue
 
         while True:
-            j += 1
+            j = j + 1
             if xi[j] >= xval: break
 
         slope = (yi[j] - yi[j-1]) / (xi[j] - xi[j-1])
-        y[i] += yi[j-1] + (xval - xi[j-1]) * slope
+        y[i] = y[i] + yi[j-1] + (xval - xi[j-1]) * slope
 
+@cython.cdivision(True)
 cdef inline float log_interp_f_one(const float x, const float[::1] xi, const float[::1] yi) nogil:
     cdef float xval, lxval, guess
     cdef float slope
@@ -169,6 +187,7 @@ cdef inline void fvmul(const float o[3], const float a, const float v[3], float 
     dest[1] = o[1] + v[1] * a
     dest[2] = o[2] + v[2] * a
 
+@cython.cdivision(True)
 cdef float brents_stock(StockholderWeight stock, const float origin[3],
                    const float direction[3],
                    const float lower, const float upper,
@@ -234,6 +253,7 @@ cdef float brents_stock(StockholderWeight stock, const float origin[3],
     return xcur
 
 
+@cython.cdivision(True)
 cdef float brents_pro(PromoleculeDensity pro, const float origin[3],
                    const float direction[3],
                    const float lower, const float upper,
@@ -303,7 +323,8 @@ cpdef sphere_promolecule_radii(
         const float l, const float u, const float tol, const int max_iter,
         const float isovalue):
     cdef int i, N = grid.shape[0]
-    cdef float d[3], o[3]
+    cdef float d[3]
+    cdef float o[3]
     r = np.empty(N, dtype=np.float64)
     cdef double[::1] rview  = r
     o[0] = origin[0]
@@ -323,7 +344,8 @@ cpdef sphere_stockholder_radii(
         StockholderWeight s, const float[::1] origin, const float[:, ::1] grid,
         const float l, const float u, const float tol, const int max_iter, const float isovalue):
     cdef int i, N = grid.shape[0]
-    cdef float d[3], o[3]
+    cdef float d[3]
+    cdef float o[3]
     r = np.empty(N, dtype=np.float64)
     cdef double[::1] rview  = r
     o[0] = origin[0]

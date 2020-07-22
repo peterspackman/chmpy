@@ -17,6 +17,8 @@ ext_modules_cython = cythonize(
         Ext(
             "chmpy.interpolate._density",
             sources=["chmpy/interpolate/_density.pyx"],
+            extra_compile_args=["-fopenmp"],
+            extra_link_args=["-fopenmp"],
             include_dirs=[get_include()],
         ),
         Ext(
