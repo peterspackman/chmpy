@@ -1,14 +1,11 @@
 # cython: language_level=3, boundscheck=False, wraparound=False
-# distutils: language = c++
 import numpy as np
 cimport numpy as np
 import cython
 from os.path import join, dirname
 
 # Enable low level memory management
-from libcpp.vector cimport vector
-from libc.stdlib cimport malloc, free
-from libc.math cimport exp, ceil, sqrt 
+from libc.math cimport exp
 _DATA_DIR = dirname(__file__)
 _FORM_FACTOR_DATA = np.load(join(_DATA_DIR, "atomic_form_factors.npz"))
 _FORM_FACTOR_KEYS = _FORM_FACTOR_DATA.f.keys

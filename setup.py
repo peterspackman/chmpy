@@ -31,7 +31,6 @@ ext_modules_cython = cythonize(
         Ext(
             "chmpy.crystal.sfac._sfac",
             sources=["chmpy/crystal/sfac/_sfac.pyx"],
-            language="c++",
             extra_compile_args=["-fopenmp"],
             extra_link_args=["-fopenmp"],
             include_dirs=[get_include()],
