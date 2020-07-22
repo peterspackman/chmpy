@@ -249,18 +249,21 @@ class _ElementMeta(type):
 
 @functools.total_ordering
 class Element(metaclass=_ElementMeta):
-    """Storage class for information about a chemical element.
+    """
+    Storage class for information about a chemical element.
 
-    >>> h = Element.from_string("H")
-    >>> c = Element.from_string("C")
-    >>> n = Element.from_atomic_number(7)
-    >>> f = Element.from_string("F")
+    Examples:
+        >>> h = Element.from_string("H")
+        >>> c = Element.from_string("C")
+        >>> n = Element.from_atomic_number(7)
+        >>> f = Element.from_string("F")
 
-    Element implements an ordering for sorting in e.g.
-    molecular formulae where carbon and hydrogen come first,
-    otherwise elements are sorted in order of atomic number.
-    >>> sorted([h, f, f, c, n])
-    [C, H, N, F, F]
+        Element implements an ordering for sorting in e.g.
+        molecular formulae where carbon and hydrogen come first,
+        otherwise elements are sorted in order of atomic number.
+
+        >>> sorted([h, f, f, c, n])
+        [C, H, N, F, F]
     """
 
     def __init__(self, atomic_number, name, symbol, cov, vdw, mass):
@@ -275,12 +278,20 @@ class Element(metaclass=_ElementMeta):
     def from_string(s):
         """
         Create an element from a given element symbol
-        >>> Element.from_string("h")
-        H
-        >>> Element["rn"].name
-        'radon'
-        >>> Element["AC"].cov
-        2.15
+
+        Parameters:
+            s (str): a string representation of an element in the periodic table
+
+        Returns:
+            Element: an Element object if the conversion was successful, otherwise an exception is raised
+
+        Examples:
+            >>> Element.from_string("h")
+            H
+            >>> Element["rn"].name
+            'radon'
+            >>> Element["AC"].cov
+            2.15
         """
         symbol = s.strip().capitalize()
         if symbol == "D":
@@ -299,16 +310,24 @@ class Element(metaclass=_ElementMeta):
     def from_label(l):
         """
         Create an element from a label e.g. 'C1', 'H2_F2___i' etc.
-        >>> Element.from_label("C1")
-        C
-        >>> Element.from_label("H")
-        H
-        >>> Element["LI2_F2____1____i"]
-        Li
-        
-        An ambiguous case, will make this Calcium not Carbon
-        >>> Element.from_label("Ca2_F2____1____i")
-        Ca
+
+        Parameters:
+            s (str): a string representation of an element in the periodic table
+
+        Returns:
+            Element: an Element object if the conversion was successful, otherwise an exception is raised
+
+        Examples:
+            >>> Element.from_label("C1")
+            C
+            >>> Element.from_label("H")
+            H
+            >>> Element["LI2_F2____1____i"]
+            Li
+            
+            An ambiguous case, will make this Calcium not Carbon
+            >>> Element.from_label("Ca2_F2____1____i")
+            Ca
         """
         m = re.match(_SYMBOL_REGEX, l)
         if m is None:
@@ -322,6 +341,13 @@ class Element(metaclass=_ElementMeta):
     def from_atomic_number(n):
         """
         Create an element from a given atomic number
+
+        Parameters:
+            n (int): the atomic number of the element
+
+        Returns:
+            Element: an Element object if atomic number was valid, otherwise an exception is raised
+
         >>> Element.from_atomic_number(2)
         He
         >>> Element[79].name
@@ -330,21 +356,25 @@ class Element(metaclass=_ElementMeta):
         return Element(n, *_ELEMENT_DATA[n - 1])
 
     @property
-    def vdw_radius(self):
+    def vdw_radius(self) -> float:
+        "the van der Waals radius in angstroms"
         return self.vdw
 
     @property
     def color(self):
+        "the color RGBA color of this element"
         return _EL_COLORS[self.atomic_number - 1]
 
     @property
-    def ball_stick_radius(self):
+    def ball_stick_radius(self) -> float:
+        "the radius of this element in a ball and stick representation"
         if self.symbol == "H":
             return self.covalent_radius
         return self.cov * 0.5
 
     @property
-    def covalent_radius(self):
+    def covalent_radius(self) -> float:
+        "the covalent radius in angstroms"
         return self.cov
 
     def __repr__(self):
@@ -376,31 +406,24 @@ class Element(metaclass=_ElementMeta):
 
 
 def chemical_formula(elements, subscript=False):
-    """Calculate the chemical formula for the given
+    """
+    Calculate the chemical formula for the given
     list of elements.
 
-    For example:
-    >>> chemical_formula(['O', 'C', 'O'])
-    'CO2'
-    >>> chemical_formula(['C', 'H', 'O', 'B'])
-    'BCHO'
+    Examples:
+        >>> chemical_formula(['O', 'C', 'O'])
+        'CO2'
+        >>> chemical_formula(['C', 'H', 'O', 'B'])
+        'BCHO'
 
-    Parameters
-    ----------
-    elements: list of :obj:`Element` or str
-        a list of elements of element symbols. Note that if a
-        list of strings are provided the order of chemical symbols
-        may not match convention.
+    Parameters:
+        elements (List[Element or str]): a list of elements or element symbols.
+            Note that if a list of strings are provided the order of chemical
+            symbols may not match convention.
+        subscript (bool, optoinal): toggle to use unicode subscripts for the chemical formula string
 
-    Keyword Args
-    ------------
-    subscript: bool
-        toggle to use unicode subscripts for the chemical formula string
-
-    Returns
-    -------
-    str
-        the chemical formula
+    Returns:
+        str: the chemical formula
     """
     count = Counter(sorted(elements))
     if subscript:
@@ -417,16 +440,14 @@ def chemical_formula(elements, subscript=False):
 
 
 def cov_radii(atomic_numbers):
-    """Return the covalent radii for the given atomic numbers
+    """
+    Return the covalent radii for the given atomic numbers
 
-    Parameters
-    ----------
-    atomic_numbers: array_like
-        the (N,) length integer array of atomic numbers
+    Parameters:
+        atomic_numbers (array_like): the (N,) length integer array of atomic numbers
 
-    Returns
-    :obj:`np.ndarray`
-        (N,) array of floats representing covalent radii
+    Returns:
+        np.ndarray: (N,) array of floats representing covalent radii
     """
     if np.any(atomic_numbers < 1) or np.any(atomic_numbers > 103):
         raise ValueError("All elements must be atomic numbers between [1,103]")
@@ -434,16 +455,14 @@ def cov_radii(atomic_numbers):
 
 
 def vdw_radii(atomic_numbers):
-    """Return the van der Waals radii for the given atomic numbers
+    """
+    Return the van der Waals radii for the given atomic numbers
 
-    Parameters
-    ----------
-    atomic_numbers: array_like
-        the (N,) length integer array of atomic numbers
+    Parameters:
+        atomic_numbers (array_like): the (N,) length integer array of atomic numbers
 
-    Returns
-    :obj:`np.ndarray`
-        (N,) array of floats representing van der Waals radii
+    Returns:
+        np.ndarray: (N,) array of floats representing van der Waals radii
     """
     if np.any(atomic_numbers < 1) or np.any(atomic_numbers > 103):
         raise ValueError("All elements must be atomic numbers between [1,103]")
@@ -451,16 +470,14 @@ def vdw_radii(atomic_numbers):
 
 
 def element_names(atomic_numbers):
-    """Return the element names for the given atomic numbers
+    """
+    Return the element names for the given atomic numbers
 
-    Parameters
-    ----------
-    atomic_numbers: array_like
-        the (N,) length integer array of atomic numbers
+    Parameters:
+        atomic_numbers (array_like): the (N,) length integer array of atomic numbers
 
-    Returns
-    list of str
-        (N,) list of strings representing element names
+    Returns:
+        List[str]: (N,) list of strings representing element names
     """
     if np.any(atomic_numbers < 1) or np.any(atomic_numbers > 103):
         raise ValueError("All elements must be atomic numbers between [1,103]")
@@ -468,16 +485,14 @@ def element_names(atomic_numbers):
 
 
 def element_symbols(atomic_numbers):
-    """Return the element symbols for the given atomic numbers
+    """
+    Return the element symbols for the given atomic numbers
 
-    Parameters
-    ----------
-    atomic_numbers: array_like
-        the (N,) length integer array of atomic numbers
+    Parameters:
+        atomic_numbers (array_like): the (N,) length integer array of atomic numbers
 
-    Returns
-    list of str
-        (N,) list of strings representing element symbols 
+    Returns:
+        List[str]: (N,) list of strings representing element symbols
     """
     if np.any(atomic_numbers < 1) or np.any(atomic_numbers > 103):
         raise ValueError("All elements must be atomic numbers between [1,103]")

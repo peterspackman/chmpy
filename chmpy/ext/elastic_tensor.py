@@ -179,28 +179,30 @@ class ElasticTensor:
         KH = (KV + KR) / 2
         GH = (GV + GR) / 2
 
-        return np.array(
-            (
-                (
-                    KV,
-                    1 / (1 / (3 * GV) + 1 / (9 * KV)),
-                    GV,
-                    (1 - 3 * GV / (3 * KV + GV)) / 2,
-                ),
-                (
-                    KR,
-                    1 / (1 / (3 * GR) + 1 / (9 * KR)),
-                    GR,
-                    (1 - 3 * GR / (3 * KR + GR)) / 2,
-                ),
-                (
-                    KH,
-                    1 / (1 / (3 * GH) + 1 / (9 * KH)),
-                    GH,
-                    (1 - 3 * GH / (3 * KH + GH)) / 2,
-                ),
-            )
-        )
+        return {
+            "bulk_modulus_avg": {
+                "voigt": KV,
+                "reuss": KR,
+                "hill": KH,
+            },
+            "shear_modulus_avg": {
+                "voigt": GV,
+                "reuss": GR,
+                "hill": GH
+            },
+            "youngs_modulus_avg": {
+                "voigt": 1 / (1 / (3 * GV) + 1 / (9 * KV)),
+                "reuss": 1 / (1 / (3 * GR) + 1 / (9 * KR)), 
+                "hill": 1 / (1 / (3 * GH) + 1 / (9 * KH)), 
+                "spackman": self.spackman_average(kind="youngs_modulus"),
+            },
+            "poissons_ratio_avg": {
+                "voigt": (1 - 3 * GV / (3 * KV + GV)) / 2,
+                "reuss": (1 - 3 * GR / (3 * KR + GR)) / 2,
+                "hill": (1 - 3 * GH / (3 * KH + GH)) / 2,
+            }
+
+        }
 
     def plot2d(self, kind="youngs_modulus", axis="xy", npoints=100, **kwargs):
         u = np.linspace(0, np.pi * 2, npoints)
@@ -235,8 +237,6 @@ class ElasticTensor:
         ax.xaxis.set_major_locator(plt.MaxNLocator(9))
         ax.yaxis.set_major_locator(plt.MaxNLocator(9))
         ax.plot(x, y, c="k", **kwargs)
-        # ax.spines["right"].set_color("none")
-        # ax.spines["top"].set_color("none")
         sns.despine(ax=ax, offset=0)
         ax.spines["bottom"].set_position("zero")
         ax.spines["left"].set_position("zero")
@@ -277,12 +277,8 @@ class ElasticTensor:
         return invariants
 
     def spackman_average(self, kind="youngs_modulus"):
-        from chmpy.ints.lebedev import load_grid
-
-        grid = load_grid(l_max=20, cartesian=True)
-        f = getattr(self, kind)
-        r = f(grid[:, :3])
-        return np.sum(r * grid[:, -1])
+        mesh = self.mesh(kind=kind)
+        return np.mean(np.linalg.norm(mesh.vertices, axis=1), axis=0)
 
     def __repr__(self):
         s = np.array2string(
