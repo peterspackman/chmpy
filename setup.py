@@ -24,12 +24,16 @@ ext_modules_cython = cythonize(
         Ext(
             "chmpy.shape._invariants",
             sources=["chmpy/shape/_invariants.pyx"],
+            extra_compile_args=["-fopenmp"],
+            extra_link_args=["-fopenmp"],
             include_dirs=[get_include()],
         ),
         Ext(
             "chmpy.crystal.sfac._sfac",
             sources=["chmpy/crystal/sfac/_sfac.pyx"],
             language="c++",
+            extra_compile_args=["-fopenmp"],
+            extra_link_args=["-fopenmp"],
             include_dirs=[get_include()],
         ),
         Ext(

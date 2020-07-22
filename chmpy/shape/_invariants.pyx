@@ -1,3 +1,4 @@
+# cython: language_level=3, boundscheck=False, wraparound=False
 cimport cython
 cimport numpy as np
 import numpy as np
@@ -79,6 +80,7 @@ cdef double * factorial = [
 ];
 
 
+@cython.cdivision(True)
 cdef double clebsch(int j1, int m1, int j2, int m2, int j, int m) nogil:
    # Calculation using Racah formula taken from "Angular Momentum",
    # D.M.Brink & G.R.Satchler, Oxford, 1968
@@ -141,10 +143,12 @@ cdef double clebsch(int j1, int m1, int j2, int m2, int j, int m) nogil:
    return res * tmp
 
 
+@cython.cdivision(True)
 cdef int coefficient_c(int l, int m) nogil:
     return ((l+1)*(l+1)) - l + m - 1
 
 
+@cython.cdivision(True)
 cdef int coefficient_r(int l, int m) nogil:
     return (l+1)*(l+2)/2 - l + m - 1
 
