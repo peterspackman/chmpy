@@ -331,11 +331,12 @@ cpdef sphere_promolecule_radii(
     o[1] = origin[1]
     o[2] = origin[2]
     
-    for i in prange(N, nogil=True):
-        d[0] = sin(grid[i, 1]) * cos(grid[i, 0])
-        d[1] = sin(grid[i, 1]) * sin(grid[i, 0])
-        d[2] = cos(grid[i, 1])
-        rview[i] = brents_pro(s, o, d, l, u, tol, max_iter, isovalue)
+    with nogil:
+        for i in range(N):
+            d[0] = sin(grid[i, 1]) * cos(grid[i, 0])
+            d[1] = sin(grid[i, 1]) * sin(grid[i, 0])
+            d[2] = cos(grid[i, 1])
+            rview[i] = brents_pro(s, o, d, l, u, tol, max_iter, isovalue)
     return r
 
 
@@ -352,11 +353,12 @@ cpdef sphere_stockholder_radii(
     o[1] = origin[1]
     o[2] = origin[2]
     
-    for i in prange(N, nogil=True):
-        d[0] = sin(grid[i, 1]) * cos(grid[i, 0])
-        d[1] = sin(grid[i, 1]) * sin(grid[i, 0])
-        d[2] = cos(grid[i, 1])
-        rview[i] = brents_stock(s, o, d, l, u, tol, max_iter, isovalue)
+    with nogil:
+        for i in range(N):
+            d[0] = sin(grid[i, 1]) * cos(grid[i, 0])
+            d[1] = sin(grid[i, 1]) * sin(grid[i, 0])
+            d[2] = cos(grid[i, 1])
+            rview[i] = brents_stock(s, o, d, l, u, tol, max_iter, isovalue)
     return r
 
 
