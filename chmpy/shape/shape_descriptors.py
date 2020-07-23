@@ -72,9 +72,9 @@ def make_invariants(l_max, coefficients, kinds="NP", real=True) -> np.ndarray:
     if "N" in kinds:
         invariants.append(make_N_invariants(coefficients, real=real))
     if "P" in kinds:
-        # Because we only have factorial precision in our
-        # clebsch implementation up to 70! l_max for P type
-        # invariants is restricted to <= 17
+        # Because we only have factorial precision (double precision)
+        # in our clebsch implementation up to 70! l_max for P type
+        # invariants is restricted to <= 23
         # TODO use a better clebsch gordan coefficients implementation
         # e.g. that in https://github.com/GXhelsinki/Clebsch-Gordan-Coefficients-
         pfunc = p_invariants_r if real else p_invariants_c

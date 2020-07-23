@@ -36,7 +36,7 @@ class ShapeDescriptorTestCase(unittest.TestCase):
         from chmpy.shape.shape_descriptors import make_N_invariants, make_invariants
 
         coeffs = np.random.rand(16).astype(np.complex128)
-        inv = make_N_invariants(coeffs, kind="complex")
+        inv = make_N_invariants(coeffs, real=False)
         self.assertEqual(len(inv), 4)
 
         coeffs = np.random.rand(26 * 26).astype(np.complex128)
