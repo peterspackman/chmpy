@@ -13,28 +13,20 @@ LOG = logging.getLogger(__name__)
 _HAVE_WARNED_ABOUT_LMAX_P = False
 
 
-def make_N_invariants(coefficients, kind="real") -> np.ndarray:
+def make_N_invariants(coefficients, real=True) -> np.ndarray:
     """
     Construct the `N` type invariants from SHT coefficients.
     If coefficients is of length n, the size of the result will be sqrt(n)
 
     Arguments:
         coefficients (np.ndarray): the set of spherical harmonic coefficients
+        real (bool, optional): whether to assume the coefficients are from a
+            real SHT (true) or a complex SHT (false)
 
     Returns:
         np.ndarray the `N` type rotational invariants based on these coefficients
     """
-    if kind == "complex":
-        size = int(np.sqrt(len(coefficients)))
-        invariants = np.empty(shape=(size), dtype=np.float64)
-        for i in range(0, size):
-            lower, upper = i ** 2, (i + 1) ** 2
-            invariants[i] = np.sum(
-                coefficients[lower : upper + 1]
-                * np.conj(coefficients[lower : upper + 1])
-            ).real
-        return np.sqrt(invariants)
-    else:
+    if real:
         # n = (l_max +2)(l_max+1)/2
         n = len(coefficients)
         size = int((-3 + np.sqrt(8 * n + 1)) // 2) + 1
@@ -48,10 +40,19 @@ def make_N_invariants(coefficients, kind="real") -> np.ndarray:
                 * np.conj(coefficients[lower : upper + 1])
             ).real
             lower += x
-        return np.sqrt(invariants)
+    else:
+        size = int(np.sqrt(len(coefficients)))
+        invariants = np.empty(shape=(size), dtype=np.float64)
+        for i in range(0, size):
+            lower, upper = i ** 2, (i + 1) ** 2
+            invariants[i] = np.sum(
+                coefficients[lower : upper + 1]
+                * np.conj(coefficients[lower : upper + 1])
+            ).real
+    return np.sqrt(invariants)
 
 
-def make_invariants(l_max, coefficients, kinds="NP") -> np.ndarray:
+def make_invariants(l_max, coefficients, kinds="NP", real=True) -> np.ndarray:
     """
     Construct the `N` and/or `P` type invariants from SHT coefficients.
 
@@ -59,6 +60,8 @@ def make_invariants(l_max, coefficients, kinds="NP") -> np.ndarray:
         l_max (int): the maximum angular momentum of the coefficients
         coefficients (np.ndarray): the set of spherical harmonic coefficients
         kinds (str, optional): which kinds of invariants to include
+        real (bool, optional): whether to assume the coefficients are from a
+            real SHT (true) or a complex SHT (false)
 
     Returns:
         np.ndarray the `N` and/or `P` type rotational invariants based on these coefficients
@@ -67,22 +70,28 @@ def make_invariants(l_max, coefficients, kinds="NP") -> np.ndarray:
     global _HAVE_WARNED_ABOUT_LMAX_P
     invariants = []
     if "N" in kinds:
-        invariants.append(make_N_invariants(coefficients))
+        invariants.append(make_N_invariants(coefficients, real=real))
     if "P" in kinds:
         # Because we only have factorial precision in our
         # clebsch implementation up to 70! l_max for P type
-        # invariants is restricted to < 23
-        if l_max > 23:
+        # invariants is restricted to <= 17
+        # TODO use a better clebsch gordan coefficients implementation
+        # e.g. that in https://github.com/GXhelsinki/Clebsch-Gordan-Coefficients-
+        pfunc = p_invariants_r if real else p_invariants_c
+        if l_max > 17:
             if not _HAVE_WARNED_ABOUT_LMAX_P:
                 LOG.warn(
-                    "P type invariants only supported up to l_max = 23: "
+                    "P type invariants only supported up to l_max = 17: "
                     "will only using N type invariants beyond that."
                 )
                 _HAVE_WARNED_ABOUT_LMAX_P = True
-            c = coefficients[: (25 * 24) // 2]
-            invariants.append(p_invariants_r(c))
+            if real:
+                c = coefficients[: (19 * 18) // 2]
+            else:
+                c = coefficients[:17*17]
+            invariants.append(pfunc(c))
         else:
-            invariants.append(p_invariants_r(coefficients))
+            invariants.append(pfunc(coefficients))
     return np.hstack(invariants)
 
 
@@ -112,6 +121,7 @@ def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
             coefficients (bool): also return the coefficients of the SHT
             origin (np.ndarray): specify the center of the surface
                 (default is the geometric centroid of the interior atoms)
+            kinds (str): the kinds of invariants to calculate (default 'NP')
             ```
     Returns:
         np.ndarray: the rotation invariant descriptors of the Hirshfeld surface shape
@@ -125,6 +135,7 @@ def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
     g[:, :] = sht.grid[:, :]
     o = kwargs.get("origin", np.mean(p_i, axis=0, dtype=np.float32))
     r = sphere_stockholder_radii(s.s, o, g, r_min, r_max, 1e-7, 30, isovalue)
+    real = True
     if property_function is not None:
         if property_function == "d_norm":
             property_function = s.d_norm
@@ -142,9 +153,10 @@ def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
         r_cplx.real = r
         r_cplx.imag = prop_values
         r = r_cplx
+        real = False
     l_max = sht.l_max
     coeffs = sht.analyse(r)
-    invariants = make_invariants(l_max, coeffs)
+    invariants = make_invariants(l_max, coeffs, kinds=kwargs.get("kinds", "NP"), real=real)
     if kwargs.get("coefficients", False):
         return coeffs, invariants
     return invariants
@@ -170,6 +182,7 @@ def promolecule_density_descriptor(sht, n_i, p_i, **kwargs):
             coefficients (bool): also return the coefficients of the SHT
             origin (np.ndarray): specify the center of the surface 
                 (default is the geometric centroid of the atoms)
+            kinds (str): the kinds of invariants to calculate (default 'NP')
             ```
     Returns:
         np.ndarray: the rotation invariant descriptors of the promolecule surface shape
@@ -182,6 +195,7 @@ def promolecule_density_descriptor(sht, n_i, p_i, **kwargs):
     g[:, :] = sht.grid[:, :]
     o = kwargs.get("origin", np.mean(p_i, axis=0, dtype=np.float32))
     r = sphere_promolecule_radii(pro.dens, o, g, r_min, r_max, 1e-7, 30, isovalue)
+    real = True
     if property_function is not None:
         if property_function == "d_norm":
             property_function = lambda x: pro.d_norm(x)[1]
@@ -197,9 +211,10 @@ def promolecule_density_descriptor(sht, n_i, p_i, **kwargs):
         r_cplx.real = r
         r_cplx.imag = prop_values
         r = r_cplx
+        real = False
     l_max = sht.l_max
     coeffs = sht.analyse(r)
-    invariants = make_invariants(l_max, coeffs)
+    invariants = make_invariants(l_max, coeffs, kinds=kwargs.get("kinds", "NP"), real=real)
     if kwargs.get("coefficients", False):
         return coeffs, invariants
     return invariants

@@ -162,7 +162,7 @@ cdef double complex invariant_P_c(double complex[::1] coeffs, int l, int l1, int
         p = 0.0
         for m1 in range(-l1, l1 + 1):
             c = clebsch(2*l1, 2*m1, 2* l2, 2*(m - m1), 2*l, 2*m)
-            if c == 0:
+            if c == 0 or c != c:
                 continue
             idx1 = coefficient_c(l1, m1)
             idx2 = coefficient_c(l2, m - m1)
@@ -181,7 +181,7 @@ cdef double complex invariant_P_r(double complex[::1] coeffs, int l, int l1, int
         p = 0.0
         for m1 in range(0, l1 + 1):
             c = clebsch(2*l1, 2*m1, 2* l2, 2*(m - m1), 2*l, 2*m)
-            if c == 0:
+            if c == 0 or c != c:
                 continue
             idx1 = coefficient_r(l1, m1)
             idx2 = coefficient_r(l2, m - m1)
@@ -213,11 +213,10 @@ cpdef p_invariants_c(coeffs):
                 else:
                     odd_inv.append(i)
     R = np.real(even_inv)
-    R = np.sign(R) * np.power(R, 1.0/3)
+    R = np.sign(R) * np.cbrt(R)
     J = np.imag(odd_inv)
-    J = np.sign(J) * np.power(J, 1.0/3)
+    J = np.sign(J) * np.cbrt(J)
     return np.hstack([R, J])
-
 
 cpdef p_invariants_r(coeffs):
     cdef int l_max = <int>((-3 + sqrt(8 * len(coeffs) + 1)) / 2)
