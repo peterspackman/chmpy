@@ -78,17 +78,18 @@ def make_invariants(l_max, coefficients, kinds="NP", real=True) -> np.ndarray:
         # TODO use a better clebsch gordan coefficients implementation
         # e.g. that in https://github.com/GXhelsinki/Clebsch-Gordan-Coefficients-
         pfunc = p_invariants_r if real else p_invariants_c
-        if l_max > 17:
+        MAX_L_MAX = 23
+        if l_max > MAX_L_MAX:
             if not _HAVE_WARNED_ABOUT_LMAX_P:
                 LOG.warn(
-                    "P type invariants only supported up to l_max = 17: "
+                    f"P type invariants only supported up to l_max = {MAX_L_MAX}: "
                     "will only using N type invariants beyond that."
                 )
                 _HAVE_WARNED_ABOUT_LMAX_P = True
             if real:
-                c = coefficients[: (19 * 18) // 2]
+                c = coefficients[: ((MAX_L_MAX + 2)* (MAX_L_MAX + 1)) // 2]
             else:
-                c = coefficients[:17*17]
+                c = coefficients[:(MAX_L_MAX*MAX_L_MAX)]
             invariants.append(pfunc(c))
         else:
             invariants.append(pfunc(coefficients))
