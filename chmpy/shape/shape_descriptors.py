@@ -87,9 +87,9 @@ def make_invariants(l_max, coefficients, kinds="NP", real=True) -> np.ndarray:
                 )
                 _HAVE_WARNED_ABOUT_LMAX_P = True
             if real:
-                c = coefficients[: ((MAX_L_MAX + 2)* (MAX_L_MAX + 1)) // 2]
+                c = coefficients[: ((MAX_L_MAX + 2) * (MAX_L_MAX + 1)) // 2]
             else:
-                c = coefficients[:(MAX_L_MAX*MAX_L_MAX)]
+                c = coefficients[: (MAX_L_MAX * MAX_L_MAX)]
             invariants.append(pfunc(c))
         else:
             invariants.append(pfunc(coefficients))
@@ -157,7 +157,9 @@ def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
         real = False
     l_max = sht.l_max
     coeffs = sht.analyse(r)
-    invariants = make_invariants(l_max, coeffs, kinds=kwargs.get("kinds", "NP"), real=real)
+    invariants = make_invariants(
+        l_max, coeffs, kinds=kwargs.get("kinds", "NP"), real=real
+    )
     if kwargs.get("coefficients", False):
         return coeffs, invariants
     return invariants
@@ -215,7 +217,9 @@ def promolecule_density_descriptor(sht, n_i, p_i, **kwargs):
         real = False
     l_max = sht.l_max
     coeffs = sht.analyse(r)
-    invariants = make_invariants(l_max, coeffs, kinds=kwargs.get("kinds", "NP"), real=real)
+    invariants = make_invariants(
+        l_max, coeffs, kinds=kwargs.get("kinds", "NP"), real=real
+    )
     if kwargs.get("coefficients", False):
         return coeffs, invariants
     return invariants

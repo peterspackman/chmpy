@@ -6,7 +6,7 @@ from scipy.sparse import dok_matrix
 from pathlib import Path
 import numpy as np
 from .element import Element
-from typing import Tuple, List
+from typing import Tuple, List, Union
 
 
 _FUNCTIONAL_GROUP_SUBGRAPHS = {}
@@ -435,7 +435,7 @@ class Molecule:
         self._bond_graph = g
         return g
 
-    def functional_groups(self, kind=None):
+    def functional_groups(self, kind=None) -> Union[dict, List]:
         """
         Find all indices of atom groups which constitute
         subgraph isomorphisms with stored functional group data
@@ -849,15 +849,15 @@ class Molecule:
         return result
 
     @classmethod
-    def from_sdf_dict(cls, sdf_dict, **kwargs):
+    def from_sdf_dict(cls, sdf_dict, **kwargs) -> "Molecule":
         """
         Construct a molecule from the provided dictionary of
         sdf terms. Not intended for typical use cases, but as a
         helper method for `Molecule.from_sdf_file`
 
         Parameters:
-        sdf_dict (dict): a dictionary containing the 'atoms', 'x', 'y', 'z',
-            'symbol', 'bonds' members.
+            sdf_dict (dict): a dictionary containing the 'atoms', 'x', 'y', 'z',
+                'symbol', 'bonds' members.
 
         Returns:
             Molecule: a new `Molecule` from the provided data

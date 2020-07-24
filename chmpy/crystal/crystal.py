@@ -11,7 +11,7 @@ from .space_group import SpaceGroup, SymmetryOperation
 from chmpy.core.element import Element, chemical_formula
 from chmpy.core.molecule import Molecule
 from chmpy.util.num import cartesian_product
-from typing import List, Tuple
+from typing import List, Tuple, Union
 from trimesh import Trimesh
 
 
@@ -933,7 +933,7 @@ class Crystal:
             kwargs: optional arguments used in the generation of this scene.
 
         Returns:
-            trimesh scene object.
+            trimesh.scene.Scene: trimesh scene object.
         """
         from trimesh.scene.scene import append_scenes
 
@@ -1304,7 +1304,7 @@ class Crystal:
         return {"POSCAR": self.to_poscar_file, "CONTCAR": self.to_poscar_file}
 
     @classmethod
-    def load(cls, filename, **kwargs):
+    def load(cls, filename, **kwargs) -> Union["Crystal", dict]:
         """
         Load a crystal structure from file (.res, .cif)
 
@@ -1527,7 +1527,7 @@ class Crystal:
         )
         return PowderPattern(tt, f2, **kwargs)
 
-    def to_translational_symmetry(self, supercell=(1, 1, 1)):
+    def to_translational_symmetry(self, supercell=(1, 1, 1)) -> "Crystal":
         """
         Create a supercell of this crystal in space group P 1.
 
@@ -1652,12 +1652,12 @@ class Crystal:
             self.space_group.international_tables_number, choice=choice
         )
 
-    def as_P1(self):
+    def as_P1(self) -> "Crystal":
         """Create a copy of this crystal in space group P 1, with the new
         asymmetric_unit consisting of self.unit_cell_molecules()"""
         return self.as_P1_supercell((1, 1, 1))
 
-    def as_P1_supercell(self, size):
+    def as_P1_supercell(self, size) -> "Crystal":
         """
         Create a supercell of this crystal in space group P 1.
 

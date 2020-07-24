@@ -2,6 +2,17 @@
 
 ## What they are
 
+A rotation invariant description of a shape.
+In essence, these are rotation invariants calculated from the coefficients of
+the spherical harmonic transform of a shape function, which in our
+case is either the radius (distance from the origin) of an isosurface
+as a function of the spherical angles theta and phi.
+
+
+### References:
+1. [PR Spackman et al. Sci. Rep. 6, 22204 (2016)](https://dx.doi.org/10.1038/srep22204)
+2. [PR Spackman et al. Angew. Chem. 58 (47), 16780-16784 (2019)](https://dx.doi.org/10.1002/anie.201906602)
+
 
 ## How to calculate shape descriptors
 
@@ -10,6 +21,8 @@
 ``` python
 from chmpy import Crystal
 c = Crystal.load("tests/test_files/acetic_acid.cif")
+
+# calculate shape descriptors for each molecule in the asymmetric unit
 desc = c.molecular_shape_descriptors()
 ```
 
@@ -20,6 +33,8 @@ calculated directly from the `Crystal` object:
 ``` python
 from chmpy import Crystal
 c = Crystal.load("tests/test_files/acetic_acid.cif")
+
+# calculate shape descriptors for each atom in the asymmetric unit
 desc = c.atomic_shape_descriptors()
 ```
 

@@ -275,7 +275,7 @@ class Element(metaclass=_ElementMeta):
         self.mass = mass
 
     @staticmethod
-    def from_string(s: str) -> 'Element':
+    def from_string(s: str) -> "Element":
         """
         Create an element from a given element symbol
 
@@ -307,7 +307,7 @@ class Element(metaclass=_ElementMeta):
         return Element(*_EL_FROM_SYM[symbol])
 
     @staticmethod
-    def from_label(l: str) -> 'Element':
+    def from_label(l: str) -> "Element":
         """
         Create an element from a label e.g. 'C1', 'H2_F2___i' etc.
 
@@ -338,7 +338,7 @@ class Element(metaclass=_ElementMeta):
         return Element(*_EL_FROM_SYM[sym])
 
     @staticmethod
-    def from_atomic_number(n: int) -> 'Element':
+    def from_atomic_number(n: int) -> "Element":
         """
         Create an element from a given atomic number
 
