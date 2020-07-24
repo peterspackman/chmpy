@@ -1,2 +1,2 @@
-# chmpy.core.element
+# element
 ::: chmpy.core.element

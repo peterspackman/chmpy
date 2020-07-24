@@ -1,2 +1,2 @@
-# chmpy.shape.shape_descriptors
+# Shape descriptors
 ::: chmpy.shape.shape_descriptors

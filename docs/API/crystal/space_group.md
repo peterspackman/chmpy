@@ -1,2 +1,2 @@
-# chmpy.crystal.space_group
+# space_group
 ::: chmpy.crystal.space_group

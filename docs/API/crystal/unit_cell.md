@@ -1,2 +1,2 @@
-# chmpy.crystal.unit_cell
+# unit_cell
 ::: chmpy.crystal.unit_cell
