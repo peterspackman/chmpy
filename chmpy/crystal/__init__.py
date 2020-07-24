@@ -5,8 +5,10 @@ space groups (`SpaceGroup`), point groups (`PointGroup`), symmetry operations in
 fractional coordinates (`SymmetryOperation`) and more.
 """
 
-from .crystal import Crystal, AsymmetricUnit
-from .space_group import SpaceGroup, SymmetryOperation
+from .asymmetric_unit import AsymmetricUnit
+from .crystal import Crystal
+from .symmetry_operation import SymmetryOperation
+from .space_group import SpaceGroup
 from .unit_cell import UnitCell
 from .point_group import PointGroup
 

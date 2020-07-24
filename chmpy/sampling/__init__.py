@@ -24,6 +24,7 @@ _SINGLE = {
     "kgf": quasirandom_kgf,
 }
 
+
 def quasirandom(d1: int, d2=None, method="sobol", seed=1) -> np.ndarray:
     """
     Generate a quasirandom point, or sequence of points with coefficients
