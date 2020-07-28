@@ -5,6 +5,8 @@ from chmpy.util.unit import units
 
 
 class CubeData:
+    _filename = "unknown cube file"
+
     def __init__(self, filename=None):
         self._interpolator = None
         if filename is not None:
@@ -56,6 +58,7 @@ class CubeData:
         return cube
 
     def _parse_cube_file(self, filename):
+        self._filename = filename
         with Path(filename).open() as f:
             self._parse_cube_buf(f)
 
@@ -68,6 +71,13 @@ class CubeData:
     def xyz(self):
         x, y, z = np.mgrid[0 : self.nx, 0 : self.ny, 0 : self.nz]
         return np.c_[x.ravel(), y.ravel(), z.ravel()] @ self.basis - self.volume_origin
+
+    def molecule(self):
+        from chmpy import Molecule
+
+        return Molecule.from_arrays(
+            self.elements, self.positions, source_file=self._filename
+        )
 
     def interpolator(self):
         if self._interpolator is None:

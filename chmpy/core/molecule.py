@@ -765,7 +765,7 @@ class Molecule:
         )
         return mesh
 
-    def to_mesh(self):
+    def to_mesh(self, **kwargs):
         """
         Convert this molecule to a mesh of spheres and
         cylinders, colored by element. The origins of the spheres
@@ -773,11 +773,11 @@ class Molecule:
         will be Angstroms.
         
         Returns:
-            trimesh.Trimesh: a mesh representing this molecule.
+            dict: a dictionary of `trimesh.Trimesh` objects representing this molecule.
         """
         from chmpy.util.mesh import molecule_to_meshes
 
-        return molecule_to_meshes(self)
+        return molecule_to_meshes(self, **kwargs)
 
     @property
     def name(self):

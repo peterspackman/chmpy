@@ -811,13 +811,22 @@ class Crystal:
             y_grid = np.arange(0, 1.0, seps[1], dtype=np.float32)
             z_grid = np.arange(0, 1.0, seps[2], dtype=np.float32)
             x, y, z = np.meshgrid(x_grid, y_grid, z_grid)
+            shape = x.shape
+            pts = np.c_[x.ravel(), y.ravel(), z.ravel()]
+            pts = pts.astype(np.float32)
+            pts = self.to_cartesian(pts)
+        elif grid_type == "box":
+            ((x0, y0, z0), (x1, y1, z1)) = kwargs.get(
+                "box_corners", ((0.0, 0.0, 0.0), (5.0, 5.0, 5.0))
+            )
+            x, y, z = np.mgrid[x0:x1:sep, y0:y1:sep, z0:z1:sep]
+            pts = np.c_[x.ravel(), y.ravel(), z.ravel()]
+            pts = pts.astype(np.float32)
+            shape = x.shape
+            seps = (sep, sep, sep)
         else:
             raise NotImplementedError("Only uc grid supported currently")
         separations = np.array((sep, sep, sep))
-        shape = x.shape
-        pts = np.c_[x.ravel(), y.ravel(), z.ravel()]
-        pts = pts.astype(np.float32)
-        pts = self.to_cartesian(pts)
         tree = KDTree(atoms["cart_pos"])
         distances, idxs = tree.query(pts)
         values = np.ones(pts.shape[0], dtype=np.float32)
@@ -828,7 +837,8 @@ class Crystal:
         verts, faces, normals, _ = marching_cubes(
             values, isovalue, spacing=seps, gradient_direction="ascent"
         )
-        verts = self.to_cartesian(np.c_[verts[:, 1], verts[:, 0], verts[:, 2]])
+        if grid_type == "uc":
+            verts = self.to_cartesian(np.c_[verts[:, 1], verts[:, 0], verts[:, 2]])
         vertex_colors = None
         mesh = trimesh.Trimesh(vertices=verts, faces=faces, normals=normals)
 
@@ -861,20 +871,25 @@ class Crystal:
         Returns:
             trimesh.scene.Scene: trimesh scene object.
         """
-        from trimesh.scene.scene import append_scenes
+        from trimesh import Scene
 
-        meshes = [append_scenes(m.to_mesh()) for m in self.unit_cell_molecules()]
+        meshes = {}
+        for i, m in enumerate(self.unit_cell_molecules()):
+            mesh = m.to_mesh(representation=kwargs.get("representation", "ball_stick"))
+            n = m.molecular_formula
+            for k, v in mesh.items():
+                meshes[f"mol_{i}_{n}.{k}"] = v
 
         if kwargs.get("void", False):
             void_kwargs = kwargs.get("void_kwargs", {})
-            meshes.append(self.void_surface(**void_kwargs))
+            meshes["void_surface"] = self.void_surface(**void_kwargs)
         if kwargs.get("axes", False):
             from trimesh.creation import axis
 
-            meshes.append(
-                axis(transform=self.unit_cell.direct_homogeneous.T, axis_length=1.0)
+            meshes["axes"] = axis(
+                transform=self.unit_cell.direct_homogeneous.T, axis_length=1.0
             )
-        return append_scenes(meshes)
+        return Scene(meshes)
 
     def hirshfeld_surfaces(self, **kwargs):
         "Alias for `self.stockholder_weight_isosurfaces`"
