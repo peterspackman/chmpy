@@ -1,8 +1,6 @@
 from collections import namedtuple
 import numpy as np
 
-param = namedtuple("param", "electronegativity hardness")
-
 EEM_KAPPA = 0.529176
 EEM_PARAMETERS = {
     "H": (0.20606, 1.31942),
@@ -30,9 +28,18 @@ EEM_PARAMETERS = {
 
 
 class EEM:
+    "Class to handle calculation of electronegativity equilibration method charges"
     @staticmethod
     def calculate_charges(mol):
-        """Calculate the partial atomic charges based on the EEM method"""
+        """
+        Calculate the partial atomic charges based on the EEM method.
+
+        Parameters:
+            mol (Molecule): The molecule with atoms where partial charges are desired
+
+        Returns:
+            np.ndarray: the partial charges associated the atoms in `mol`
+        """
         A = []
         B = []
         for el in mol.elements:

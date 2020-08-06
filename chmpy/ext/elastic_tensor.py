@@ -1,9 +1,13 @@
-"""Heavily inspired by fxcoudert's ELATE, and subject
+"""
+Heavily inspired by fxcoudert's ELATE, and since
+it is a modified version of that, this is subject
 to the same MIT license.
 
-See: http://progs.coudert.name/elate
-
-Source here: https://github.com/fxcoudert/elate
+See the page, and the source here:
+```
+    http://progs.coudert.name/elate
+    https://github.com/fxcoudert/elate
+```
 """
 
 import numpy as np
@@ -49,7 +53,9 @@ def _maximize(func, dim):
 
 
 class ElasticTensor:
-    """An elastic tensor, along with methods to access it"""
+    """
+    Class to represent an elastic tensor, along with methods to access it
+    """
 
     def __init__(self, mat):
         mat = np.asarray(mat)
