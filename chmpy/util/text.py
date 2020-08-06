@@ -71,15 +71,46 @@ SUBSCRIPT_MAP = {
 }
 
 
-def subscript(x):
+def subscript(x: str) -> str:
+    """
+    Convert the provided string to its subscript
+    equivalent in unicode
+
+    Parameters:
+        x (str): the string to be converted
+
+    Returns:
+        str: the converted string
+    """
     return SUBSCRIPT_MAP.get(x, x)
 
 
-def overline(x):
+def overline(x: str) -> str:
+    """
+    Add a unicode overline modifier
+    to the provided string.
+
+    Parameters:
+        x (str): the string to be overlined
+
+    Returns:
+        str: the overlined string
+    """
     return f"\u0305{x}"
 
 
-def natural_sort_key(s, _nsre=re.compile(r"([a-zA-Z]+)(\d+)")):
+def natural_sort_key(s: str, _nsre=re.compile(r"([a-zA-Z]+)(\d+)")):
+    """
+    Utility function for sorting strings of the form A1, B_2, A12
+    etc. so that the suffixes will be in numeric order rather than
+    lexicographical order.
+
+    Parameters:
+        s (str): the string whose sort key to determine
+
+    Returns:
+        tuple: the (str, int) natural sort key for the provided string
+    """
     m = _nsre.match(s)
     if not m:
         return s

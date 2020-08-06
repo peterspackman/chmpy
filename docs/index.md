@@ -9,7 +9,8 @@ While the library is intended to be flexible and make it easy to build
 complex pipelines or properties, the following is a brief summary of 
 intended features:
 
-- Load crystal structures from ``.cif``, ``.res``, ``POSCAR`` files.
+- Load crystal structures from ``.cif``, ``.res``, ``POSCAR`` files, 
+and molecules from ``.xyz``, ``.sdf`` files.
 - Evaluate promolecule and procrystal electron densities.
 - Easily generate Hirshfeld or promolecule isosurfaces and associated properties.
 - Easily generate spherical harmonic shape descriptors for atoms, molecules, or molecular fragments.

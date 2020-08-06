@@ -2,12 +2,22 @@ import collections
 
 
 def recursive_dict_update(dict_to, dict_from):
-    """Iterate through a dict, updating items recursively from a second
-    dictionary
-    >>> d1 = {'test': {'test_val': 3}}
-    >>> d2 = {'test': {'test_val': 5}, 'other': 3}
-    >>> recursive_dict_update(d1, d2)
-    {'test': {'test_val': 5}, 'other': 3}
+    """
+    Iterate through a dictionary , updating items inplace
+    recursively from a second dictionary.
+
+    Parameters:
+        dict_to (dict): the first dictionary (to update)
+        dict_from (dict): the second dictionary (to pull updates from)
+
+    Returns:
+        dict: the modified dict_to
+
+    Examples:
+        >>> d1 = {'test': {'test_val': 3}}
+        >>> d2 = {'test': {'test_val': 5}, 'other': 3}
+        >>> recursive_dict_update(d1, d2)
+        {'test': {'test_val': 5}, 'other': 3}
     """
     for key, val in dict_from.items():
         if isinstance(val, collections.Mapping):
@@ -18,16 +28,27 @@ def recursive_dict_update(dict_to, dict_from):
 
 
 def nested_dict_delete(root, key, sep="."):
-    """Iterate through a dict, deleting items
-    recursively based on a key
-    >>> d1 = {'test': {'test_val': 3}}
-    >>> d2 = {'test': {'test_val': 5, 'test_val_2': 7}, 'other': 3}
-    >>> nested_dict_delete(d1, 'test.test_val')
-    >>> d1
-    {}
-    >>> nested_dict_delete(d2, 'test.test_val')
-    >>> d2
-    {'test': {'test_val_2': 7}, 'other': 3}
+    """
+    Iterate through a dict, deleting items
+    recursively based on a key.
+
+    Parameters:
+        root (dict): dictionary to remove an entry from
+        key (str): the string used to locate the key to delete in the root dictionary
+        sep (str): the separator for dictionary key items
+
+    Returns:
+        dict: the modified dict_to
+
+    Examples:
+        >>> d1 = {'test': {'test_val': 3}}
+        >>> d2 = {'test': {'test_val': 5, 'test_val_2': 7}, 'other': 3}
+        >>> nested_dict_delete(d1, 'test.test_val')
+        >>> d1
+        {}
+        >>> nested_dict_delete(d2, 'test.test_val')
+        >>> d2
+        {'test': {'test_val_2': 7}, 'other': 3}
     """
 
     levels = key.split(sep)

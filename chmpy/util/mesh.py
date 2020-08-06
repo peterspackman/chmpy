@@ -4,14 +4,12 @@ LOG = logging.getLogger(__name__)
 
 
 def save_mesh(mesh, filename):
-    """Save the given Trimesh to a file.
+    """
+    Save the given Trimesh to a file.
 
-    Parameters
-    ----------
-    mesh: :obj:`trimesh.Trimesh`
-        The mesh to save.
-    filename: str
-        The path to the destination file.
+    Parameters:
+        mesh (trimesh.Trimesh): The mesh to save.
+        filename (str): The path to the destination file.
     """
     ext = filename.split(".")[-1]
     with open(filename, "wb") as f:
@@ -21,6 +19,20 @@ def save_mesh(mesh, filename):
 
 
 def molecule_to_meshes(molecule, **kwargs):
+    """
+    Convert the provided molecule into a list
+    of trimesh Meshes representing the molecule
+    either as van der Waals spheres or as a CPK
+    representation.
+
+    Parameters:
+        molecule (Molecule): The molecule to represent
+        kwargs (dict): Optional Keyword arguments
+
+    Returns:
+        list: a list of meshes representing atoms and (optionally) bonds
+    """
+
     from trimesh.creation import icosphere, cylinder
     from trimesh import Scene
     from trimesh import Trimesh
