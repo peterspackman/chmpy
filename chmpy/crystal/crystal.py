@@ -1399,6 +1399,21 @@ class Crystal:
         )
         return cls(unit_cell, space_group, asymmetric_unit, **kwargs)
 
+    @classmethod
+    def from_crystal17_opt_string(cls, string, **kwargs):
+        from chmpy.fmt.crystal17 import load_crystal17_geometry_string
+        data = load_crystal17_geometry_string(string)
+        unit_cell = UnitCell(data["direct"])
+        space_group = SpaceGroup.from_symmetry_operations(data["symmetry_operations"]) 
+        asym = AsymmetricUnit(data["elements"], unit_cell.to_fractional(data["xyz"]))
+        return Crystal(unit_cell, space_group, asym)
+
+    @classmethod
+    def from_crystal17_opt_file(cls, filename, **kwargs):
+        p = Path(filename)
+        titl = p.stem
+        return cls.from_crystal17_opt_string(p.read_text(), **kwargs)
+
     @property
     def name(self) -> str:
         "synonym for titl"

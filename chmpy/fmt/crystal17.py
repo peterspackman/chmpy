@@ -1,5 +1,8 @@
 from chmpy.templates import load_template
+from chmpy.crystal import SymmetryOperation
+from chmpy import Element
 from pathlib import Path
+import numpy as np
 import logging
 
 LOG = logging.getLogger(__name__)
@@ -49,3 +52,38 @@ def load_crystal17_output_string(string):
 
 def load_crystal17_output_file(filename):
     return load_crystal17_output_string(Path(filename).read_text())
+
+def load_crystal17_geometry_string(string):
+    lines = string.splitlines()
+    tokens = lines[0].split()
+    data = {
+        "dimensionality": int(tokens[0]),
+        "centering": int(tokens[1]),
+        "crystal_type": int(tokens[2]),
+        "energy": float(tokens[4]),
+        "direct": np.fromstring(" ".join(lines[1:4]), sep=" ").reshape(3,3),
+        "symmetry_operations": [],
+        "elements": [],
+        "xyz": []
+    }
+    nsymops = int(lines[4])
+
+    for i in range(5, 5 + nsymops, 4):
+        data["symmetry_operations"].append(SymmetryOperation(
+            np.fromstring(" ".join(lines[i:i+3]), sep=" ").astype(int).reshape(3, 3),
+            np.fromstring(lines[i+3], sep=" "),
+        ))
+
+    l = i + 4
+    natoms = int(lines[l])
+    l += 1
+    for i in range(l, l + natoms):
+        tokens = lines[i].split()
+        data["elements"].append(Element[tokens[0]])
+        data["xyz"].append(np.array([float(x) for x in tokens[1:]]))
+    data["xyz"] = np.vstack(data["xyz"])
+    return data
+
+def load_crystal17_geometry_file(filename):
+    return load_crystal17_geometry_string(Path(filename).read_text())
+

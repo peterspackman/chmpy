@@ -1,8 +1,6 @@
-from ccpy.templates import load_template
-from chmpy import Element, Molecule
-from chmpy.crystal import AsymmetricUnit
-from chmpy.unit_cell import UnitCell
-from chmpy.space_group import SpaceGroup
+from chmpy.templates import load_template
+from chmpy.core import Element, Molecule
+from chmpy.crystal import AsymmetricUnit, UnitCell, SpaceGroup
 import numpy as np
 import logging
 from collections import namedtuple
@@ -41,7 +39,7 @@ def turbomole_string(obj, **kwargs):
 
 
 def load_turbomole_string(tmol_string):
-    from ccpy.util import units
+    from chmpy.util.unit import units
 
     "Initialize from an xtb coord string resulting from optimization"
     data = {}

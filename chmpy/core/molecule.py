@@ -912,3 +912,13 @@ class Molecule:
         if len(molecules) == 1:
             return molecules[0]
         return molecules
+
+    @classmethod
+    def from_pdb_file(cls, filename, **kwargs):
+        from chmpy.fmt.pdb import Pdb
+        p = Pdb.from_file(filename)
+        xyz = np.c_[p.data["x"], p.data["y"], p.data["z"]]
+        elements = [Element[x] for x in p.data["element"]]
+        print(p.data["heteroatom"])
+        return cls(elements, xyz)
+

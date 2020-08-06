@@ -1,8 +1,8 @@
-from chempy import Element, Crystal, Molecule
+from chmpy import Element, Crystal, Molecule
 from collections.abc import Iterable
-from chempy.exe.xtb import Xtb
-from chempy.exe import ReturnCodeError, TimeoutExpired
-from chempy.fmt.xtb import turbomole_string, load_turbomole_string
+from chmpy.exe.xtb import Xtb
+from chmpy.exe import ReturnCodeError, TimeoutExpired
+from chmpy.fmt.xtb import turbomole_string, load_turbomole_string
 from os.path import join, exists
 from pathlib import Path
 import os
@@ -25,7 +25,7 @@ def find_energies(stdout):
 
 class XtbOptimizer:
 
-    xtb_param_fmt = ".param_gfn{}.xtb"
+    xtb_param_fmt = "param_gfn{}-xtb.txt"
 
     def __init__(self, gfn=0, name="molecule", **kwargs):
         LOG.debug("Initializing XtbOptimizer: GFN%s-XTB", gfn)
@@ -37,9 +37,9 @@ class XtbOptimizer:
         self.gfn = gfn
         gfnstr = "" if str(gfn) == "1" else str(gfn)
         xtb_param_file = self.xtb_param_fmt.format(gfnstr)
-        param_file_loc = os.path.join(xtb_path, xtb_param_file)
-        home_param = exists(param_file_loc)
-        LOG.debug("Found %s: %s", param_file_loc, home_param)
+        self.param_file_loc = os.path.join(xtb_path, xtb_param_file)
+        home_param = exists(self.param_file_loc)
+        LOG.warn("Found %s: %s", self.param_file_loc, home_param)
         if not home_param:
             LOG.error("No parameter data for GFN%s-XTB, will likely fail", self.gfn)
             raise RuntimeError(f"Missing parameter file for Xtb: {xtb_param_file}")
