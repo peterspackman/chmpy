@@ -1682,7 +1682,7 @@ class Crystal:
             )
         return cart_symops
 
-    def symmetry_unique_dimers(self, radius=3.8):
+    def symmetry_unique_dimers(self, radius=3.8, distance_method="nearest_atom"):
         """
         Calculate the information for all molecule
         pairs surrounding the symmetry_unique_molecules
@@ -1701,14 +1701,30 @@ class Crystal:
         hklmin = np.array([np.inf, np.inf, np.inf])
         frac_radius = radius / np.array(self.unit_cell.lengths)
 
+        for pos in self.asymmetric_unit.positions:
+            hklmax = np.maximum(hklmax, np.ceil(frac_radius + pos))
+            hklmin = np.minimum(hklmin, np.floor(pos - frac_radius))
+
         hmax, kmax, lmax = hklmax.astype(int)
         hmin, kmin, lmin = hklmin.astype(int)
 
-        symop_keys = [x.integer_code for x in self.symmetry_operations]
+        symop_keys = [str(x) for x in self.symmetry_operations]
         symops = self.cartesian_symmetry_operations()
         included_mols = []
+        shifts = self.to_cartesian(
+            cartesian_product(
+                np.arange(hmin, hmax), np.arange(kmin, kmax), np.arange(lmin, lmax)
+            )
+        )
+        LOG.warn("Looking in %d neighbouring cells: %s : %s", len(shifts), hklmin.astype(int), hklmax.astype(int))
+        dimers = []
         for mol_a in self.symmetry_unique_molecules():
             for mol_b in self.symmetry_unique_molecules():
-                for k, (r, t) in zip(symop_keys, symops):
-                    mol_b = mol_b.transformed(rotation=r, translation=t)
-                    print(k, mol_a, mol_b)
+                for k, (rot, trans) in zip(symop_keys, symops):
+                    for shift in shifts:
+                        t = trans + shift
+                        mol_bt = mol_b.transformed(rotation=rot, translation=t)
+                        r = mol_a.distance_to(mol_bt, method=distance_method)
+                        if r > 1e-1 and r < radius: 
+                            dimers.append((r, k, mol_a, mol_bt))
+        return dimers
