@@ -66,6 +66,7 @@ class CrystalTestCase(unittest.TestCase):
         self.ice_ii = Crystal(_ICE_II_CELL, _ICE_II_SG, ice_ii_asym())
         self.acetic = Crystal.load(TEST_FILES["acetic_acid.cif"])
         self.acetic_res = Crystal.load(TEST_FILES["acetic_acid.res"])
+        self.r3c_example = Crystal.load(TEST_FILES["r3c_example.cif"])
 
     def test_crystal_load(self):
         c = Crystal.load(TEST_FILES["iceII.cif"])
@@ -175,7 +176,7 @@ class CrystalTestCase(unittest.TestCase):
         self.assertEqual(len(atoms["element"]), natom_old)
 
     def test_cached_calls(self):
-        for c in ("ice_ii", "acetic"):
+        for c in ("ice_ii", "acetic", "r3c_example"):
             x = getattr(self, c)
             g1 = x.unit_cell_connectivity()
             g2 = x.unit_cell_connectivity()
@@ -188,12 +189,27 @@ class CrystalTestCase(unittest.TestCase):
             self.assertEqual(m1, m2)
 
     def test_environments_functions(self):
-        for c in ("ice_ii", "acetic"):
+        for c in ("ice_ii", "acetic", "r3c_example"):
             x = getattr(self, c)
             atoms = x.atoms_in_radius(5.0)
             atoms = x.atomic_surroundings()
             atoms = x.atom_group_surroundings([0, 1, 2])
             environments = x.molecule_environments()
+
+    def test_cartesian_symmetry_operations(self):
+        for c in ("ice_ii", "acetic", "r3c_example"):
+            x = getattr(self, c)
+            mol = x.symmetry_unique_molecules()[0]
+            pos = mol.positions
+            pos_frac = x.to_fractional(pos)
+            symops_cart = x.cartesian_symmetry_operations()
+            symops_frac = x.symmetry_operations
+            for (r, t), sf in zip(symops_cart, symops_frac):
+                pos_a = np.dot(pos, r) + t
+                pos_b = x.to_cartesian(sf.apply(pos_frac))
+                np.testing.assert_allclose(pos_a, pos_b)
+                mol_t = mol.transformed(rotation=r, translation=t)
+                np.testing.assert_allclose(mol_t.positions, pos_b)
 
 
 class CifTestCase(unittest.TestCase):
@@ -244,3 +260,5 @@ class CifTestCase(unittest.TestCase):
         s = c.to_string()
         c2 = Cif.from_string(s)
         self.assertDictEqual(c.data, c2.data)
+
+

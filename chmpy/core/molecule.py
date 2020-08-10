@@ -821,6 +821,38 @@ class Molecule:
             self.atomic_numbers[mask], self.positions[mask], **kwargs
         )
 
+    def rotate(self, rotation, origin=(0, 0, 0)):
+        """
+        Convenience method to rotate this molecule by a given 
+        rotation matrix
+        
+        Parameters:
+            rotation (np.ndarray): A (3, 3) rotation matrix
+        """
+
+        if np.allclose(origin, (0, 0, 0)):
+            np.dot(self.positions, rotation, out=self.positions)
+        else:
+            self.positions -= origin
+            np.dot(self.positions, rotation, out=self.positions)
+            self.positions += origin
+
+    def rotated(self, rotation, origin=(0, 0, 0)):
+        """
+        Convenience method to construct a new copy of thismolecule
+        rotated by a given rotation matrix
+        
+        Parameters:
+            rotation (np.ndarray): A (3, 3) rotation matrix
+
+        Returns:
+            Molecule: a new copy of this `Molecule` rotated by the given rotation matrix.
+        """
+        from copy import deepcopy
+        result = deepcopy(self)
+        result.rotate(rotation, origin=origin)
+        return result
+
     def translate(self, translation):
         """
         Convenience method to translate this molecule by a given 
@@ -846,6 +878,39 @@ class Molecule:
 
         result = copy.deepcopy(self)
         result.positions += translation
+        return result
+
+    def transform(self, rotation=None, translation=None):
+        """
+        Convenience method to transform this molecule
+        by rotation and translation.
+        
+        Parameters:
+            rotation (np.ndarray): A (3,3) rotation matrix
+            translation (np.ndarray): A (3,) vector of x, y, z coordinates of the translation
+        """
+
+        if rotation is not None:
+            self.rotate(rotation, origin=(0, 0, 0))
+        if translation is not None:
+            self.translate(translation)
+
+    def transformed(self, rotation=None, translation=None):
+        """
+        Convenience method to transform this molecule
+        by rotation and translation.
+        
+        Parameters:
+            rotation (np.ndarray): A (3,3) rotation matrix
+            translation (np.ndarray): A (3,) vector of x, y, z coordinates of the translation
+
+        Returns:
+            Molecule: a new copy of this `Molecule` transformed by the provided matrix and vector.
+        """
+
+        from copy import deepcopy
+        result = deepcopy(self)
+        result.transform(rotation=rotation, translation=translation)
         return result
 
     @classmethod

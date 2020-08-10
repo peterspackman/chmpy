@@ -1478,9 +1478,12 @@ class Crystal:
         from chmpy.crystal.powder import PowderPattern
 
         tt, f2 = powder_pattern(self, **kwargs)
-        LOG.warn(
-            "Powder pattern calculation is a work in progress, currently values may be incorrect for many systems"
-        )
+        if not hasattr(self, "_have_warned_powder"):
+            LOG.warn(
+                "Warning -- pattern calculation is a work in progress, currently values may "
+                "be incorrect for many systems. USE AT YOUR OWN RISK"
+            )
+            self._have_warned_powder = True
         return PowderPattern(tt, f2, **kwargs)
 
     def to_translational_symmetry(self, supercell=(1, 1, 1)) -> "Crystal":
@@ -1649,3 +1652,53 @@ class Crystal:
         new_crystal = Crystal(sc, SpaceGroup(1), asymmetric_unit)
         new_crystal.properties["titl"] = self.titl + "-P1-{}-{}-{}".format(*size)
         return new_crystal
+
+    def cartesian_symmetry_operations(self):
+        """
+        Create a list of symmetry operations (rotation, translation)
+        for evaluation of transformations in cartesian space.
+
+        The rotation matrices are stored to be used as np.dot(x, R),
+        (i.e. post-multiplicaiton on row-major coordinates)
+
+        Returns:
+            List[Tuple[np.ndarray, np.ndarray]]: a list of (rotation, translation)
+        """
+        cart_symops = []
+        d = self.unit_cell.direct
+        r = self.unit_cell.reciprocal_lattice
+        i = self.unit_cell.inverse
+        for symop in self.symmetry_operations:
+            cart_symops.append(
+                (np.dot(d.T,  np.dot(symop.rotation, i.T)).T, self.to_cartesian(symop.translation))
+            )
+        return cart_symops
+
+    def symmetry_unique_dimers(self, radius=3.8):
+        """
+        Calculate the information for all molecule
+        pairs surrounding the symmetry_unique_molecules
+        in this crystal within the given radius. 
+
+        Parameters:
+            radius (float, optional): Maximum distance in Angstroms between any atom in the molecule
+                and the resulting neighbouring atoms
+
+        Returns:
+            A dictionary of dimers (Molecule, elements, positions)
+                where `elements` is an `np.ndarray` of atomic numbers,
+                and `positions` is an `np.ndarray` of Cartesian atomic positions
+        """
+        raise NotImplementedError
+
+        hklmax = np.array([-np.inf, -np.inf, -np.inf])
+        hklmin = np.array([np.inf, np.inf, np.inf])
+        frac_radius = radius / np.array(self.unit_cell.lengths)
+
+        hmax, kmax, lmax = hklmax.astype(int)
+        hmin, kmin, lmin = hklmin.astype(int)
+
+        symops = self.space_group.symmetry_operations
+        for mol_a in self.symmetry_unique_molecules():
+            for mol_b in self.symmetry_unique_molecules():
+                pass
