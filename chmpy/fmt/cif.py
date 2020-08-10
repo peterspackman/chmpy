@@ -1,11 +1,11 @@
 import logging
-from chmpy.crystal.space_group import SymmetryOperation, SpaceGroup
 from pathlib import Path
 import re
 
 LOG = logging.getLogger(__name__)
 NUM_ERR_REGEX = re.compile(r"([-+]?[0-9]+[.]?[0-9]*)(\(\d+\))?")
 QUOTE_REGEX = r"{0}\s*([^{0}]*)\s*{0}"
+VALUES_REGEX = re.compile(r"""('.*?'|".*?"|;.*?;|\S+)""")
 
 
 def parse_value(string, with_uncertainty=False):
@@ -28,8 +28,8 @@ def parse_value(string, with_uncertainty=False):
 
     >>> parse_value("2.3(1)", with_uncertainty=True)
     (2.3, 1)
-    >>> parse_value("string")
-    'string'
+    >>> parse_value("string help")
+    'string help'
     >>> parse_value("3.1415") * 4
     12.566
     """
@@ -72,6 +72,9 @@ def parse_quote(string, delimiter=";"):
     ":'quote text':"
     >>> parse_quote(":'quote text':", delimiter=":")
     "'quote text'"
+    >>> parse_quote("'-y, x-y, z'", delimiter="'")
+    '-y, x-y, z'
+
     """
 
     match = re.match(QUOTE_REGEX.format(delimiter), string)
@@ -208,7 +211,8 @@ class Cif:
             self.current_data_block[k] = []
 
         for value in values:
-            for k, v in zip(keys, value.split()):
+            vs = re.findall(VALUES_REGEX, value.strip())
+            for k, v in zip(keys, vs):
                 self.current_data_block[k].append(parse_value(v))
         LOG.debug("Parsed loop block")
 

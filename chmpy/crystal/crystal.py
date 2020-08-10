@@ -1318,6 +1318,12 @@ class Crystal:
             "symmetry_equiv_pos_as_xyz",
             "space_group_symop_operation_xyz",
         )
+        number = space_group.international_tables_number
+        for k in ("space_group_IT_number", "symmetry_Int_Tables_number"):
+            if k in cif_data:
+                number = cif_data[k]
+                break
+
         for symop_data_block in symop_data_names:
             if symop_data_block in cif_data:
                 latt = space_group.latt
@@ -1330,9 +1336,11 @@ class Crystal:
                     space_group = new_sg
                 except ValueError as e:
                     space_group.symmetry_operations = symops
+                    
                     symbol = cif_data.get(
-                        "symmetry_space_group_name_H-M", space_group.symbol
+                        "symmetry_space_group_name_H-M", "Unknown"
                     )
+                    space_group.international_tables_number = number
                     space_group.symbol = symbol
                     space_group.full_symbol = symbol
                     LOG.warn(
@@ -1340,10 +1348,10 @@ class Crystal:
                         "some SG data may be missing",
                         symbol,
                     )
+                break
         else:
             # fall back to international tables number
-            if "symmetry_Int_Tables_number" in cif_data:
-                space_group = SpaceGroup(cif_data["symmetry_Int_Tables_number"])
+            space_group = SpaceGroup(number)
 
         return Crystal(unit_cell, space_group, asym, cif_data=cif_data, titl=titl)
 
@@ -1689,8 +1697,6 @@ class Crystal:
                 where `elements` is an `np.ndarray` of atomic numbers,
                 and `positions` is an `np.ndarray` of Cartesian atomic positions
         """
-        raise NotImplementedError
-
         hklmax = np.array([-np.inf, -np.inf, -np.inf])
         hklmin = np.array([np.inf, np.inf, np.inf])
         frac_radius = radius / np.array(self.unit_cell.lengths)
@@ -1698,7 +1704,11 @@ class Crystal:
         hmax, kmax, lmax = hklmax.astype(int)
         hmin, kmin, lmin = hklmin.astype(int)
 
-        symops = self.space_group.symmetry_operations
+        symop_keys = [x.integer_code for x in self.symmetry_operations]
+        symops = self.cartesian_symmetry_operations()
+        included_mols = []
         for mol_a in self.symmetry_unique_molecules():
             for mol_b in self.symmetry_unique_molecules():
-                pass
+                for k, (r, t) in zip(symop_keys, symops):
+                    mol_b = mol_b.transformed(rotation=r, translation=t)
+                    print(k, mol_a, mol_b)
