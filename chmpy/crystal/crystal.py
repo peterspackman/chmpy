@@ -1697,6 +1697,9 @@ class Crystal:
                 where `elements` is an `np.ndarray` of atomic numbers,
                 and `positions` is an `np.ndarray` of Cartesian atomic positions
         """
+        from chmpy.core.dimer import Dimer
+        from copy import deepcopy
+        from collections import defaultdict
         hklmax = np.array([-np.inf, -np.inf, -np.inf])
         hklmin = np.array([np.inf, np.inf, np.inf])
         frac_radius = radius / np.array(self.unit_cell.lengths)
@@ -1711,20 +1714,34 @@ class Crystal:
         symop_keys = [str(x) for x in self.symmetry_operations]
         symops = self.cartesian_symmetry_operations()
         included_mols = []
-        shifts = self.to_cartesian(
-            cartesian_product(
-                np.arange(hmin, hmax), np.arange(kmin, kmax), np.arange(lmin, lmax)
-            )
+        shifts_frac = cartesian_product(
+            np.arange(hmin, hmax), np.arange(kmin, kmax), np.arange(lmin, lmax)
         )
-        LOG.warn("Looking in %d neighbouring cells: %s : %s", len(shifts), hklmin.astype(int), hklmax.astype(int))
-        dimers = []
+
+        shifts = self.to_cartesian(shifts_frac)
+        LOG.debug("Looking in %d neighbouring cells: %s : %s", len(shifts), hklmin.astype(int), hklmax.astype(int))
+        all_dimers = []
+        mol_dimers = []
         for mol_a in self.symmetry_unique_molecules():
-            for mol_b in self.symmetry_unique_molecules():
-                for k, (rot, trans) in zip(symop_keys, symops):
-                    for shift in shifts:
-                        t = trans + shift
-                        mol_bt = mol_b.transformed(rotation=rot, translation=t)
-                        r = mol_a.distance_to(mol_bt, method=distance_method)
-                        if r > 1e-1 and r < radius: 
-                            dimers.append((r, k, mol_a, mol_bt))
-        return dimers
+            dimers_a = []
+            for mol_b in self.unit_cell_molecules():
+                for shift, shift_frac in zip(shifts, shifts_frac):
+                    mol_bt = mol_b.translated(shift)
+                    r = mol_a.distance_to(mol_bt, method=distance_method)
+                    if r > 1e-1 and r < radius: 
+                        d = Dimer(
+                            mol_a, mol_bt, separation=r, transform_ab="calculate",
+                            frac_shift=shift_frac
+                        )
+                        for i, dimer in enumerate(all_dimers):
+                            if dimer.separation <= d.separation + 1e-3:
+                                if d == dimer:
+                                    dimer.equivalent_count += 1
+                                    dimers_a.append(i)
+                                    break
+                        else:
+                            dimers_a.append(len(all_dimers))
+                            all_dimers.append(d)
+                        all_dimers = sorted(all_dimers, key=lambda x: x.separation)
+            mol_dimers.append(dimers_a)
+        return all_dimers, mol_dimers
