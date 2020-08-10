@@ -4,14 +4,16 @@ import logging
 from jinja2 import Environment, FileSystemLoader, Template
 
 LOG = logging.getLogger(__name__)
-CCPY_TEMPLATE_DIR = dirname(abspath(__file__))
-CCPY_TEMPLATE_ENV = Environment(loader=FileSystemLoader(CCPY_TEMPLATE_DIR))
+CHMPY_TEMPLATE_DIR = dirname(abspath(__file__))
+CHMPY_TEMPLATE_ENV = Environment(loader=FileSystemLoader(CHMPY_TEMPLATE_DIR))
 
 
 # Object to store all templates
 _ALL_TEMPLATES = {
-    "turbomole": CCPY_TEMPLATE_ENV.get_template("tmol.jinja2"),
-    "crystal17": CCPY_TEMPLATE_ENV.get_template("crystal17.jinja2"),
+    "turbomole": CHMPY_TEMPLATE_ENV.get_template("tmol.jinja2"),
+    "crystal17": CHMPY_TEMPLATE_ENV.get_template("crystal17.jinja2"),
+    "gaussian_scf": CHMPY_TEMPLATE_ENV.get_template("gaussian_scf.jinja2"),
+    "tonto_pair_energy": CHMPY_TEMPLATE_ENV.get_template("tonto_pair_energy.jinja2"),
 }
 
 
@@ -30,7 +32,7 @@ def load_template(name):
     result = _ALL_TEMPLATES.get(name)
     if result is None:
         try:
-            return CCPY_TEMPLATE_ENV.get_template(name)
+            return CHMPY_TEMPLATE_ENV.get_template(name)
         except Exception as e:
             LOG.error("Could not find template: %s (%s)", name, e)
     return result

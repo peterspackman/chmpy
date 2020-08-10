@@ -1,0 +1,23 @@
+{
+    {% if basis_directory %} basis_directory= {{basis}} {% endif %}
+    name= {{name}}
+    atom_groups= {
+        keys= { name= atom_indices= fchk_file= rotation= shift= }
+        data= {
+            Group1    { {{idxs_a}} }
+            "{{fchk_a}}"
+            {{rot_a}}
+            {{shift_a}}
+
+            Group2    { {{idxs_b}} }
+            "{{fchk_b}}"
+            {{rot_b}}
+            {{shift_b}}
+        }
+    }
+
+    put_group_12_polarization_energy
+    put_group_12_energies
+    put_group_12_grimme2006_energy
+
+}

@@ -446,6 +446,20 @@ class Crystal:
                 break
         LOG.debug("%d symmetry unique molecules", len(molecules))
         setattr(self, "_symmetry_unique_molecules", molecules)
+        for i, mol in enumerate(molecules):
+            mol.properties["asym_mol_idx"] = i
+
+        ak = "asymmetric_unit_atoms"
+        for mol in self.unit_cell_molecules():
+            if "asym_mol_idx" in mol.properties:
+                continue
+            else:
+                for asym_mol in molecules:
+                    if np.all(mol.properties[ak] == asym_mol.properties[ak]):
+                        mol.properties["asym_mol_idx"] = asym_mol.properties["asym_mol_idx"]
+                        break
+                else:
+                    LOG.warn("No equivalent asymmetric unit molecule found!? -- this should not happen!")
         return molecules
 
     def slab(self, bounds=((-1, -1, -1), (1, 1, 1))) -> dict:
@@ -1736,7 +1750,6 @@ class Crystal:
                         for i, dimer in enumerate(all_dimers):
                             if dimer.separation <= d.separation + 1e-3:
                                 if d == dimer:
-                                    dimer.equivalent_count += 1
                                     dimers_a.append(i)
                                     break
                         else:

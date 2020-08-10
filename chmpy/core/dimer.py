@@ -4,16 +4,15 @@ import logging
 LOG = logging.getLogger(__name__)
 
 class Dimer:
-    seitz_ab = None
-    seitz_ba = None
-    str_ab_frac = None
-    str_ba_frac = None
+    seitz_b = None
+    symm_str = None
     crystal_transform = False
-    equivalent_count = 1
 
     def __init__(self, mol_a, mol_b, separation=None, transform_ab=None, frac_shift=None):
         self.a = mol_a
         self.b = mol_b
+        self.a_idx = self.a.properties.get("asym_mol_idx", 0)
+        self.b_idx = self.b.properties.get("asym_mol_idx", 0)
         self.frac_shift = frac_shift
         if "generator_symop" in self.a.properties:
             self.symop_a = self.a.properties["generator_symop"]
@@ -57,15 +56,10 @@ class Dimer:
             s_a = SymmetryOperation.from_integer_code(self.symop_a[0])
             s_b = SymmetryOperation.from_integer_code(self.symop_b[0])
             seitz_a = s_a.seitz_matrix
-            seitz_b = s_b.seitz_matrix
             t_ab = np.zeros((4, 4))
             t_ab[:3, 3] = self.frac_shift
-            t_ba = np.zeros((4, 4))
-            t_ba[:3, 3] = -self.frac_shift
-            self.seitz_ab = np.dot(s_b.seitz_matrix + t_ab, s_a.seitz_matrix)
-            self.seitz_ba = np.dot(s_a.seitz_matrix + t_ba, s_b.seitz_matrix)
-            self.str_ab_frac = encode_symm_str(self.seitz_ab[:3, :3], self.seitz_ab[:3, 3])
-            self.str_ba_frac = encode_symm_str(self.seitz_ba[:3, :3], self.seitz_ba[:3, 3])
+            self.seitz_b = s_b.seitz_matrix + t_ab
+            self.symm_str = encode_symm_str(self.seitz_b[:3, :3], self.seitz_b[:3, 3])
         return self.transform_ab
 
     @property
@@ -77,10 +71,10 @@ class Dimer:
 
     def transform_string(self):
         if self.transform_ab is None:
-            return "n/a"
+            return "none"
         if self.crystal_transform:
-            return self.str_ab_frac
+            return self.symm_str
         return str(self.transform_ab)
 
     def __repr__(self):
-        return f"<Dimer: N={self.equivalent_count} R={self.separation:.2f} symm={self.transform_string()}>"
+        return f"<Dimer: d={self.separation:.2f} symm={self.transform_string()}>"

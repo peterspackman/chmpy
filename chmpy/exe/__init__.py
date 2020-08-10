@@ -1,4 +1,5 @@
 from .gaussian import Gaussian
+from .tonto import Tonto
 from .xtb import Xtb
 from .exe import run_subprocess, AbstractExecutable, ReturnCodeError
 from subprocess import TimeoutExpired, CalledProcessError, PIPE

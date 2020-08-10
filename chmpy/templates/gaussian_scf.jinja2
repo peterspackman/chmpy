@@ -1,0 +1,14 @@
+{%- for cmd, val in link0.items() -%}
+%{{cmd}}={{val}}{{'\n'}}
+{%- endfor -%}
+# {{method}}/{{basis}} {{route_commands}}
+
+{{title}}
+
+{{charge}} {{multiplicity}}
+{{geometry}}
+{{'\n'}}{{'\n'}}
+{%- for section in additional_sections -%}
+{{section}}{{'\n'}}
+{%- endfor -%}
+{{'\n'}}
