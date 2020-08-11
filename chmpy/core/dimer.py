@@ -33,7 +33,7 @@ class Dimer:
         self.com_separation = self.a.distance_to(self.b, method="center_of_mass")
 
     def calculate_transform(self):
-        from chmpy.util.num import kabsch_rotation_matrix
+        from chmpy.util.num import kabsch_rotation_matrix, rmsd_points
         if len(self.a) != len(self.b):
             self.transform_ab = None
             return
@@ -58,7 +58,8 @@ class Dimer:
             seitz_a = s_a.seitz_matrix
             t_ab = np.zeros((4, 4))
             t_ab[:3, 3] = self.frac_shift
-            self.seitz_b = s_b.seitz_matrix + t_ab
+            self.seitz_b = s_b.seitz_matrix.copy()
+            self.seitz_b[:3, 3] += self.frac_shift
             self.symm_str = encode_symm_str(self.seitz_b[:3, :3], self.seitz_b[:3, 3])
         return self.transform_ab
 

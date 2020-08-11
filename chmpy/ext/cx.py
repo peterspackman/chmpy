@@ -24,8 +24,8 @@ def tonto_pair_energy(wavefunctions, transforms, na, nb):
         name="test",
         idxs_a=f"1 ... {na}",
         idxs_b=f"{na + 1} ... {na + nb}",
-        rot_a=" ".join(str(x) for x in rot_a.ravel()), shift_a=" ".join(str(x) for x in shift_a),
-        rot_b=" ".join(str(x) for x in rot_b.ravel()), shift_b=" ".join(str(x) for x in shift_b),
+        rot_a=" ".join(str(x) for x in rot_a.T.ravel()), shift_a=" ".join(str(x) for x in shift_a),
+        rot_b=" ".join(str(x) for x in rot_b.T.ravel()), shift_b=" ".join(str(x) for x in shift_b),
         fchk_a=fchk_a, fchk_b=fchk_b,
     )
     LOG.debug("Tonto input:\n%s", input_file)
@@ -64,15 +64,16 @@ def interaction_energies(c, model="CE-B3LYP", radius=3.8):
     for i, mol in tqdm(enumerate(mols), desc="Calculating wavefunctions", total=len(mols)):
         if "fchk_contents" not in mol.properties:
             LOG.debug("Calculating wavefunction for %s", mol)
+            mol_at_origin = mol.translated(-mol.centroid)
             input_file = G09_SCF.render(
                 link0={"chk": f"mol_{i}.chk"},
                 method="B3LYP", basis="6-31G(d,p)",
-                route_commands="NoSymm 6d 10f",
+                route_commands="6d 10f NoSymm",
                 title=f"{mol} wavefunction for chmpy {model} interaction energy",
                 charge=0, multiplicity=1,
-                geometry=mol.to_xyz_string(header=False),
+                geometry=mol_at_origin.to_xyz_string(header=False),
             )
-            LOG.debug("G09 input:\n%s", input_file)
+            LOG.warn("G09 input:\n%s", input_file)
             g09 = Gaussian(input_file, run_formchk=f"mol_{i}.chk")
             g09.run()
             mol.properties["fchk_contents"] = g09.fchk_contents
@@ -81,17 +82,25 @@ def interaction_energies(c, model="CE-B3LYP", radius=3.8):
 
     stdout_contents = []
     for d in tqdm(dimers, "Calculating tonto pair energies", total=len(dimers)):
+        from chmpy import Molecule
+        from chmpy.crystal.symmetry_operation import SymmetryOperation
+        from chmpy.util.num import kabsch_rotation_matrix
         LOG.debug("Calculating pair energy for %s", d)
         asym_a = mols[d.a.properties["asym_mol_idx"]]
         asym_b = mols[d.b.properties["asym_mol_idx"]]
         wfn_a = asym_a.properties["fchk_contents"]
         wfn_b = asym_b.properties["fchk_contents"] 
         wavefunctions = (wfn_a, wfn_b)
-        shift_a = np.zeros(3)
-        rot_a = np.eye(3)
-        seitz = d.seitz_b
-        rot_b = np.dot(c.uc.direct.T,  np.dot(seitz[:3, :3], c.uc.inverse.T))
-        shift_b = c.to_cartesian(seitz[:3, 3])
+        mol_fchk_a = Molecule.from_fchk_string(wfn_a)
+        mol_fchk_b = Molecule.from_fchk_string(wfn_b)
+        symop = SymmetryOperation.from_integer_code(
+            d.b.properties["generator_symop"][0]
+        )
+        shift_a = d.a.centroid
+        rot_a = kabsch_rotation_matrix(mol_fchk_a.positions, d.a.positions)
+        rot_b = kabsch_rotation_matrix(mol_fchk_b.positions, d.b.positions)
+        shift_b = d.b.centroid
+        shift_b = d.b.centroid
         LOG.debug("\nrot_a:\n%s\nrot_b:\n%s", rot_a, rot_b)
         LOG.debug("shift_a: %s, shift_b: %s", shift_a, shift_b)
         transforms = ((rot_a, shift_a), (rot_b, shift_b))
@@ -108,7 +117,11 @@ def interaction_energies(c, model="CE-B3LYP", radius=3.8):
         energies, columns=["E_coul", "E_pol", "E_disp", "E_rep"]
     )
     scale_factors = CE_SCALE_FACTORS[model]
-    df["d"] = [d.separation for d in dimers]
+    df["mol_A"] = [d.a.properties["asym_mol_idx"] for d in dimers]
+    df["mol_B"] = [d.b.properties["asym_mol_idx"] for d in dimers]
+    df["d_closest"] = [d.closest_separation for d in dimers]
+    df["d_centroid"] = [d.centroid_separation for d in dimers]
+    df["d_com"] = [d.com_separation for d in dimers]
     df["symm"] = [d.transform_string() for d in dimers]
     df["E_tot"] = (
         scale_factors[0]  * df["E_coul"] +

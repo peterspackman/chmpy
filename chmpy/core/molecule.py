@@ -299,8 +299,28 @@ class Molecule:
         return cls.from_xyz_string(Path(filename).read_text(), **kwargs)
 
     @classmethod
+    def from_fchk_string(cls, fchk_contents, **kwargs):
+        from chmpy.fmt.fchk import FchkFile
+        from chmpy.util.unit import units
+        fchk = FchkFile(fchk_contents, parse=True)
+        elements = np.array(fchk["Atomic numbers"])
+        positions = np.array(fchk["Current cartesian coordinates"]).reshape(
+            elements.shape[0], 3
+        )
+        positions = units.angstrom(positions, unit="bohr")
+        return cls.from_arrays(elements=elements, positions=positions, **kwargs)
+
+    @classmethod
+    def from_fchk_file(cls, filename, **kwargs):
+        return cls.from_fchk_string(Path(filename).read_text(), **kwargs)
+
+    @classmethod
     def _ext_load_map(cls):
-        return {".xyz": cls.from_xyz_file, ".sdf": cls.from_sdf_file}
+        return {
+            ".xyz": cls.from_xyz_file,
+            ".sdf": cls.from_sdf_file,
+            ".fchk": cls.from_fchk_file,
+        }
 
     @classmethod
     def _fname_load_map(cls):

@@ -1740,6 +1740,7 @@ class Crystal:
             dimers_a = []
             for mol_b in self.unit_cell_molecules():
                 for shift, shift_frac in zip(shifts, shifts_frac):
+                    # shift_frac assumes the molecule is generated from the [0, 0, 0] cell, it's not
                     mol_bt = mol_b.translated(shift)
                     r = mol_a.distance_to(mol_bt, method=distance_method)
                     if r > 1e-1 and r < radius: 
