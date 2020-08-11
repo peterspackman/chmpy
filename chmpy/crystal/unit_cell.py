@@ -275,9 +275,32 @@ class UnitCell:
         return self.lengths[0]
 
     @property
+    def v_a(self) -> np.ndarray:
+        "lattice vector a"
+        return self.direct[0]
+
+    @property
+    def v_a_star(self) -> np.ndarray:
+        "reciprocal lattice vector a*"
+        return self.inverse[:, 0]
+
+    @property
+    def a_star(self) -> float:
+        "length of reciprocal lattice vector a*"
+        return self.b * self.c * np.sin(self.alpha) / self.volume()
+
+    @property
     def alpha(self) -> float:
         "Angle between lattice vectors b and c"
         return self.angles[0]
+
+    @property
+    def alpha_star(self) -> float:
+        "Angle between reciprocal lattice vectors b* and c*"
+        return np.arccos(
+            (np.cos(self.beta) * np.cos(self.gamma) - np.cos(self.alpha)) /
+            (np.sin(self.beta) * np.sin(self.gamma))
+        )
 
     @property
     def b(self) -> float:
@@ -285,9 +308,32 @@ class UnitCell:
         return self.lengths[1]
 
     @property
+    def v_b(self) -> np.ndarray:
+        "lattice vector a"
+        return self.direct[1]
+
+    @property
+    def v_b_star(self) -> np.ndarray:
+        "reciprocal lattice vector b*"
+        return self.inverse[:, 1]
+
+    @property
+    def b_star(self) -> float:
+        "length of reciprocal lattice vector b*"
+        return self.a * self.c * np.sin(self.beta) / self.volume()
+
+    @property
     def beta(self) -> float:
         "Angle between lattice vectors a and c"
         return self.angles[1]
+
+    @property
+    def beta_star(self) -> float:
+        "Angle between reciprocal lattice vectors a* and c*"
+        return np.arccos(
+            (np.cos(self.alpha) * np.cos(self.gamma) - np.cos(self.beta)) /
+            (np.sin(self.alpha) * np.sin(self.gamma))
+        )
 
     @property
     def c(self) -> float:
@@ -295,9 +341,32 @@ class UnitCell:
         return self.lengths[2]
 
     @property
+    def v_c(self) -> np.ndarray:
+        "lattice vector a"
+        return self.direct[2]
+
+    @property
+    def v_c_star(self) -> np.ndarray:
+        "reciprocal lattice vector c*"
+        return self.inverse[:, 2]
+
+    @property
+    def c_star(self) -> float:
+        "length of reciprocal lattice vector c*"
+        return self.a * self.b * np.sin(self.gamma) / self.volume()
+
+    @property
     def gamma(self) -> float:
         "Angle between lattice vectors a and b"
         return self.angles[2]
+
+    @property
+    def gamma_star(self) -> float:
+        "Angle between reciprocal lattice vectors a* and c*"
+        return np.arccos(
+            (np.cos(self.alpha) * np.cos(self.beta) - np.cos(self.gamma)) /
+            (np.sin(self.alpha) * np.sin(self.beta))
+        )
 
     @property
     def alpha_deg(self) -> float:

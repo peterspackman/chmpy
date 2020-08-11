@@ -44,7 +44,7 @@ def parse_value(string, with_uncertainty=False):
         return number
     else:
         s = string.strip()
-        if s[0] == s[-1]:
+        if s[0] == s[-1] and s[0] in ("'", ";", '"'):
             return parse_quote(string, delimiter=s[0])
     return string
 
@@ -77,7 +77,8 @@ def parse_quote(string, delimiter=";"):
 
     """
 
-    match = re.match(QUOTE_REGEX.format(delimiter), string)
+    regex = QUOTE_REGEX.format(delimiter)
+    match = re.match(regex, string)
     if match:
         return match.groups()[0]
     return string

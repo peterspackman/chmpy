@@ -109,19 +109,21 @@ def reflections(crystal, wavelength=LAMBDA_Cu, size=10):
         hkl += a
         sections.append(hkl)
     hkl = np.vstack(sections)
-    q = np.dot(hkl, recip)
-    q_mag = np.linalg.norm(q, axis=1)
-    mask = q_mag < (1 / wavelength)
-    return Reflections(q[mask], q_mag[mask], hkl[mask])
+    G = hkl @ recip
+    q = np.linalg.norm(G, axis=1)
+    mask = q <= (2 / wavelength)
+    return Reflections(G[mask], q[mask], hkl[mask])
 
 
 def powder_pattern(crystal, wavelength=LAMBDA_Cu, two_theta_range=(5, 50)):
     """Calculate the powder pattern the given crystal at a given wavelength
     over a given range of 2-theta"""
     sfac = structure_factors(crystal, wavelength=wavelength)
-    hkl, q, q_mag, sfac, norm = sfac
-    f2 = np.abs(sfac * sfac) / norm
-    theta = np.arcsin(wavelength * q_mag / 2)
+    hkl, G, q, sfac, norm = sfac
+    f2 = np.abs(sfac) 
+    f2 = f2 * f2 / norm
+    print(norm)
+    theta = np.arcsin(wavelength * q / 2)
     two_theta = 2 * theta
     l, u = np.radians(two_theta_range)
     l = max(l, 1e-3)
@@ -138,7 +140,7 @@ def powder_pattern(crystal, wavelength=LAMBDA_Cu, two_theta_range=(5, 50)):
 def structure_factors(crystal, wavelength=LAMBDA_Cu):
     """Calculate the structure factors for a given crystal at the provided
     wavelength"""
-    q, q_mag, hkl = reflections(crystal, wavelength=wavelength)
+    G, q, hkl = reflections(crystal, wavelength=wavelength)
     uc = crystal.unit_cell_atoms()
     asym_sfac_idx = [
         _sfac.get_form_factor_index(el.symbol)
@@ -147,17 +149,19 @@ def structure_factors(crystal, wavelength=LAMBDA_Cu):
     indices = [asym_sfac_idx[i] for i in uc["asym_atom"]]
     N = len(indices)
     unique_indices = set(asym_sfac_idx)
-    q2 = q_mag * q_mag
-    sintl = q2 / (16 * np.pi * np.pi)
+    sintl = q / 2
     scattering_factors = {i: _sfac.scattering_factors(i, sintl) for i in unique_indices}
     frac_pos = uc["frac_pos"]
     exp_fac = np.zeros(hkl.shape[0], dtype=np.complex128)
     exp_fac.imag = 2 * np.pi
     sfac = np.zeros_like(exp_fac)
-    normalization = np.zeros_like(q_mag)
+    normalization = np.zeros_like(q)
     for i, idx in enumerate(indices):
         fj = scattering_factors[idx]
         pos = frac_pos[i]
-        sfac += fj * np.exp(exp_fac * np.dot(hkl, pos))
+        hkl_dot_pos = hkl @ pos
+        sfac += fj * np.exp(exp_fac * hkl_dot_pos)
         normalization += fj * fj
-    return StructureFactors(hkl, q, q_mag, sfac, normalization)
+    f000 = sfac[0]
+    print("F(000): ", np.sqrt(sfac[0].real * sfac[0].real + sfac[0].imag * sfac[0].imag))
+    return StructureFactors(hkl, G, q, sfac, normalization)
