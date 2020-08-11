@@ -174,9 +174,16 @@ class Cif:
         v = None
         if len(tokens) == 1:
             next_line = self.content_lines[self.line_index + 1]
+            while next_line.strip().startswith("#"):
+                self.line_index += 1
+                next_line = self.content_lines[self.line_index + 1]
+
             if ";" in next_line:
                 self.line_index += 1
                 v = self.parse_quoted_block().strip()
+            else:
+                v = parse_value(next_line)
+                self.line_index += 1
         else:
             v = " ".join(tokens[1:])
         if v is None:
