@@ -4,7 +4,6 @@ import numpy as np
 import re
 from collections import namedtuple
 from copy import deepcopy
-from .point_group import POINT_GROUP_DATA
 
 LOG = logging.getLogger(__name__)
 
