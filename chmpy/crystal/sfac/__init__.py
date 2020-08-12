@@ -76,6 +76,9 @@ UNIQUE_REFLECTION_TYPES = {
 }
 
 
+def hklmax(uc, dmin):
+    return (np.array(uc.lengths) / dmin).astype(int)
+
 def reflections(crystal, wavelength=LAMBDA_Cu, size=10):
     """Calculate the unique reflections contributing to 
     diffraction for the given crystal, along with the q

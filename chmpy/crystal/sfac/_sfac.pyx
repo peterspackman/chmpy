@@ -32,6 +32,7 @@ cpdef scattering_factors(idx, sintl):
     form_factor.calc(sintl, result)
     return result
 
+@cython.final
 cdef class Aff:
     cdef double a1
     cdef double b1
@@ -74,3 +75,43 @@ cdef class Aff:
                 self.c
             )
 
+
+cdef void reflection_multiplicity_cubic(const int[:, ::1] hkl, int[::1] m) nogil:
+
+cdef void reflection_multiplicity_trigonal(const int[:, ::1] hkl, int[::1] m) nogil:
+
+cdef void reflection_multiplicity_tetragonal(const int[:, ::1] hkl, int[::1] m) nogil:
+
+cdef void reflection_multiplicity_orthorhombic(const int[:, ::1] hkl, int[::1] m) nogil:
+    cdef int N = hkl.shape[0]
+    cdef int i, h, k, l
+    for i in range(N):
+        h = hkl[i, 0]
+        k = hkl[i, 1]
+        if (not h) or (not k):
+            m[i] = 2
+        else:
+            m[i] = 4
+
+
+cdef void reflection_multiplicity_monoclinic(const int[:, ::1] hkl, int[::1] m) nogil:
+    cdef int N = hkl.shape[0]
+    cdef int i, h, k
+    for i in range(N):
+        h = hkl[i, 0]
+        k = hkl[i, 1]
+        if (not h) or (not k):
+            m[i] = 2
+        else:
+            m[i] = 4
+
+cdef void reflection_multiplicity_triclinic(const int[:, ::1] hkl, int[::1] m) nogil:
+    cdef int N = hkl.shape[0]
+    cdef int i
+    for i in range(N):
+        m[i] = 2
+
+
+cpdef reflection_multiplicity(const int[:, ::1] hkl, int latt)
+    result = np.ones(int.shape[0])
+    cdef int[::1] res = result
