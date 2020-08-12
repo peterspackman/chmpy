@@ -93,24 +93,24 @@ def reflections(crystal, wavelength=LAMBDA_Cu, size=10):
     ):
         raise NotImplementedError("Rhombohedral crystals not currently supported")
 
-   #apexes, bases = zip(*UNIQUE_REFLECTION_TYPES[(laue_class, centering)])
-   #h_range = np.r_[0: h_max + 1]
-   #k_range = np.r_[0: k_max + 1]
-   #l_range = np.r_[0: l_max + 1]
-   #sections = []
-   #for a, b in zip(apexes, bases):
-   #    v1 = np.r_[b[0][0], b[0][1], b[0][2]]
-   #    v2 = np.r_[b[1][0], b[1][1], b[1][2]]
-   #    v3 = np.r_[b[2][0], b[2][1], b[2][2]]
-   #    hkl = v1 * h_range[:, None]
-   #    hkl = hkl + (v2 * k_range[:, None])[:, None]
-   #    hkl = hkl + (v3 * l_range[:, None, None])[:, None, None]
-   #    hkl = hkl.reshape(-1, 3)
-   #    hkl += a
-   #    sections.append(hkl)
-   #hkl = np.vstack(sections)
-    h, k, l = np.mgrid[-2:2, -2:2, -2:2]
-    hkl = np.c_[h.ravel(), k.ravel(), l.ravel()]
+    apexes, bases = zip(*UNIQUE_REFLECTION_TYPES[(laue_class, centering)])
+    h_range = np.r_[0: h_max + 1]
+    k_range = np.r_[0: k_max + 1]
+    l_range = np.r_[0: l_max + 1]
+    sections = []
+    for a, b in zip(apexes, bases):
+        v1 = np.r_[b[0][0], b[0][1], b[0][2]]
+        v2 = np.r_[b[1][0], b[1][1], b[1][2]]
+        v3 = np.r_[b[2][0], b[2][1], b[2][2]]
+        hkl = v1 * h_range[:, None]
+        hkl = hkl + (v2 * k_range[:, None])[:, None]
+        hkl = hkl + (v3 * l_range[:, None, None])[:, None, None]
+        hkl = hkl.reshape(-1, 3)
+        hkl += a
+        sections.append(hkl)
+    hkl = np.vstack(sections)
+    #h, k, l = np.mgrid[-10:10, -10:10, -10:10]
+    #hkl = np.c_[h.ravel(), k.ravel(), l.ravel()]
     G = hkl @ recip
     q = np.linalg.norm(G, axis=1)
     mask = q <= (2 / wavelength)
@@ -124,7 +124,6 @@ def powder_pattern(crystal, wavelength=LAMBDA_Cu, two_theta_range=(5, 50)):
     hkl, G, q, sfac, norm = sfac
     f2 = np.abs(sfac) 
     f2 = f2 * f2 / norm
-    print(norm)
     theta = np.arcsin(wavelength * q / 2)
     two_theta = 2 * theta
     l, u = np.radians(two_theta_range)
@@ -166,5 +165,4 @@ def structure_factors(crystal, wavelength=LAMBDA_Cu):
         sfac += fj * np.exp(exp_fac * hkl_dot_pos)
         normalization += fj * fj
     f000 = sfac[0]
-    print("F(000): ", np.sqrt(sfac[0].real * sfac[0].real + sfac[0].imag * sfac[0].imag))
     return StructureFactors(hkl, G, q, sfac, normalization)
