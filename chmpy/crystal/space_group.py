@@ -5,7 +5,7 @@ import json
 import re
 from copy import deepcopy
 from chmpy.util.text import subscript, overline
-from .point_group import POINT_GROUP_DATA
+from .point_group import PointGroup
 from .symmetry_operation import (
     SymmetryOperation,
     expanded_symmetry_list,
@@ -66,7 +66,9 @@ class SpaceGroup:
         self.full_symbol = sgdata.full
         self.choice = sgdata.choice
         self.centering = sgdata.centering
-        self._point_group = POINT_GROUP_DATA[sgdata.pointgroup]
+        if choice not in ("b", "c", "R"):
+            choice = None
+        self._point_group = PointGroup.from_number(sgdata.pointgroup, choice=choice)
         self.schoenflies = sgdata.schoenflies
         self.centrosymmetric = sgdata.centrosymmetric
         symops = sgdata.symops

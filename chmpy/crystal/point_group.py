@@ -1,26 +1,41 @@
 from typing import Tuple
 from dataclasses import dataclass
-
+from chmpy.crystal.symmetry_operation import SymmetryOperation
 
 @dataclass
 class PointGroup:
     number: int
-    symops: str
+    symops_string: str
     symbol: str
     schoenflies: str
     crystal_system: str
-    laue: str
+    laue_group: str
     choice: str
 
     def __repr__(self):
         return f"<PointGroup: {self.symbol}>"
 
+    @property
+    def symmetry_operations(self):
+        return [SymmetryOperation.from_string_code(x) for x in self.symops_string.split(';')]
+
     @classmethod
     def from_number(cls, number, choice=None):
-        pass
+        if number < 1 or number > 32:
+            raise ValueError("Point group number must be between [1, 32]")
+        options = POINT_GROUP_FROM_NUMBER[number]
+        if not choice:
+            return options[0]
+        else:
+            for option in options:
+                if choice == option.choice:
+                    return option
+                    break
+            else:
+                raise ValueError(f"Could not find choice '{choice}' for point group {number}")
+
 
 POINT_GROUP_DATA = (
-    None,
     PointGroup(1, "x,y,z", "1", "C1", "triclinic", "-1", ""), 
     PointGroup(2, "-x,-y,-z", "-1", "Ci", "triclinic", "-1", ""),
     PointGroup(3, "-x,y,-z", "2", "C2", "monoclinic", "2/m", "b"),
@@ -72,3 +87,8 @@ POINT_GROUP_DATA = (
     PointGroup(31, "z,x,y; y,-x,-z; -y,-x,z", "-43m", "Td", "cubic", "m3m", ""),
     PointGroup(32, "-z,-x,-y; -y,x,z; y,x,-z", "m-3m", "Oh", "cubic", "m3m", ""),
 )
+
+POINT_GROUP_FROM_NUMBER = {
+    i: [x for x in POINT_GROUP_DATA if x.number == i]
+    for i in range(1, 33)
+}
