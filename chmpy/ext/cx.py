@@ -15,25 +15,28 @@ CE_SCALE_FACTORS = {
 }
 
 def tonto_pair_energy(wavefunctions, transforms, na, nb):
-    fchk_a = Path("mol_a.fchk")
-    fchk_b = Path("mol_b.fchk")
-    fchk_a.write_text(wavefunctions[0])
-    fchk_b.write_text(wavefunctions[1])
+    from tempfile import TemporaryDirectory
     (rot_a, shift_a), (rot_b, shift_b) = transforms
-    input_file = TONTO_PAIR_ENERGY.render(
-        name="test",
-        idxs_a=f"1 ... {na}",
-        idxs_b=f"{na + 1} ... {na + nb}",
-        rot_a=" ".join(str(x) for x in rot_a.T.ravel()), shift_a=" ".join(str(x) for x in shift_a),
-        rot_b=" ".join(str(x) for x in rot_b.T.ravel()), shift_b=" ".join(str(x) for x in shift_b),
-        fchk_a=fchk_a, fchk_b=fchk_b,
-    )
-    LOG.debug("Tonto input:\n%s", input_file)
-    t = Tonto(input_file)
-    t.run()
-    fchk_a.unlink()
-    fchk_b.unlink()
-    Path("/home/uniwa/staff2/staff/00087762/linux/stdin").write_text(input_file)
+    with TemporaryDirectory() as working_directory:
+
+        fchk_a = Path(working_directory, "mol_a.fchk")
+        fchk_b = Path(working_directory, "mol_b.fchk")
+        fchk_a.write_text(wavefunctions[0])
+        fchk_b.write_text(wavefunctions[1])
+        input_file = TONTO_PAIR_ENERGY.render(
+            name="test",
+            idxs_a=f"1 ... {na}",
+            idxs_b=f"{na + 1} ... {na + nb}",
+            rot_a=" ".join(str(x) for x in rot_a.T.ravel()), shift_a=" ".join(str(x) for x in shift_a),
+            rot_b=" ".join(str(x) for x in rot_b.T.ravel()), shift_b=" ".join(str(x) for x in shift_b),
+            fchk_a=fchk_a, fchk_b=fchk_b,
+         )
+        LOG.debug("Tonto input:\n%s", input_file)
+
+        t = Tonto(input_file, working_directory=working_directory)
+        t.run()
+        fchk_a.unlink()
+        fchk_b.unlink()
     return t.stdout_contents
 
 
@@ -55,9 +58,14 @@ def parse_tonto_interaction_energies_stdout(stdout_contents):
     return coul, pol, disp, rep
 
 
-def interaction_energies(c, model="CE-B3LYP", radius=3.8):
+def interaction_energies(c, model="CE-B3LYP", radius=3.8, nthreads=1):
     from tqdm import tqdm
     import pandas as pd
+    from concurrent.futures import ThreadPoolExecutor
+    from chmpy import Molecule
+    from chmpy.crystal.symmetry_operation import SymmetryOperation
+    from chmpy.util.num import kabsch_rotation_matrix
+
     LOG.debug("Calculating %s model interaction_energies for %s", model, c)
     mols = c.symmetry_unique_molecules()
 
@@ -78,13 +86,12 @@ def interaction_energies(c, model="CE-B3LYP", radius=3.8):
             g09.run()
             mol.properties["fchk_contents"] = g09.fchk_contents
     
-    dimers, asym_pair_ids = c.symmetry_unique_dimers()
+    dimers, asym_pair_ids = c.symmetry_unique_dimers(radius=radius)
 
     stdout_contents = []
-    for d in tqdm(dimers, "Calculating tonto pair energies", total=len(dimers)):
-        from chmpy import Molecule
-        from chmpy.crystal.symmetry_operation import SymmetryOperation
-        from chmpy.util.num import kabsch_rotation_matrix
+    args = []
+    
+    for d in dimers:
         LOG.debug("Calculating pair energy for %s", d)
         asym_a = mols[d.a.properties["asym_mol_idx"]]
         asym_b = mols[d.b.properties["asym_mol_idx"]]
@@ -106,8 +113,12 @@ def interaction_energies(c, model="CE-B3LYP", radius=3.8):
         transforms = ((rot_a, shift_a), (rot_b, shift_b))
         na = len(asym_a)
         nb = len(asym_b)
-        contents = tonto_pair_energy(wavefunctions, transforms, na, nb)
-        stdout_contents.append(contents)
+        args.append((wavefunctions, transforms, na, nb))
+
+    with ThreadPoolExecutor(nthreads) as e:
+        stdout_contents = list(
+            tqdm(e.map(lambda x: tonto_pair_energy(*x), args), desc="Calculating pair energies", total=len(args))
+        )
 
     energies = []
     for stdout in stdout_contents:

@@ -139,7 +139,7 @@ class SpaceGroup:
     @property
     def laue_class(self) -> str:
         "the Laue class of the point group associated with this space group"
-        return self._point_group.laue
+        return self._point_group.laue_group
 
     @property
     def lattice_type(self) -> str:

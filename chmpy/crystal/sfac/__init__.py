@@ -1,4 +1,3 @@
-from . import atomic_form_factors
 from . import _sfac
 import numpy as np
 from collections import namedtuple
@@ -79,11 +78,11 @@ UNIQUE_REFLECTION_TYPES = {
 def hklmax(uc, dmin):
     return (np.array(uc.lengths) / dmin).astype(int)
 
-def reflections(crystal, wavelength=LAMBDA_Cu, size=10):
+def reflections(crystal, wavelength=LAMBDA_Cu, dmin=LAMBDA_Cu/2):
     """Calculate the unique reflections contributing to 
     diffraction for the given crystal, along with the q
     vector at the provided wavelength"""
-    h_max, k_max, l_max = size, size, size
+    h_max, k_max, l_max = hklmax(crystal.unit_cell, dmin)
     recip = crystal.unit_cell.reciprocal_lattice.copy()
     system = crystal.space_group.crystal_system
     centering = (
@@ -96,24 +95,24 @@ def reflections(crystal, wavelength=LAMBDA_Cu, size=10):
     ):
         raise NotImplementedError("Rhombohedral crystals not currently supported")
 
-    apexes, bases = zip(*UNIQUE_REFLECTION_TYPES[(laue_class, centering)])
-    h_range = np.r_[0: h_max + 1]
-    k_range = np.r_[0: k_max + 1]
-    l_range = np.r_[0: l_max + 1]
-    sections = []
-    for a, b in zip(apexes, bases):
-        v1 = np.r_[b[0][0], b[0][1], b[0][2]]
-        v2 = np.r_[b[1][0], b[1][1], b[1][2]]
-        v3 = np.r_[b[2][0], b[2][1], b[2][2]]
-        hkl = v1 * h_range[:, None]
-        hkl = hkl + (v2 * k_range[:, None])[:, None]
-        hkl = hkl + (v3 * l_range[:, None, None])[:, None, None]
-        hkl = hkl.reshape(-1, 3)
-        hkl += a
-        sections.append(hkl)
-    hkl = np.vstack(sections)
-    #h, k, l = np.mgrid[-10:10, -10:10, -10:10]
-    #hkl = np.c_[h.ravel(), k.ravel(), l.ravel()]
+#   apexes, bases = zip(*UNIQUE_REFLECTION_TYPES[(laue_class, centering)])
+#   h_range = np.r_[0: h_max + 1]
+#   k_range = np.r_[0: k_max + 1]
+#   l_range = np.r_[0: l_max + 1]
+#   sections = []
+#   for a, b in zip(apexes, bases):
+#       v1 = np.r_[b[0][0], b[0][1], b[0][2]]
+#       v2 = np.r_[b[1][0], b[1][1], b[1][2]]
+#       v3 = np.r_[b[2][0], b[2][1], b[2][2]]
+#       hkl = v1 * h_range[:, None]
+#       hkl = hkl + (v2 * k_range[:, None])[:, None]
+#       hkl = hkl + (v3 * l_range[:, None, None])[:, None, None]
+#       hkl = hkl.reshape(-1, 3)
+#       hkl += a
+#       sections.append(hkl)
+#   hkl = np.vstack(sections)
+    h, k, l = np.mgrid[-h_max:h_max, -k_max:k_max, -l_max:l_max]
+    hkl = np.c_[h.ravel(), k.ravel(), l.ravel()]
     G = hkl @ recip
     q = np.linalg.norm(G, axis=1)
     mask = q <= (2 / wavelength)
