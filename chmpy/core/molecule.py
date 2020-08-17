@@ -128,7 +128,7 @@ class Molecule:
             import graph_tool as gt
 
             self.bond_graph()
-        except ImportError as e:
+        except ImportError:
             pass
 
     def connected_fragments(self) -> List:
@@ -435,10 +435,10 @@ class Molecule:
         """
 
         if hasattr(self, "_bond_graph"):
-            return self._bond_graph
+            return getattr(self, "_bond_graph")
         try:
             import graph_tool as gt
-        except ImportError as e:
+        except ImportError:
             raise RuntimeError(
                 "Please install the graph_tool library for graph operations"
             )
@@ -470,7 +470,7 @@ class Molecule:
         global _FUNCTIONAL_GROUP_SUBGRAPHS
         try:
             import graph_tool.topology as top
-        except ImportError as e:
+        except ImportError:
             raise RuntimeError(
                 "Please install the graph_tool library for graph operations"
             )
@@ -508,7 +508,7 @@ class Molecule:
 
         try:
             import graph_tool.topology as top
-        except ImportError as e:
+        except ImportError:
             raise RuntimeError(
                 "Please install the graph_tool library for graph operations"
             )
@@ -539,7 +539,7 @@ class Molecule:
         """
         try:
             import graph_tool.topology as top
-        except ImportError as e:
+        except ImportError:
             raise RuntimeError(
                 "Please install the graph_tool library for graph operations"
             )
@@ -652,7 +652,7 @@ class Molecule:
         from chmpy.surface import stockholder_weight_isosurface
         from matplotlib.cm import get_cmap
         import trimesh
-        from chmpy.crystal import DEFAULT_COLORMAPS
+        from chmpy.util.color import DEFAULT_COLORMAPS
 
         sep = kwargs.get("separation", kwargs.get("resolution", 0.2))
         radius = kwargs.get("radius", 12.0)
@@ -726,7 +726,6 @@ class Molecule:
             https://dx.doi.org/10.1002/anie.201906602
         ```
         """
-        descriptors = []
         from chmpy.shape import SHT, promolecule_density_descriptor
 
         sph = SHT(l_max=l_max)
@@ -767,7 +766,6 @@ class Molecule:
         isovalue = kwargs.get("isovalue", 0.002)
         sep = kwargs.get("separation", kwargs.get("resolution", 0.2))
         vertex_color = kwargs.get("color", "d_norm_i")
-        meshes = []
         extra_props = {}
         pro = PromoleculeDensity((self.atomic_numbers, self.positions))
         if vertex_color == "esp":
@@ -950,7 +948,8 @@ class Molecule:
         atoms = sdf_dict["atoms"]
         positions = np.c_[atoms["x"], atoms["y"], atoms["z"]]
         elements = [Element[x] for x in atoms["symbol"]]
-        bonds = sdf_dict["bonds"]
+        # TODO use bonds from SDF
+        # bonds = sdf_dict["bonds"]
         m = cls(elements, positions, **sdf_dict["data"])
         if "sdf" in sdf_dict:
             m.properties["sdf"] = sdf_dict["sdf"]

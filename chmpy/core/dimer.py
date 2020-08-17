@@ -1,14 +1,35 @@
+"""Module for pairs of molecules, handling symmetry relations and more."""
 import numpy as np
 import logging
 
 LOG = logging.getLogger(__name__)
 
+
 class Dimer:
+    """Storage class for symmetry information about a dimers.
+
+    Dimers are two molecules that may or may not be symmetry related.
+
+    Parameters:
+            mol_a (Molecule):
+                one of the molecules in the pair (symmetry unique)
+            mol_b (Molecule): the neighbouring molecule (may be symmetry related to mol_a)
+            separation (float, optional): set the separation of the molecules (otherwise it
+                will be calculated)
+            transform_ab (np.ndarray, optional): specify the transform from mol_a to mol_b
+                (otherwise it will be calculated)
+            frac_shift (np.ndarray, optional): specify the offset in fractions of a unit cell,
+                which combined with transform_ab will yield mol_b
+    """
+
     seitz_b = None
     symm_str = None
     crystal_transform = False
 
-    def __init__(self, mol_a, mol_b, separation=None, transform_ab=None, frac_shift=None):
+    def __init__(
+        self, mol_a, mol_b, separation=None, transform_ab=None, frac_shift=None
+    ):
+        """Initialize a Dimer."""
         self.a = mol_a
         self.b = mol_b
         self.a_idx = self.a.properties.get("asym_mol_idx", 0)
@@ -33,7 +54,9 @@ class Dimer:
         self.com_separation = self.a.distance_to(self.b, method="center_of_mass")
 
     def calculate_transform(self):
-        from chmpy.util.num import kabsch_rotation_matrix, rmsd_points
+        """Calculate the transform (if any) from mol_a to mol_b."""
+        from chmpy.util.num import kabsch_rotation_matrix
+
         if len(self.a) != len(self.b):
             self.transform_ab = None
             return
@@ -50,12 +73,18 @@ class Dimer:
         R = kabsch_rotation_matrix(pos_b, pos_a)
         self.transform_ab = (R, v_ab)
 
-        if self.frac_shift is not None and self.symop_a is not None and self.symop_b is not None:
+        if (
+            self.frac_shift is not None
+            and self.symop_a is not None
+            and self.symop_b is not None
+        ):
             self.crystal_transform = True
-            from chmpy.crystal.symmetry_operation import SymmetryOperation, encode_symm_str
-            s_a = SymmetryOperation.from_integer_code(self.symop_a[0])
+            from chmpy.crystal.symmetry_operation import (
+                SymmetryOperation,
+                encode_symm_str,
+            )
+
             s_b = SymmetryOperation.from_integer_code(self.symop_b[0])
-            seitz_a = s_a.seitz_matrix
             t_ab = np.zeros((4, 4))
             t_ab[:3, 3] = self.frac_shift
             self.seitz_b = s_b.seitz_matrix.copy()
@@ -65,12 +94,17 @@ class Dimer:
 
     @property
     def separations(self):
-       return np.array((self.closest_separation, self.centroid_separation, self.com_separation))
+        """The closest atom, centroid-centroid, and center of mass - center of mass separations of mol_a and mol_b."""
+        return np.array(
+            (self.closest_separation, self.centroid_separation, self.com_separation)
+        )
 
     def __eq__(self, other):
+        """Return true if all separations are identical."""
         return np.allclose(self.separations, other.separations)
 
     def transform_string(self):
+        """The transform from mol_a to mol_b as a string (e.g. x,-y,z)."""
         if self.transform_ab is None:
             return "none"
         if self.crystal_transform:
@@ -78,4 +112,5 @@ class Dimer:
         return str(self.transform_ab)
 
     def __repr__(self):
+        """Represent the Dimer for a REPL or similar."""
         return f"<Dimer: d={self.separation:.2f} symm={self.transform_string()}>"

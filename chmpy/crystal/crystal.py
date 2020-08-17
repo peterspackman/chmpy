@@ -48,7 +48,7 @@ class Crystal:
 
 
         Arguments:
-            unit_cell: The unit cell for this crystal i.e. the 
+            unit_cell: The unit cell for this crystal i.e. the
                 translational symmetry of the crystal structure.
             space_group: The space group symmetry of this crystal
                 i.e. the generators for populating the unit cell given the
@@ -130,11 +130,11 @@ class Crystal:
 
     def unit_cell_atoms(self, tolerance=1e-2) -> dict:
         """
-        Generate all atoms in the unit cell (i.e. with 
+        Generate all atoms in the unit cell (i.e. with
         fractional coordinates in [0, 1]) along with associated
         information about symmetry operations, occupation, elements
         related asymmetric_unit atom etc.
-        
+
         Will merge atom sites within tolerance of each other, and
         sum their occupation numbers. A warning will be logged if
         any atom site in the unit cell has > 1.0 occupancy after
@@ -183,8 +183,8 @@ class Crystal:
         mask = np.ones(len(uc_pos), dtype=bool)
         # because crystals may have partially occupied sites
         # on special positions, we need to merge some sites
-        expected_natoms = np.sum(occupation)
-        for (i, j), d in dist.items():
+        # expected_natoms = np.sum(occupation)
+        for (i, j), _ in dist.items():
             if not (i < j):
                 continue
             occupation[i] += occupation[j]
@@ -205,7 +205,7 @@ class Crystal:
                 "cart_pos": self.to_cartesian(translated[mask]),
             },
         )
-        return self._unit_cell_atom_dict
+        return getattr(self, "_unit_cell_atom_dict")
 
     def unit_cell_connectivity(self, tolerance=0.4, neighbouring_cells=1) -> Tuple:
         """
@@ -216,9 +216,9 @@ class Crystal:
         higher index to be bonded to the lower
 
         Bonding is determined by interatomic distances being less than the
-        sum of covalent radii for the sites plus the tolerance (provided 
+        sum of covalent radii for the sites plus the tolerance (provided
         as a parameter)
-        
+
         Arguments:
             tolerance (float, optional):
                 Bonding tolerance (bonded if d < cov_a + cov_b + tolerance)
@@ -249,9 +249,6 @@ class Crystal:
         max_cov = np.max(covalent_radii)
         # TODO this needs to be sped up for large cells, tends to slow for > 1000 atoms
         # and the space storage will become a problem
-        thresholds = (
-            covalent_radii[:, np.newaxis] + covalent_radii[np.newaxis, :] + tolerance
-        )
         tree = KDTree(cart_uc_pos)
         dist = tree.sparse_distance_matrix(tree, max_distance=2 * max_cov + tolerance)
         uc_edges = []
@@ -262,8 +259,6 @@ class Crystal:
             if d > 1e-3 and d < (covalent_radii[i] + covalent_radii[j] + tolerance):
                 uc_edges.append((i, j, d, (0, 0, 0)))
 
-        idxs = np.arange(n_uc)
-        asymmetric_unit_idx = slab["asym_atom"]
         cart_neighbour_pos = self.unit_cell.to_cartesian(neighbour_pos)
         tree2 = KDTree(cart_neighbour_pos)
         dist = tree.sparse_distance_matrix(tree2, max_distance=2 * max_cov + tolerance)
@@ -286,14 +281,14 @@ class Crystal:
             properties[(i, j)] = cell
 
         setattr(self, "_uc_graph", (uc_graph, properties))
-        return self._uc_graph
+        return getattr(self, "_uc_graph")
 
     def unit_cell_molecules(self) -> List[Molecule]:
         """
         Calculate the molecules for all sites in the unit cell,
         where the number of molecules will be equal to number of
         symmetry unique molecules times number of symmetry operations.
-        
+
         Returns:
             A list of all connected molecules in this crystal, which
             when translated by the unit cell would produce the full crystal.
@@ -307,11 +302,11 @@ class Crystal:
         n_uc_mols, uc_mols = csgraph.connected_components(
             csgraph=uc_graph, directed=False, return_labels=True
         )
-        uc_frac = self._unit_cell_atom_dict["frac_pos"]
-        uc_cartesian = self._unit_cell_atom_dict["cart_pos"]
-        uc_elements = self._unit_cell_atom_dict["element"]
-        uc_asym = self._unit_cell_atom_dict["asym_atom"]
-        uc_symop = self._unit_cell_atom_dict["symop"]
+        uc_dict = getattr(self, "_unit_cell_atom_dict")
+        uc_frac = uc_dict["frac_pos"]
+        uc_elements = uc_dict["element"]
+        uc_asym = uc_dict["asym_atom"]
+        uc_symop = uc_dict["symop"]
 
         molecules = []
 
@@ -366,7 +361,7 @@ class Crystal:
             radius (float, optional): The maximum distance (Angstroms) between the central
                 molecule and the neighbours.
             method (str, optional): the method to use when determining inclusion of neighbours.
-        
+
         Returns:
             A list of neighbouring molecules using the given method.
         """
@@ -392,7 +387,7 @@ class Crystal:
 
     def molecule_dict(self, **kwargs) -> dict:
         """
-        A dictionary of `symmetry_unique_molecules`, grouped by 
+        A dictionary of `symmetry_unique_molecules`, grouped by
         their chemical formulae.
 
         Returns:
@@ -415,7 +410,7 @@ class Crystal:
 
         Populates the _symmetry_unique_molecules member, subsequent
         calls to this function will be a no-op.
-       
+
         Parameters:
             bond_tolerance (float, optional): Bonding tolerance (bonded if d < cov_a + cov_b + bond_tolerance)
 
@@ -434,8 +429,10 @@ class Crystal:
         uc_molecules = self.unit_cell_molecules()
         asym_atoms = np.zeros(len(self.asymmetric_unit), dtype=bool)
         molecules = []
+
         # sort by % of identity symop
-        order = lambda x: len(np.where(x.asym_symops == 16484)[0]) / len(x)
+        def order(x):
+            return len(np.where(x.asym_symops == 16484)[0]) / len(x)
         for i, mol in enumerate(sorted(uc_molecules, key=order, reverse=True)):
             asym_atoms_in_g = np.unique(mol.properties["asymmetric_unit_atoms"])
             if np.all(asym_atoms[asym_atoms_in_g]):
@@ -467,13 +464,13 @@ class Crystal:
         Calculate the atoms and associated information
         for a slab consisting of multiple unit cells.
 
-        If unit cell atoms have not been calculated, this calculates 
+        If unit cell atoms have not been calculated, this calculates
         their information and caches it.
 
         Parameters:
             bounds (Tuple, optional): Tuple of upper and lower corners (hkl) describing the bounds
                 of the slab.
-        
+
         Returns:
             A dictionary of arrays associated with all sites contained
             in the unit cell of this crystal, members are:
@@ -494,13 +491,13 @@ class Crystal:
 
             occupation: (N) array of occupation numbers for each site. Will
             warn if any of these are greater than 1.0
-    
+
         """
         uc_atoms = self.unit_cell_atoms()
         (hmin, kmin, lmin), (hmax, kmax, lmax) = bounds
         h = np.arange(hmin, hmax + 1)
         k = np.arange(kmin, kmax + 1)
-        l = np.arange(lmin, lmax + 1)
+        l = np.arange(lmin, lmax + 1)  # noqa: E741
         cells = cartesian_product(
             h[np.argsort(np.abs(h))], k[np.argsort(np.abs(k))], l[np.argsort(np.abs(l))]
         )
@@ -510,8 +507,8 @@ class Crystal:
         pos = np.empty((ncells * n_uc, 3), dtype=np.float64)
         slab_cells = np.empty((ncells * n_uc, 3), dtype=np.float64)
         for i, cell in enumerate(cells):
-            pos[i * n_uc : (i + 1) * n_uc, :] = uc_pos + cell
-            slab_cells[i * n_uc : (i + 1) * n_uc] = cell
+            pos[i * n_uc:(i + 1) * n_uc, :] = uc_pos + cell
+            slab_cells[i * n_uc:(i + 1) * n_uc] = cell
         slab_dict = {
             k: np.tile(v, ncells) for k, v in uc_atoms.items() if not k.endswith("pos")
         }
@@ -548,7 +545,7 @@ class Crystal:
 
     def atomic_surroundings(self, radius=6.0) -> List[Tuple]:
         """
-        Calculate all atoms within the given `radius` of 
+        Calculate all atoms within the given `radius` of
         each atomic site in the asymmetric unit.
 
         Arguments:
@@ -570,7 +567,7 @@ class Crystal:
         slab = self.slab(bounds=((hmin, kmin, lmin), (hmax, kmax, lmax)))
         tree = KDTree(slab["cart_pos"])
         results = []
-        for i, (n, pos) in enumerate(zip(self.asymmetric_unit.elements, cart_asym)):
+        for n, pos in zip(self.asymmetric_unit.elements, cart_asym):
             idxs = tree.query_ball_point(pos, radius)
             positions = slab["cart_pos"][idxs]
             elements = slab["element"][idxs]
@@ -591,7 +588,6 @@ class Crystal:
             A list of atomic number, Cartesian position for both the
             atomic sites in question and their surroundings (as an array)
         """
-        results = []
         hklmax = np.array([-np.inf, -np.inf, -np.inf])
         hklmin = np.array([np.inf, np.inf, np.inf])
         frac_radius = radius / np.array(self.unit_cell.lengths)
@@ -612,7 +608,7 @@ class Crystal:
         keep = np.zeros(positions.shape[0], dtype=bool)
 
         this_mol = []
-        for i, (n, pos) in enumerate(zip(central_elements, central_cart_positions)):
+        for pos in central_cart_positions:
             idxs = tree.query_ball_point(pos, radius)
             d, nn = tree.query(pos)
             keep[idxs] = True
@@ -629,11 +625,11 @@ class Crystal:
         Calculate the atomic information for all
         atoms surrounding the given molecule in this crystal
         within the given radius. Atoms closer than `threshold`
-        to any atom in the provided molecule will be excluded and 
+        to any atom in the provided molecule will be excluded and
         considered part of the molecule.
 
         Parameters:
-            mol (Molecule): the molecule whose environment to calculate 
+            mol (Molecule): the molecule whose environment to calculate
             radius (float, optional): Maximum distance in Angstroms between any atom in the molecule
                 and the resulting neighbouring atoms
             threshold (float, optional): tolerance for detecting the neighbouring sites as part of the
@@ -659,7 +655,7 @@ class Crystal:
         tree = KDTree(positions)
         keep = np.zeros(positions.shape[0], dtype=bool)
         this_mol = []
-        for i, (n, pos) in enumerate(zip(mol.elements, mol.positions)):
+        for pos in mol.positions:
             idxs = tree.query_ball_point(pos, radius)
             d, nn = tree.query(pos)
             keep[idxs] = True
@@ -725,9 +721,7 @@ class Crystal:
                 fg = list(fg)
                 keep = np.zeros(positions.shape[0], dtype=bool)
                 inside = []
-                for i, (n, pos) in enumerate(
-                    zip(mol.atomic_numbers[fg], mol.positions[fg])
-                ):
+                for pos in mol.positions[fg]:
                     idxs = tree.query_ball_point(pos, radius)
                     d, nn = tree.query(pos)
                     keep[idxs] = True
@@ -795,7 +789,7 @@ class Crystal:
 
         Args:
             kwargs: Keyword arguments used in the evaluation of the surface.
-                
+
                 Options are:
                 ```
                 isovalue (float, optional): level set value for the isosurface (default=0.002) in au.
@@ -810,7 +804,6 @@ class Crystal:
         from chmpy import PromoleculeDensity
         import trimesh
         from chmpy.mc import marching_cubes
-        from scipy.spatial import cKDTree as KDTree
 
         vertex_color = kwargs.get("color", None)
 
@@ -840,9 +833,8 @@ class Crystal:
             seps = (sep, sep, sep)
         else:
             raise NotImplementedError("Only uc grid supported currently")
-        separations = np.array((sep, sep, sep))
         tree = KDTree(atoms["cart_pos"])
-        distances, idxs = tree.query(pts)
+        distances, _ = tree.query(pts)
         values = np.ones(pts.shape[0], dtype=np.float32)
         mask = distances > 1.0  # minimum bigger than 1 angstrom
         rho = density.rho(pts[mask])
@@ -853,11 +845,10 @@ class Crystal:
         )
         if grid_type == "uc":
             verts = self.to_cartesian(np.c_[verts[:, 1], verts[:, 0], verts[:, 2]])
-        vertex_colors = None
         mesh = trimesh.Trimesh(vertices=verts, faces=faces, normals=normals)
 
         if kwargs.get("subdivide", False):
-            for i in range(int(kwargs.get("subdivide", False))):
+            for _ in range(int(kwargs.get("subdivide", False))):
                 mesh = mesh.subdivide()
 
         if vertex_color == "esp":
@@ -1002,7 +993,7 @@ class Crystal:
         Parameters:
             l_max (int, optional): maximum level of angular momenta to include in the spherical harmonic
                 transform of the molecular shape function. (default: 5)
-            radius (float, optional): maximum distance (Angstroms) of neighbouring atoms to include in 
+            radius (float, optional): maximum distance (Angstroms) of neighbouring atoms to include in
                 stockholder weight calculation (default: 5)
             kind (str, optional): Identifier for the functional group type (default: 'carboxylic_acid')
 
@@ -1050,7 +1041,7 @@ class Crystal:
         self, mol, l_max=5, radius=6.0, with_property=None
     ) -> np.ndarray:
         """
-        Calculate the molecular shape descriptors `[1,2]` for 
+        Calculate the molecular shape descriptors `[1,2]` for
         the provided molecule in the crystal.
 
         Parameters:
@@ -1071,7 +1062,6 @@ class Crystal:
             https://dx.doi.org/10.1002/anie.201906602
         ```
         """
-        descriptors = []
         from chmpy.shape import SHT, stockholder_weight_descriptor
 
         sph = SHT(l_max=l_max)
@@ -1340,7 +1330,6 @@ class Crystal:
 
         for symop_data_block in symop_data_names:
             if symop_data_block in cif_data:
-                latt = space_group.latt
                 symops = [
                     SymmetryOperation.from_string_code(x)
                     for x in cif_data[symop_data_block]
@@ -1348,9 +1337,8 @@ class Crystal:
                 try:
                     new_sg = SpaceGroup.from_symmetry_operations(symops)
                     space_group = new_sg
-                except ValueError as e:
+                except ValueError:
                     space_group.symmetry_operations = symops
-                    
                     symbol = cif_data.get(
                         "symmetry_space_group_name_H-M", "Unknown"
                     )
@@ -1426,7 +1414,7 @@ class Crystal:
         from chmpy.fmt.crystal17 import load_crystal17_geometry_string
         data = load_crystal17_geometry_string(string)
         unit_cell = UnitCell(data["direct"])
-        space_group = SpaceGroup.from_symmetry_operations(data["symmetry_operations"]) 
+        space_group = SpaceGroup.from_symmetry_operations(data["symmetry_operations"])
         asym = AsymmetricUnit(data["elements"], unit_cell.to_fractional(data["xyz"]))
         return Crystal(unit_cell, space_group, asym)
 
@@ -1434,7 +1422,7 @@ class Crystal:
     def from_crystal17_opt_file(cls, filename, **kwargs):
         p = Path(filename)
         titl = p.stem
-        return cls.from_crystal17_opt_string(p.read_text(), **kwargs)
+        return cls.from_crystal17_opt_string(p.read_text(), titl=titl, **kwargs)
 
     @property
     def name(self) -> str:
@@ -1688,7 +1676,6 @@ class Crystal:
         """
         cart_symops = []
         d = self.unit_cell.direct
-        r = self.unit_cell.reciprocal_lattice
         i = self.unit_cell.inverse
         for symop in self.symmetry_operations:
             cart_symops.append(
@@ -1725,9 +1712,6 @@ class Crystal:
         hmax, kmax, lmax = hklmax.astype(int)
         hmin, kmin, lmin = hklmin.astype(int)
 
-        symop_keys = [str(x) for x in self.symmetry_operations]
-        symops = self.cartesian_symmetry_operations()
-        included_mols = []
         shifts_frac = cartesian_product(
             np.arange(hmin, hmax), np.arange(kmin, kmax), np.arange(lmin, lmax)
         )

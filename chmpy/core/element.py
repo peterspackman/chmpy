@@ -307,7 +307,7 @@ class Element(metaclass=_ElementMeta):
         return Element(*_EL_FROM_SYM[symbol])
 
     @staticmethod
-    def from_label(l: str) -> "Element":
+    def from_label(label: str) -> "Element":
         """
         Create an element from a label e.g. 'C1', 'H2_F2___i' etc.
 
@@ -324,17 +324,17 @@ class Element(metaclass=_ElementMeta):
             H
             >>> Element["LI2_F2____1____i"]
             Li
-            
+
             An ambiguous case, will make this Calcium not Carbon
             >>> Element.from_label("Ca2_F2____1____i")
             Ca
         """
-        m = re.match(_SYMBOL_REGEX, l)
+        m = re.match(_SYMBOL_REGEX, label)
         if m is None:
-            raise ValueError("Could not determine symbol from {}".format(l))
+            raise ValueError("Could not determine symbol from {}".format(label))
         sym = m.group(1).strip().capitalize()
         if sym not in _EL_FROM_SYM:
-            raise ValueError("Could not determine symbol from {}".format(l))
+            raise ValueError("Could not determine symbol from {}".format(label))
         return Element(*_EL_FROM_SYM[sym])
 
     @staticmethod

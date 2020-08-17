@@ -1,7 +1,7 @@
 """
 This module implements funcionality associated with
 3D periodic crystals (`Crystal`), including Bravais lattices/unit cells (`UnitCell`),
-space groups (`SpaceGroup`), point groups (`PointGroup`), symmetry operations in 
+space groups (`SpaceGroup`), point groups (`PointGroup`), symmetry operations in
 fractional coordinates (`SymmetryOperation`) and more.
 """
 
