@@ -6,7 +6,7 @@ def recursive_dict_update(dict_to, dict_from):
     Iterate through a dictionary , updating items inplace
     recursively from a second dictionary.
 
-    Parameters:
+    Args:
         dict_to (dict): the first dictionary (to update)
         dict_from (dict): the second dictionary (to pull updates from)
 
@@ -32,7 +32,7 @@ def nested_dict_delete(root, key, sep="."):
     Iterate through a dict, deleting items
     recursively based on a key.
 
-    Parameters:
+    Args:
         root (dict): dictionary to remove an entry from
         key (str): the string used to locate the key to delete in the root dictionary
         sep (str): the separator for dictionary key items

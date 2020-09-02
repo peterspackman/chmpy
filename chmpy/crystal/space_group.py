@@ -227,7 +227,7 @@ class SpaceGroup:
         to only translational symmetry (i.e. a unit cell).
         Assumes the input coordinates are fractional.
 
-        Parameters:
+        Args:
             coordinates (np.ndarray): (N, 3) set of fractional coordinates
 
         Returns:
@@ -284,7 +284,7 @@ class SpaceGroup:
         symmetry operations and expanding them based on the lattice
         type.
 
-        Parameters:
+        Args:
             symops (List[SymmetryOperation]): a reduced or full list of symmetry operations
             expand_latt (int, optional): the SHELX LATT number to expand this list of symmetry operations
 

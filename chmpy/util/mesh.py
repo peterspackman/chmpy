@@ -7,7 +7,7 @@ def save_mesh(mesh, filename):
     """
     Save the given Trimesh to a file.
 
-    Parameters:
+    Args:
         mesh (trimesh.Trimesh): The mesh to save.
         filename (str): The path to the destination file.
     """
@@ -25,7 +25,7 @@ def molecule_to_meshes(molecule, **kwargs):
     either as van der Waals spheres or as a CPK
     representation.
 
-    Parameters:
+    Args:
         molecule (Molecule): The molecule to represent
         kwargs (dict): Optional Keyword arguments
 

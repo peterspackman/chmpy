@@ -76,7 +76,7 @@ def subscript(x: str) -> str:
     Convert the provided string to its subscript
     equivalent in unicode
 
-    Parameters:
+    Args:
         x (str): the string to be converted
 
     Returns:
@@ -90,7 +90,7 @@ def overline(x: str) -> str:
     Add a unicode overline modifier
     to the provided string.
 
-    Parameters:
+    Args:
         x (str): the string to be overlined
 
     Returns:
@@ -105,7 +105,7 @@ def natural_sort_key(s: str, _nsre=re.compile(r"([a-zA-Z]+)(\d+)")):
     etc. so that the suffixes will be in numeric order rather than
     lexicographical order.
 
-    Parameters:
+    Args:
         s (str): the string whose sort key to determine
 
     Returns:

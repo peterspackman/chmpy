@@ -6,7 +6,7 @@ def is_perfect_square(value: Number) -> bool:
     """
     Check if a number is perfect square.
 
-    Parameters:
+    Args:
         value (Number): the number in question
 
     Returns:
@@ -27,7 +27,7 @@ def cartesian_product(*arrays) -> np.ndarray:
     provided vectors A x B x C ... etc. This will maintain
     order in loops from the right most array.
 
-    Parameters:
+    Args:
         *arrays (array_like): 1D arrays to use for the Cartesian product
 
     Returns:
@@ -53,7 +53,7 @@ def spherical_to_cartesian(rtp: np.ndarray, dtype=np.float64) -> np.ndarray:
         y = r sin(theta) sin(phi)
         z = r cos(theta)
 
-    Parameters:
+    Args:
         rtp (array_like): (N,3) array of of r, theta, phi coordinates
             in the above spherical coordinate system.
         dtype: numpy datatype or string
@@ -75,7 +75,7 @@ def rmsd_points(A, B, reorient="kabsch"):
     Rotate the points in `A` onto `B` and calculate
     their RMSD
 
-    Parameters:
+    Args:
         A (np.ndarray): (N,D) matrix where N is the number of vectors and D
             is the dimension of each vector
         B (np.ndarray): (N,D) matrix where N is the number of
@@ -94,7 +94,7 @@ def reorient_points(A, B, method="kabsch"):
     """
     Rotate the points in `A` onto `B`
 
-    Parameters:
+    Args:
         A (np.ndarray): (N,D) matrix where N is the number of vectors and D
             is the dimension of each vector
         B (np.ndarray): (N,D) matrix where N is the number of
@@ -124,7 +124,7 @@ def kabsch_rotation_matrix(A, B):
     Kabsch, W. Acta Cryst. A, 32, 922-923, (1976)
     DOI: http://dx.doi.org/10.1107/S0567739476001873
     ```
-    Parameters:
+    Args:
         A (np.ndarray): (N,D) matrix where N is the number of vectors and D
             is the dimension of each vector
         B (np.ndarray): (N,D) matrix where N is the number of

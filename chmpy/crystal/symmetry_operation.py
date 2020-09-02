@@ -32,7 +32,7 @@ def encode_symm_str(rotation, translation):
     >>> encode_symm_str(((1, 1, 1), (1, 0, 1), (0, 1, 0)), (0, 0.5, 1/3))
     '+x+y+z,1/2+x+z,1/3+y'
 
-    Parameters:
+    Args:
         rotation (array_like): (3,3) matrix of -1, 0, or 1s encoding the rotation component
             of the symmetry operation
         translation (array_like): (3) vector of rational numbers encoding the translation component
@@ -69,7 +69,7 @@ def decode_symm_str(s):
     >>> encode_symm_str(*decode_symm_str("1/2 - x,y-0.3333333,z"))
     '1/2-x,2/3+y,+z'
 
-    Parameters:
+    Args:
         s (str): the encoded symmetry operation string
 
     Returns:
@@ -122,7 +122,7 @@ def decode_symm_int(coded_integer):
     >>> encode_symm_str(*decode_symm_int(16484))
     '+x,+y,+z'
 
-    Parameters:
+    Args:
         coded_integer (int): integer encoding a symmetry operation
 
     Returns:
@@ -165,7 +165,7 @@ def encode_symm_int(rotation, translation):
     >>> encode_symm_int(((1, 0, 0), (0, 1, 0), (0, 1, 1)), (0, 0.5, 0))
     1433663
 
-     Parameters:
+     Args:
         rotation (array_like): (3,3) matrix of -1, 0, or 1s encoding the rotation component
             of the symmetry operation
         translation (array_like): (3) vector of rational numbers encoding the translation component
@@ -273,7 +273,7 @@ class SymmetryOperation:
         """
         Apply this symmetry operation to a set of fractional coordinates.
         
-        Parameters:
+        Args:
             coordinates (np.ndarray): (N,3) or (N,4) array of fractional coordinates or homogeneous
                 fractional coordinates.
 
@@ -315,7 +315,7 @@ class SymmetryOperation:
 
         See also  the `encode_symm_int`, `decode_symm_int` methods.
 
-        Parameters:
+        Args:
             code (int): integer-encoded symmetry operation
 
         Returns:
@@ -335,7 +335,7 @@ class SymmetryOperation:
 
         See also the `encode_symm_str`, `decode_symm_str` methods.
 
-        Parameters:
+        Args:
             code (str): string-encoded symmetry operation
 
         Returns:
@@ -361,7 +361,7 @@ def expanded_symmetry_list(reduced_symops, lattice_type):
     Create an expanded list of symmetry operations from the minimum
     specification given a certain lattice type.
 
-    Parameters:
+    Args:
         reduced_symops (List[SymmetryOperation]): reduced list of symmetry operations
         lattice_type (int): integer encoded lattice type with SHELX conventions, i.e.
             ```
@@ -404,7 +404,7 @@ def reduced_symmetry_list(full_symops, lattice_type):
     Reduce an expanded list of symmetry operations to the minimum
     specification given a certain lattice type.
 
-    Parameters:
+    Args:
         full_symops (List[SymmetryOperation]): list of symmetry operations
         lattice_type (int): integer encoded lattice type with SHELX conventions, i.e.
             ```

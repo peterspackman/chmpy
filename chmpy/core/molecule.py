@@ -108,7 +108,7 @@ class Molecule:
         `bond_graph` method to populate the connectivity graph.
 
 
-        Parameters:
+        Args:
             tolerance (float, optional): Additional tolerance for attributing two sites as 'bonded'.
                 The default is 0.4 angstroms, which is recommended by the CCDC
         """
@@ -125,8 +125,6 @@ class Molecule:
         self.bonds[mask] = dist[mask]
         self.bonds = dok_matrix(self.bonds)
         try:
-            import graph_tool as gt
-
             self.bond_graph()
         except ImportError:
             pass
@@ -229,7 +227,7 @@ class Molecule:
         charges associated with this molecule. The potential will be
         in atomic units.
 
-        Parameters:
+        Args:
             positions (np.ndarray): (N, 3) array of locations where the molecular ESP should
                 be calculated. Assumed to be in Angstroms.
 
@@ -270,7 +268,7 @@ class Molecule:
         Construct a molecule from the provided xmol .xyz file. kwargs
         will be passed through to the Molecule constructor.
 
-        Parameters:
+        Args:
             contents (str): the contents of the .xyz file to read
             kwargs: keyword arguments passed ot the `Molecule` constructor
 
@@ -288,7 +286,7 @@ class Molecule:
         Construct a molecule from the provided xmol .xyz file. kwargs
         will be passed through to the Molecule constructor.
 
-        Parameters:
+        Args:
             filename (str): the path to the .xyz file
             kwargs: keyword arguments passed ot the `Molecule` constructor
 
@@ -337,7 +335,7 @@ class Molecule:
         """
         Construct a molecule from the provided file. 
 
-        Parameters:
+        Args:
             filename (str): the path to the (xyz or SDF) file
             kwargs: keyword arguments passed ot the `Molecule` constructor
 
@@ -384,7 +382,7 @@ class Molecule:
         of an xmol .xyz file. Keyword arguments are
         passed to `self.to_xyz_string`.
 
-        Parameters:
+        Args:
             filename (str): The path in which store this molecule
             kwargs: Keyword arguments to be passed to `self.to_xyz_string`
         """
@@ -396,7 +394,7 @@ class Molecule:
         Save this molecule to the destination file in xyz format,
         optionally discarding the typical header.
 
-        Parameters:
+        Args:
             filename (str): path to the destination file
             kwargs: keyword arguments passed to the relevant method
         """
@@ -460,7 +458,7 @@ class Molecule:
         Find all indices of atom groups which constitute
         subgraph isomorphisms with stored functional group data
 
-        Parameters:
+        Args:
             kind (str, optional):Find only matches of the given kind
 
         Returns:
@@ -469,7 +467,7 @@ class Molecule:
         """
         global _FUNCTIONAL_GROUP_SUBGRAPHS
         try:
-            import graph_tool.topology as top
+            import graph_tool.topology as top  # noqa: F401
         except ImportError:
             raise RuntimeError(
                 "Please install the graph_tool library for graph operations"
@@ -495,10 +493,9 @@ class Molecule:
         return matches
 
     def matching_subgraph(self, sub):
-        """
-        Find all indices of atoms which match the given graph
+        """Find all indices of atoms which match the given graph.
 
-        Parameters:
+        Args:
             sub (graph_tool.Graph): the subgraph
 
         Returns:
@@ -529,7 +526,7 @@ class Molecule:
         Find the indices of a matching fragment to the given
         molecular fragment
 
-        Parameters:
+        Args:
             fragment (Molecule): Molecule object containing the desired fragment
             method (str, optional): the method for matching
 
@@ -565,7 +562,7 @@ class Molecule:
         the crystal environment please see the corresponding method
         in :obj:`chmpy.crystal.Crystal`.
 
-        Parameters:
+        Args:
             l_max (int, optional): maximum level of angular momenta to include in the spherical harmonic
                 transform of the shape function. (default=5)
             radius (float, optional): Maximum distance in Angstroms between any atom in the molecule
@@ -593,8 +590,8 @@ class Molecule:
         dists = self.distance_matrix
 
         for n in range(elements.shape[0]):
-            els = elements[n : n + 1]
-            pos = positions[n : n + 1, :]
+            els = elements[n:n + 1]
+            pos = positions[n:n + 1, :]
             idxs = np.where((dists[n, :] < radius) & (dists[n, :] > 1e-3))[0]
             neighbour_els = elements[idxs]
             neighbour_pos = positions[idxs]
@@ -670,8 +667,8 @@ class Molecule:
         dists = self.distance_matrix
 
         for n in range(elements.shape[0]):
-            els = elements[n : n + 1]
-            pos = positions[n : n + 1, :]
+            els = elements[n:n + 1]
+            pos = positions[n:n + 1, :]
             idxs = np.where((dists[n, :] < radius) & (dists[n, :] > 1e-3))[0]
             neighbour_els = elements[idxs]
             neighbour_pos = positions[idxs]
@@ -704,7 +701,7 @@ class Molecule:
         Calculate the molecular shape descriptors`[1,2]` for 
         this molecule using the promolecule density.
 
-        Parameters:
+        Args:
             kwargs: keyword arguments passed to `promolecule_density_descriptor`
                 Options are:
                 ```
@@ -737,7 +734,7 @@ class Molecule:
         """
         Calculate promolecule electron density isosurface
         for this molecule.
-        Parameters:
+        Args:
             kwargs: keyword arguments passed to `promolecule_density_isosurface`
                 Options are:
                 ```
@@ -815,7 +812,7 @@ class Molecule:
         Construct a molecule from the provided arrays. kwargs
         will be passed through to the Molecule constructor.
 
-        Parameters:
+        Args:
             elements (np.ndarray): (N,) array of atomic numbers for each atom in this molecule
             positions (np.ndarray): (N, 3) array of Cartesian coordinates for each atom in this molecule (Angstroms)
 
@@ -829,7 +826,7 @@ class Molecule:
         Convenience method to construct a new molecule from this molecule with the given mask
         array.
 
-        Parameters:
+        Args:
             mask (np.ndarray): a numpy mask array used to filter which atoms to keep in the new molecule.
 
         Returns:
@@ -844,7 +841,7 @@ class Molecule:
         Convenience method to rotate this molecule by a given 
         rotation matrix
         
-        Parameters:
+        Args:
             rotation (np.ndarray): A (3, 3) rotation matrix
         """
 
@@ -860,7 +857,7 @@ class Molecule:
         Convenience method to construct a new copy of thismolecule
         rotated by a given rotation matrix
         
-        Parameters:
+        Args:
             rotation (np.ndarray): A (3, 3) rotation matrix
 
         Returns:
@@ -876,7 +873,7 @@ class Molecule:
         Convenience method to translate this molecule by a given 
         translation vector
         
-        Parameters:
+        Args:
             translation (np.ndarray): A (3,) vector of x, y, z coordinates of the translation
         """
         self.positions += translation
@@ -886,7 +883,7 @@ class Molecule:
         Convenience method to construct a new copy of this molecule
         translated by a given translation vector
         
-        Parameters:
+        Args:
             translation (np.ndarray): A (3,) vector of x, y, z coordinates of the translation
 
         Returns:
@@ -903,7 +900,7 @@ class Molecule:
         Convenience method to transform this molecule
         by rotation and translation.
         
-        Parameters:
+        Args:
             rotation (np.ndarray): A (3,3) rotation matrix
             translation (np.ndarray): A (3,) vector of x, y, z coordinates of the translation
         """
@@ -918,7 +915,7 @@ class Molecule:
         Convenience method to transform this molecule
         by rotation and translation.
         
-        Parameters:
+        Args:
             rotation (np.ndarray): A (3,3) rotation matrix
             translation (np.ndarray): A (3,) vector of x, y, z coordinates of the translation
 
@@ -938,7 +935,7 @@ class Molecule:
         sdf terms. Not intended for typical use cases, but as a
         helper method for `Molecule.from_sdf_file`
 
-        Parameters:
+        Args:
             sdf_dict (dict): a dictionary containing the 'atoms', 'x', 'y', 'z',
                 'symbol', 'bonds' members.
 
@@ -963,7 +960,7 @@ class Molecule:
         an optional keyword argument 'progress' may be provided
         to track the loading of many molecules.
 
-        Parameters:
+        Args:
             filename (str): the path of the SDF file to read.
 
         Returns:

@@ -30,7 +30,7 @@ def quasirandom(d1: int, d2=None, method="sobol", seed=1) -> np.ndarray:
     Generate a quasirandom point, or sequence of points with coefficients
     in the interval [0, 1].
 
-    Parameters:
+    Args:
         d1 (int): number of points to generate (or number of dimensions if d2 is not provided)
         d2 (int, optional): number of dimensions
         method (str, optional): use the 'sobol' or 'kgf' sequences to generate points

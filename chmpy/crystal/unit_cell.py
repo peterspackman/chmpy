@@ -25,7 +25,7 @@ class UnitCell:
         a row major direct matrix. Unless otherwise specified, length
         units are Angstroms, and angular units are radians.
 
-        Parameters:
+        Args:
             vectors (array_like): (3, 3) array of lattice vectors, row major i.e. vectors[0, :] is
                 lattice vector A etc.
         """
@@ -54,7 +54,7 @@ class UnitCell:
         to Cartesian space (x, y, z). The x-direction will be aligned
         along lattice vector A.
 
-        Parameters:
+        Args:
             coords (array_like): (N, 3) array of fractional coordinates
 
         Returns:
@@ -68,7 +68,7 @@ class UnitCell:
         to fractional space (a, b, c). The x-direction will is assumed
         be aligned along lattice vector A.
 
-        Parameters:
+        Args:
             coords (array_like): an (N, 3) array of Cartesian coordinates
 
         Returns:
@@ -82,7 +82,7 @@ class UnitCell:
         according to lengths a, b, c and angles alpha, beta, gamma of
         a parallelipiped.
 
-        Parameters:
+        Args:
             lengths (array_like): array of (a, b, c), the unit cell side lengths in Angstroms.
             angles (array_like): array of (alpha, beta, gamma), the unit cell angles lengths
                 in radians.
@@ -123,7 +123,7 @@ class UnitCell:
         lengths/angles anyway, it is important to have these consistent.
 
 
-        Parameters:
+        Args:
             vectors (array_like): (3, 3) array of lattice vectors, row major i.e. vectors[0, :] is
                 lattice vector A etc.
         """
@@ -401,7 +401,7 @@ class UnitCell:
         """
         Construct a new UnitCell from the provided lengths and angles.
 
-        Parameters:
+        Args:
             lengths (array_like): Lattice side lengths (a, b, c) in Angstroms.
             angles (array_like): Lattice angles (alpha, beta, gamma) in provided units (default radians)
             unit (str, optional): Unit for angles i.e. 'radians' or 'degrees' (default radians).
@@ -426,7 +426,7 @@ class UnitCell:
         """
         Construct a new cubic UnitCell from the provided side length.
 
-        Parameters:
+        Args:
             length (float): Lattice side length a in Angstroms.
 
         Returns:
@@ -440,7 +440,7 @@ class UnitCell:
         Construct a new unit cell from the unique parameters and
         the specified cell type.
 
-        Parameters:
+        Args:
             params (Tuple): tuple of floats of unique parameters
             cell_type (str, optional): the desired cell type
         """
@@ -451,7 +451,7 @@ class UnitCell:
         """
         Construct a new UnitCell from the provided side lengths and angles.
 
-        Parameters:
+        Args:
             params (array_like): Lattice side lengths and angles (a, b, c, alpha, beta, gamma)
 
         Returns:
@@ -466,7 +466,7 @@ class UnitCell:
         """
         Construct a new UnitCell from the provided side lengths and angle.
 
-        Parameters:
+        Args:
             params (array_like): Lattice side lengths and angles (a, b, c, beta)
 
         Returns:
@@ -490,7 +490,7 @@ class UnitCell:
         """
         Construct a new UnitCell from the provided side lengths and angles.
 
-        Parameters:
+        Args:
             params (array_like): Lattice side lengths (a, c)
 
         Returns:
@@ -511,7 +511,7 @@ class UnitCell:
         """
         Construct a new UnitCell from the provided side lengths and angles.
 
-        Parameters:
+        Args:
             params (array_like): Lattice side lengths (a, c)
 
         Returns:
@@ -530,7 +530,7 @@ class UnitCell:
         """
         Construct a new UnitCell from the provided side lengths and angles.
 
-        Parameters:
+        Args:
             params (array_like): Lattice side length a and angle alpha c
 
         Returns:
@@ -544,7 +544,7 @@ class UnitCell:
         """
         Construct a new orthorhombic UnitCell from the provided side lengths.
 
-        Parameters:
+        Args:
             lengths (array_like): Lattice side lengths (a, b, c) in Angstroms.
 
         Returns:
@@ -553,6 +553,19 @@ class UnitCell:
 
         assert len(lengths) == 3, "Requre three lengths for Orthorhombic cell"
         return cls(np.diag(lengths))
+
+    def as_rhombohedral(self, T=((-1/3, 1/3, 1/3), (2/3, 1/3, 1/3), (-1/3, -2/3, 1/3))):
+        if not (self.is_hexagonal):
+            raise ValueError("Only hexagonal cells can be converted to rhombohedral")
+        T = np.array(T) 
+        return UnitCell(np.dot(T, self.direct))
+
+    def as_hexagonal(self, T=((-1, 1, 0), (1, 0, -1), (1, 1, 1))):
+        if not self.is_rhombohedral:
+            raise ValueError("Only rhombohedral cells can be converted to hexagonal")
+        # Crystal17 convention =  ((1, -1,  0), (0, 1, -1), (1, 1, 1))
+        T = np.array(T)
+        return UnitCell(np.dot(T, self.direct))
 
     def __repr__(self):
         cell = self.cell_type

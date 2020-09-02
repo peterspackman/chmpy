@@ -68,12 +68,15 @@ def load_crystal17_geometry_string(string):
     }
     nsymops = int(lines[4])
 
-    for i in range(5, 5 + nsymops, 4):
-        data["symmetry_operations"].append(SymmetryOperation(
-            np.fromstring(" ".join(lines[i:i+3]), sep=" ").astype(int).reshape(3, 3),
-            np.fromstring(lines[i+3], sep=" "),
-        ))
+    D = data["direct"]
+    I = np.linalg.inv(D)
 
+    for i in range(5, 5 + nsymops * 4, 4):
+        rotation = np.fromstring(" ".join(lines[i:i+3]), sep=" ").reshape(3, 3)
+        translation = np.fromstring(lines[i+3], sep=" ")
+        rot_frac = np.dot(I.T,  np.dot(rotation, D.T)).T.round(7).astype(int)
+        t_frac = np.dot(translation, I)
+        data["symmetry_operations"].append(SymmetryOperation(rot_frac, t_frac))
     l = i + 4
     natoms = int(lines[l])
     l += 1

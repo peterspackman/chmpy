@@ -1,3 +1,5 @@
+"""Module for static information about chemical elements."""
+
 import re
 import functools
 from collections import Counter
@@ -249,8 +251,7 @@ class _ElementMeta(type):
 
 @functools.total_ordering
 class Element(metaclass=_ElementMeta):
-    """
-    Storage class for information about a chemical element.
+    """Storage class for information about a chemical element.
 
     Examples:
         >>> h = Element.from_string("H")
@@ -267,6 +268,7 @@ class Element(metaclass=_ElementMeta):
     """
 
     def __init__(self, atomic_number, name, symbol, cov, vdw, mass):
+        """Initialize an Element from its chemical data."""
         self.atomic_number = atomic_number
         self.name = name
         self.symbol = symbol
@@ -276,10 +278,9 @@ class Element(metaclass=_ElementMeta):
 
     @staticmethod
     def from_string(s: str) -> "Element":
-        """
-        Create an element from a given element symbol
+        """Create an element from a given element symbol.
 
-        Parameters:
+        Args:
             s (str): a string representation of an element in the periodic table
 
         Returns:
@@ -308,10 +309,9 @@ class Element(metaclass=_ElementMeta):
 
     @staticmethod
     def from_label(label: str) -> "Element":
-        """
-        Create an element from a label e.g. 'C1', 'H2_F2___i' etc.
+        """Create an element from a label e.g. 'C1', 'H2_F2___i' etc.
 
-        Parameters:
+        Args:
             l (str): a string representation of an element in the periodic table
 
         Returns:
@@ -339,10 +339,9 @@ class Element(metaclass=_ElementMeta):
 
     @staticmethod
     def from_atomic_number(n: int) -> "Element":
-        """
-        Create an element from a given atomic number
+        """Create an element from a given atomic number.
 
-        Parameters:
+        Args:
             n (int): the atomic number of the element
 
         Returns:
@@ -358,41 +357,45 @@ class Element(metaclass=_ElementMeta):
 
     @property
     def vdw_radius(self) -> float:
-        "the van der Waals radius in angstroms"
+        """The van der Waals radius in angstroms."""
         return self.vdw
 
     @property
     def color(self):
-        "the color RGBA color of this element"
+        """The color RGBA color of this element."""
         return _EL_COLORS[self.atomic_number - 1]
 
     @property
     def ball_stick_radius(self) -> float:
-        "the radius of this element in a ball and stick representation"
+        """The radius of this element in a ball and stick representation."""
         if self.symbol == "H":
             return self.covalent_radius
         return self.cov * 0.5
 
     @property
     def covalent_radius(self) -> float:
-        "the covalent radius in angstroms"
+        """The covalent radius in angstroms."""
         return self.cov
 
     def __repr__(self):
+        """Represent this element as a string for REPL."""
         return self.symbol
 
     def __hash__(self):
+        """Hash of this element (its atomic number)."""
         return int(self.atomic_number)
 
     def _is_valid_operand(self, other):
         return hasattr(other, "atomic_number")
 
     def __eq__(self, other):
+        """Check if two Elements have the same atomic number."""
         if not self._is_valid_operand(other):
             raise NotImplementedError
         return self.atomic_number == other.atomic_number
 
     def __lt__(self, other):
+        """Check which element comes before the other in chemical formulae (C first, then order of atomic number)."""
         if not self._is_valid_operand(other):
             raise NotImplementedError
         n1, n2 = self.atomic_number, other.atomic_number
@@ -407,9 +410,7 @@ class Element(metaclass=_ElementMeta):
 
 
 def chemical_formula(elements, subscript=False):
-    """
-    Calculate the chemical formula for the given
-    list of elements.
+    """Calculate the chemical formula for the given list of elements.
 
     Examples:
         >>> chemical_formula(['O', 'C', 'O'])
@@ -417,7 +418,7 @@ def chemical_formula(elements, subscript=False):
         >>> chemical_formula(['C', 'H', 'O', 'B'])
         'BCHO'
 
-    Parameters:
+    Args:
         elements (List[Element or str]): a list of elements or element symbols.
             Note that if a list of strings are provided the order of chemical
             symbols may not match convention.
@@ -441,10 +442,9 @@ def chemical_formula(elements, subscript=False):
 
 
 def cov_radii(atomic_numbers):
-    """
-    Return the covalent radii for the given atomic numbers
+    """Return the covalent radii for the given atomic numbers.
 
-    Parameters:
+    Args:
         atomic_numbers (array_like): the (N,) length integer array of atomic numbers
 
     Returns:
@@ -456,10 +456,9 @@ def cov_radii(atomic_numbers):
 
 
 def vdw_radii(atomic_numbers):
-    """
-    Return the van der Waals radii for the given atomic numbers
+    """Return the van der Waals radii for the given atomic numbers.
 
-    Parameters:
+    Args:
         atomic_numbers (array_like): the (N,) length integer array of atomic numbers
 
     Returns:
@@ -471,10 +470,9 @@ def vdw_radii(atomic_numbers):
 
 
 def element_names(atomic_numbers):
-    """
-    Return the element names for the given atomic numbers
+    """Return the element names for the given atomic numbers.
 
-    Parameters:
+    Args:
         atomic_numbers (array_like): the (N,) length integer array of atomic numbers
 
     Returns:
@@ -486,10 +484,9 @@ def element_names(atomic_numbers):
 
 
 def element_symbols(atomic_numbers):
-    """
-    Return the element symbols for the given atomic numbers
+    """Return the element symbols for the given atomic numbers.
 
-    Parameters:
+    Args:
         atomic_numbers (array_like): the (N,) length integer array of atomic numbers
 
     Returns:

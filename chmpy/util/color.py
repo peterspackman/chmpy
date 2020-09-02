@@ -15,7 +15,7 @@ def property_to_color(prop, cmap="viridis", **kwargs):
     Convert a scalar array of property values to colors, 
     given a provided color map (or property name).
 
-    Parameters:
+    Args:
         prop (array_like): the scalar array of property values
         cmap (str): the color map name or property name
         kwargs (dict): optional keyword arguments

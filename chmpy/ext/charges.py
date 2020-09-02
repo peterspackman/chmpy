@@ -34,7 +34,7 @@ class EEM:
         """
         Calculate the partial atomic charges based on the EEM method.
 
-        Parameters:
+        Args:
             mol (Molecule): The molecule with atoms where partial charges are desired
 
         Returns:

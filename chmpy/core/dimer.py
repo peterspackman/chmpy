@@ -10,7 +10,7 @@ class Dimer:
 
     Dimers are two molecules that may or may not be symmetry related.
 
-    Parameters:
+    Args:
             mol_a (Molecule):
                 one of the molecules in the pair (symmetry unique)
             mol_b (Molecule): the neighbouring molecule (may be symmetry related to mol_a)

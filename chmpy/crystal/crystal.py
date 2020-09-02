@@ -118,7 +118,7 @@ class Crystal:
         """
         Convert coordinates (row major) from cartesian to fractional coordinates.
 
-        Parameters:
+        Args:
             coords (np.ndarray): (N, 3) array of positions assumed to be in cartesian (orthogonal) coordinates
 
         Returns:
@@ -411,7 +411,7 @@ class Crystal:
         Populates the _symmetry_unique_molecules member, subsequent
         calls to this function will be a no-op.
 
-        Parameters:
+        Args:
             bond_tolerance (float, optional): Bonding tolerance (bonded if d < cov_a + cov_b + bond_tolerance)
 
         Returns:
@@ -467,7 +467,7 @@ class Crystal:
         If unit cell atoms have not been calculated, this calculates
         their information and caches it.
 
-        Parameters:
+        Args:
             bounds (Tuple, optional): Tuple of upper and lower corners (hkl) describing the bounds
                 of the slab.
 
@@ -628,7 +628,7 @@ class Crystal:
         to any atom in the provided molecule will be excluded and
         considered part of the molecule.
 
-        Parameters:
+        Args:
             mol (Molecule): the molecule whose environment to calculate
             radius (float, optional): Maximum distance in Angstroms between any atom in the molecule
                 and the resulting neighbouring atoms
@@ -670,7 +670,7 @@ class Crystal:
         atoms surrounding each symmetry unique molecule
         in this crystal within the given radius.
 
-        Parameters:
+        Args:
             radius (float, optional): Maximum distance in Angstroms between any atom in the molecule
                 and the resulting neighbouring atoms
             threshold (float, optional): tolerance for detecting the neighbouring sites as part of the
@@ -692,7 +692,7 @@ class Crystal:
         atoms surrounding each functional group in each symmetry unique molecule
         in this crystal within the given radius.
 
-        Parameters:
+        Args:
             radius (float, optional): Maximum distance in Angstroms between any atom in the molecule
                 and the resulting neighbouring atoms
             kind (str, optional): the functional group type
@@ -990,7 +990,7 @@ class Crystal:
         Calculate the shape descriptors `[1,2]` for the all atoms in the functional group
         given for all symmetry unique molecules in this crystal.
 
-        Parameters:
+        Args:
             l_max (int, optional): maximum level of angular momenta to include in the spherical harmonic
                 transform of the molecular shape function. (default: 5)
             radius (float, optional): maximum distance (Angstroms) of neighbouring atoms to include in
@@ -1044,7 +1044,7 @@ class Crystal:
         Calculate the molecular shape descriptors `[1,2]` for
         the provided molecule in the crystal.
 
-        Parameters:
+        Args:
             l_max (int, optional): maximum level of angular momenta to include in the spherical harmonic
                 transform of the molecular shape function.
             radius (float, optional): maximum distance (Angstroms) to include surroundings
@@ -1089,7 +1089,7 @@ class Crystal:
         Calculate the molecular shape descriptors[1,2] for all symmetry unique
         molecules in this crystal.
 
-        Parameters:
+        Args:
             l_max (int, optional): maximum level of angular momenta to include in the spherical harmonic
                 transform of the molecular shape function.
             radius (float, optional): maximum distance (Angstroms) to include surroundings
@@ -1136,7 +1136,7 @@ class Crystal:
         Calculate the shape descriptors[1,2] for all symmetry unique
         atoms in this crystal.
 
-        Parameters:
+        Args:
             l_max (int, optional): maximum level of angular momenta to include in the spherical harmonic
                 transform of the molecular shape function.
             radius (float, optional): maximum distance (Angstroms) to include surroundings
@@ -1172,7 +1172,7 @@ class Crystal:
         """Calculate the shape descriptors[1,2] for the given atomic
         group in this crystal.
 
-        Parameters:
+        Args:
             atoms (Tuple): atoms to include in the as the 'inside' of the shape description.
             l_max (int, optional): maximum level of angular momenta to include in the spherical harmonic
                 transform of the molecular shape function.
@@ -1253,7 +1253,7 @@ class Crystal:
         """
         Load a crystal structure from file (.res, .cif)
 
-        Parameters:
+        Args:
             filename (str): the path to the crystal structure file
 
         Returns:
@@ -1500,7 +1500,7 @@ class Crystal:
         """
         Create a supercell of this crystal in space group P 1.
 
-        Parameters:
+        Args:
             supercell (Tuple[int]): size of the supercell to be created
 
         Returns:
@@ -1600,7 +1600,7 @@ class Crystal:
         Change the choice of lattice for this crystal to either
         rhombohedral or hexagonal cell
 
-        Parameters:
+        Args:
             choice (str, optional): The choice of the resulting lattice, either 'H' for hexagonal
                 or 'R' for rhombohedral (default 'H').
         """
@@ -1630,7 +1630,7 @@ class Crystal:
         """
         Create a supercell of this crystal in space group P 1.
 
-        Parameters:
+        Args:
             size (Tuple[int]): size of the P 1 supercell to be created
 
         Returns:
@@ -1689,7 +1689,7 @@ class Crystal:
         pairs surrounding the symmetry_unique_molecules
         in this crystal within the given radius. 
 
-        Parameters:
+        Args:
             radius (float, optional): Maximum distance in Angstroms between any atom in the molecule
                 and the resulting neighbouring atoms
 

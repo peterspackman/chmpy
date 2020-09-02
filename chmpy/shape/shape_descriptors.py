@@ -102,7 +102,7 @@ def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
     Hirshfeld weight i.e. ratio of electron density from the 'interior'
     to the total electron density.
 
-    Parameters:
+    Args:
         sht (SHT): the spherical harmonic transform object handle
         n_i (np.ndarray): atomic numbers of the interior atoms
         p_i (np.ndarray): Cartesian coordinates of the interior atoms
@@ -169,7 +169,7 @@ def promolecule_density_descriptor(sht, n_i, p_i, **kwargs):
     """
     Calculate the shape description of the promolecule density isosurface.
 
-    Parameters:
+    Args:
         sht (SHT): the spherical harmonic transform object handle
         n_i (np.ndarray): atomic numbers of the atoms
         p_i (np.ndarray): Cartesian coordinates of the atoms
