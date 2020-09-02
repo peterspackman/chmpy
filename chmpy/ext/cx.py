@@ -14,8 +14,10 @@ CE_SCALE_FACTORS = {
     "CE-HF": (1.019, 0.651, 0.901, 0.811),
 }
 
+
 def tonto_pair_energy(wavefunctions, transforms, na, nb):
     from tempfile import TemporaryDirectory
+
     (rot_a, shift_a), (rot_b, shift_b) = transforms
     with TemporaryDirectory() as working_directory:
 
@@ -27,10 +29,13 @@ def tonto_pair_energy(wavefunctions, transforms, na, nb):
             name="test",
             idxs_a=f"1 ... {na}",
             idxs_b=f"{na + 1} ... {na + nb}",
-            rot_a=" ".join(str(x) for x in rot_a.T.ravel()), shift_a=" ".join(str(x) for x in shift_a),
-            rot_b=" ".join(str(x) for x in rot_b.T.ravel()), shift_b=" ".join(str(x) for x in shift_b),
-            fchk_a=fchk_a, fchk_b=fchk_b,
-         )
+            rot_a=" ".join(str(x) for x in rot_a.T.ravel()),
+            shift_a=" ".join(str(x) for x in shift_a),
+            rot_b=" ".join(str(x) for x in rot_b.T.ravel()),
+            shift_b=" ".join(str(x) for x in shift_b),
+            fchk_a=fchk_a,
+            fchk_b=fchk_b,
+        )
         LOG.debug("Tonto input:\n%s", input_file)
 
         t = Tonto(input_file, working_directory=working_directory)
@@ -69,34 +74,38 @@ def interaction_energies(c, model="CE-B3LYP", radius=3.8, nthreads=1):
     LOG.debug("Calculating %s model interaction_energies for %s", model, c)
     mols = c.symmetry_unique_molecules()
 
-    for i, mol in tqdm(enumerate(mols), desc="Calculating wavefunctions", total=len(mols)):
+    for i, mol in tqdm(
+        enumerate(mols), desc="Calculating wavefunctions", total=len(mols)
+    ):
         if "fchk_contents" not in mol.properties:
             LOG.debug("Calculating wavefunction for %s", mol)
             mol_at_origin = mol.translated(-mol.centroid)
             input_file = G09_SCF.render(
                 link0={"chk": f"mol_{i}.chk"},
-                method="B3LYP", basis="6-31G(d,p)",
+                method="B3LYP",
+                basis="6-31G(d,p)",
                 route_commands="6d 10f NoSymm",
                 title=f"{mol} wavefunction for chmpy {model} interaction energy",
-                charge=0, multiplicity=1,
+                charge=0,
+                multiplicity=1,
                 geometry=mol_at_origin.to_xyz_string(header=False),
             )
             LOG.warn("G09 input:\n%s", input_file)
             g09 = Gaussian(input_file, run_formchk=f"mol_{i}.chk")
             g09.run()
             mol.properties["fchk_contents"] = g09.fchk_contents
-    
+
     dimers, asym_pair_ids = c.symmetry_unique_dimers(radius=radius)
 
     stdout_contents = []
     args = []
-    
+
     for d in dimers:
         LOG.debug("Calculating pair energy for %s", d)
         asym_a = mols[d.a.properties["asym_mol_idx"]]
         asym_b = mols[d.b.properties["asym_mol_idx"]]
         wfn_a = asym_a.properties["fchk_contents"]
-        wfn_b = asym_b.properties["fchk_contents"] 
+        wfn_b = asym_b.properties["fchk_contents"]
         wavefunctions = (wfn_a, wfn_b)
         mol_fchk_a = Molecule.from_fchk_string(wfn_a)
         mol_fchk_b = Molecule.from_fchk_string(wfn_b)
@@ -117,16 +126,18 @@ def interaction_energies(c, model="CE-B3LYP", radius=3.8, nthreads=1):
 
     with ThreadPoolExecutor(nthreads) as e:
         stdout_contents = list(
-            tqdm(e.map(lambda x: tonto_pair_energy(*x), args), desc="Calculating pair energies", total=len(args))
+            tqdm(
+                e.map(lambda x: tonto_pair_energy(*x), args),
+                desc="Calculating pair energies",
+                total=len(args),
+            )
         )
 
     energies = []
     for stdout in stdout_contents:
         energies.append(parse_tonto_interaction_energies_stdout(stdout))
 
-    df = pd.DataFrame(
-        energies, columns=["E_coul", "E_pol", "E_disp", "E_rep"]
-    )
+    df = pd.DataFrame(energies, columns=["E_coul", "E_pol", "E_disp", "E_rep"])
     scale_factors = CE_SCALE_FACTORS[model]
     df["mol_A"] = [d.a.properties["asym_mol_idx"] for d in dimers]
     df["mol_B"] = [d.b.properties["asym_mol_idx"] for d in dimers]
@@ -135,9 +146,9 @@ def interaction_energies(c, model="CE-B3LYP", radius=3.8, nthreads=1):
     df["d_com"] = [d.com_separation for d in dimers]
     df["symm"] = [d.transform_string() for d in dimers]
     df["E_tot"] = (
-        scale_factors[0]  * df["E_coul"] +
-        scale_factors[1]  * df["E_pol"] +
-        scale_factors[2]  * df["E_disp"] +
-        scale_factors[3]  * df["E_rep"]
+        scale_factors[0] * df["E_coul"]
+        + scale_factors[1] * df["E_pol"]
+        + scale_factors[2] * df["E_disp"]
+        + scale_factors[3] * df["E_rep"]
     )
     return df

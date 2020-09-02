@@ -1,3 +1,4 @@
+"""Isosurfaces for molecules in crystals or isolation."""
 import numpy as np
 from collections import namedtuple
 import time
@@ -11,26 +12,20 @@ LOG = logging.getLogger(__name__)
 def promolecule_density_isosurface(
     promol, isovalue=0.002, sep=0.2, props=True, extra_props=None
 ):
-    """Calculate the promolecule density isosurface for a given :obj:`PromoleculeDensity`
-    object.
+    """Calculate the promolecule density isosurface.
 
-    Parameters
-    ----------
-
-    isovalue: float, optional
-        level set value for the isosurface (default=0.002) in au.
-    separation: float, optional
-        separation between density grid used in the surface calculation
-        (default 0.2) in Angstroms.
-    props: bool, optional
-        calculate surface properties
-    extra_props: dict, optional
-        dictionary of property names and functions of vertex positions
-        for the calculation of additional properties on the isosurface 
-    Returns
-    -------
-    :obj:`IsosurfaceMesh`
-        a namedtuple of vertices, faces, face normals and vertex properties
+    Args:
+        isovalue (float, optional): level set value for the isosurface
+            (default=0.002) in au.
+        separation (float, optional):  separation between density grid
+                used in the surface calculation (default 0.2) in Angstroms.
+        props (bool, optional): calculate surface properties
+        extra_props(dict, optional): dictionary of property names and functions
+            of vertex positions for the calculation of additional properties
+            on the isosurface
+    Returns:
+        IsosurfaceMesh: a namedtuple of vertices, faces,
+            face normals and vertex properties
     """
     t1 = time.time()
     l, u = promol.bb()
@@ -69,27 +64,20 @@ def promolecule_density_isosurface(
 def stockholder_weight_isosurface(
     s, isovalue=0.5, sep=0.2, props=True, extra_props=None
 ):
-    """Calculate the promolecule density isosurface for a given :obj:`StockholderWeight`
-    object.
+    """Calculate stockholder weight (Hirshfeld) surface.
 
-    Parameters
-    ----------
-
-    isovalue: float, optional
-        level set value for the isosurface (default=0.5).
-    separation: float, optional
-        separation between density grid used in the surface calculation
-        (default 0.2) in Angstroms.
-    props: bool, optional
-        calculate surface properties
-    extra_props: dict, optional
-        dictionary of property names and functions of vertex positions
-        for the calculation of additional properties on the isosurface
-        
-    Returns
-    -------
-    :obj:`IsosurfaceMesh`
-        a namedtuple of vertices, faces, face normals and vertex properties
+    Args:
+        isovalue (float, optional): level set value for the isosurface
+            (default=0.5), dimensionless.
+        separation (float, optional):  separation between density grid
+                used in the surface calculation (default 0.2) in Angstroms.
+        props (bool, optional): calculate surface properties
+        extra_props(dict, optional): dictionary of property names and functions
+            of vertex positions for the calculation of additional properties
+            on the isosurface
+    Returns:
+        IsosurfaceMesh: a namedtuple of vertices, faces,
+            face normals and vertex properties
     """
     t1 = time.time()
     l, u = s.bb()

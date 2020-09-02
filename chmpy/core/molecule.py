@@ -300,6 +300,7 @@ class Molecule:
     def from_fchk_string(cls, fchk_contents, **kwargs):
         from chmpy.fmt.fchk import FchkFile
         from chmpy.util.unit import units
+
         fchk = FchkFile(fchk_contents, parse=True)
         elements = np.array(fchk["Atomic numbers"])
         positions = np.array(fchk["Current cartesian coordinates"]).reshape(
@@ -590,8 +591,8 @@ class Molecule:
         dists = self.distance_matrix
 
         for n in range(elements.shape[0]):
-            els = elements[n:n + 1]
-            pos = positions[n:n + 1, :]
+            els = elements[n : n + 1]
+            pos = positions[n : n + 1, :]
             idxs = np.where((dists[n, :] < radius) & (dists[n, :] > 1e-3))[0]
             neighbour_els = elements[idxs]
             neighbour_pos = positions[idxs]
@@ -667,8 +668,8 @@ class Molecule:
         dists = self.distance_matrix
 
         for n in range(elements.shape[0]):
-            els = elements[n:n + 1]
-            pos = positions[n:n + 1, :]
+            els = elements[n : n + 1]
+            pos = positions[n : n + 1, :]
             idxs = np.where((dists[n, :] < radius) & (dists[n, :] > 1e-3))[0]
             neighbour_els = elements[idxs]
             neighbour_pos = positions[idxs]
@@ -864,6 +865,7 @@ class Molecule:
             Molecule: a new copy of this `Molecule` rotated by the given rotation matrix.
         """
         from copy import deepcopy
+
         result = deepcopy(self)
         result.rotate(rotation, origin=origin)
         return result
@@ -924,6 +926,7 @@ class Molecule:
         """
 
         from copy import deepcopy
+
         result = deepcopy(self)
         result.transform(rotation=rotation, translation=translation)
         return result
@@ -997,9 +1000,9 @@ class Molecule:
     @classmethod
     def from_pdb_file(cls, filename, **kwargs):
         from chmpy.fmt.pdb import Pdb
+
         p = Pdb.from_file(filename)
         xyz = np.c_[p.data["x"], p.data["y"], p.data["z"]]
         elements = [Element[x] for x in p.data["element"]]
         print(p.data["heteroatom"])
         return cls(elements, xyz)
-

@@ -298,8 +298,8 @@ class UnitCell:
     def alpha_star(self) -> float:
         "Angle between reciprocal lattice vectors b* and c*"
         return np.arccos(
-            (np.cos(self.beta) * np.cos(self.gamma) - np.cos(self.alpha)) /
-            (np.sin(self.beta) * np.sin(self.gamma))
+            (np.cos(self.beta) * np.cos(self.gamma) - np.cos(self.alpha))
+            / (np.sin(self.beta) * np.sin(self.gamma))
         )
 
     @property
@@ -331,8 +331,8 @@ class UnitCell:
     def beta_star(self) -> float:
         "Angle between reciprocal lattice vectors a* and c*"
         return np.arccos(
-            (np.cos(self.alpha) * np.cos(self.gamma) - np.cos(self.beta)) /
-            (np.sin(self.alpha) * np.sin(self.gamma))
+            (np.cos(self.alpha) * np.cos(self.gamma) - np.cos(self.beta))
+            / (np.sin(self.alpha) * np.sin(self.gamma))
         )
 
     @property
@@ -364,8 +364,8 @@ class UnitCell:
     def gamma_star(self) -> float:
         "Angle between reciprocal lattice vectors a* and c*"
         return np.arccos(
-            (np.cos(self.alpha) * np.cos(self.beta) - np.cos(self.gamma)) /
-            (np.sin(self.alpha) * np.sin(self.beta))
+            (np.cos(self.alpha) * np.cos(self.beta) - np.cos(self.gamma))
+            / (np.sin(self.alpha) * np.sin(self.beta))
         )
 
     @property
@@ -554,10 +554,12 @@ class UnitCell:
         assert len(lengths) == 3, "Requre three lengths for Orthorhombic cell"
         return cls(np.diag(lengths))
 
-    def as_rhombohedral(self, T=((-1/3, 1/3, 1/3), (2/3, 1/3, 1/3), (-1/3, -2/3, 1/3))):
+    def as_rhombohedral(
+        self, T=((-1 / 3, 1 / 3, 1 / 3), (2 / 3, 1 / 3, 1 / 3), (-1 / 3, -2 / 3, 1 / 3))
+    ):
         if not (self.is_hexagonal):
             raise ValueError("Only hexagonal cells can be converted to rhombohedral")
-        T = np.array(T) 
+        T = np.array(T)
         return UnitCell(np.dot(T, self.direct))
 
     def as_hexagonal(self, T=((-1, 1, 0), (1, 0, -1), (1, 1, 1))):

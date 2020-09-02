@@ -14,8 +14,7 @@ class PowderPattern:
         )
         self.bins = kwargs.get("bins", 1000)
         self.bin_edges, self.bin_heights = np.histogram(
-            self.two_theta, bins=self.bins, weights=self.f2,
-            range=self.two_theta_range
+            self.two_theta, bins=self.bins, weights=self.f2, range=self.two_theta_range
         )
 
     def plot(self, ax=None, **kwargs):

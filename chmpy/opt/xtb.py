@@ -1,4 +1,4 @@
-from chmpy import Element, Crystal, Molecule
+from chmpy import Crystal, Molecule
 from collections.abc import Iterable
 from chmpy.exe.xtb import Xtb
 from chmpy.exe import ReturnCodeError, TimeoutExpired
@@ -10,6 +10,7 @@ import logging
 import time
 from tempfile import TemporaryDirectory
 import re
+import numpy as np
 
 LOG = logging.getLogger(__name__)
 NUMERIC_CONST_PATTERN = r"[-+]?(?:(?:\d*\.\d+)|(?:\d+\.?))(?:[Ee][+-]?\d+)?"
@@ -37,7 +38,7 @@ class XtbOptimizer:
         self.gfn = gfn
         gfnstr = "" if str(gfn) == "1" else str(gfn)
         xtb_param_file = self.xtb_param_fmt.format(gfnstr)
-        self.param_file_loc = os.path.join(xtb_path, xtb_param_file)
+        self.param_file_loc = join(xtb_path, xtb_param_file)
         home_param = exists(self.param_file_loc)
         LOG.warn("Found %s: %s", self.param_file_loc, home_param)
         if not home_param:

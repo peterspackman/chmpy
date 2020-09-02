@@ -78,7 +78,8 @@ UNIQUE_REFLECTION_TYPES = {
 def hklmax(uc, dmin):
     return (np.array(uc.lengths) / dmin).astype(int)
 
-def reflections(crystal, wavelength=LAMBDA_Cu, dmin=LAMBDA_Cu/2):
+
+def reflections(crystal, wavelength=LAMBDA_Cu, dmin=LAMBDA_Cu / 2):
     """Calculate the unique reflections contributing to 
     diffraction for the given crystal, along with the q
     vector at the provided wavelength"""
@@ -95,22 +96,22 @@ def reflections(crystal, wavelength=LAMBDA_Cu, dmin=LAMBDA_Cu/2):
     ):
         raise NotImplementedError("Rhombohedral crystals not currently supported")
 
-#   apexes, bases = zip(*UNIQUE_REFLECTION_TYPES[(laue_class, centering)])
-#   h_range = np.r_[0: h_max + 1]
-#   k_range = np.r_[0: k_max + 1]
-#   l_range = np.r_[0: l_max + 1]
-#   sections = []
-#   for a, b in zip(apexes, bases):
-#       v1 = np.r_[b[0][0], b[0][1], b[0][2]]
-#       v2 = np.r_[b[1][0], b[1][1], b[1][2]]
-#       v3 = np.r_[b[2][0], b[2][1], b[2][2]]
-#       hkl = v1 * h_range[:, None]
-#       hkl = hkl + (v2 * k_range[:, None])[:, None]
-#       hkl = hkl + (v3 * l_range[:, None, None])[:, None, None]
-#       hkl = hkl.reshape(-1, 3)
-#       hkl += a
-#       sections.append(hkl)
-#   hkl = np.vstack(sections)
+    #   apexes, bases = zip(*UNIQUE_REFLECTION_TYPES[(laue_class, centering)])
+    #   h_range = np.r_[0: h_max + 1]
+    #   k_range = np.r_[0: k_max + 1]
+    #   l_range = np.r_[0: l_max + 1]
+    #   sections = []
+    #   for a, b in zip(apexes, bases):
+    #       v1 = np.r_[b[0][0], b[0][1], b[0][2]]
+    #       v2 = np.r_[b[1][0], b[1][1], b[1][2]]
+    #       v3 = np.r_[b[2][0], b[2][1], b[2][2]]
+    #       hkl = v1 * h_range[:, None]
+    #       hkl = hkl + (v2 * k_range[:, None])[:, None]
+    #       hkl = hkl + (v3 * l_range[:, None, None])[:, None, None]
+    #       hkl = hkl.reshape(-1, 3)
+    #       hkl += a
+    #       sections.append(hkl)
+    #   hkl = np.vstack(sections)
     h, k, l = np.mgrid[-h_max:h_max, -k_max:k_max, -l_max:l_max]
     hkl = np.c_[h.ravel(), k.ravel(), l.ravel()]
     G = hkl @ recip
@@ -124,7 +125,7 @@ def powder_pattern(crystal, wavelength=LAMBDA_Cu, two_theta_range=(5, 50)):
     over a given range of 2-theta"""
     sfac = structure_factors(crystal, wavelength=wavelength)
     hkl, G, q, sfac, norm = sfac
-    f2 = np.abs(sfac) 
+    f2 = np.abs(sfac)
     f2 = f2 * f2 / norm
     theta = np.arcsin(wavelength * q / 2)
     two_theta = 2 * theta
@@ -154,7 +155,9 @@ def structure_factors(crystal, wavelength=LAMBDA_Cu):
     unique_indices = set(asym_sfac_idx)
     sintl = q / 2
     sintl2 = sintl * sintl
-    scattering_factors = {i: _sfac.scattering_factors(i, sintl2) for i in unique_indices}
+    scattering_factors = {
+        i: _sfac.scattering_factors(i, sintl2) for i in unique_indices
+    }
     frac_pos = uc["frac_pos"]
     exp_fac = np.zeros(hkl.shape[0], dtype=np.complex128)
     exp_fac.imag = 2 * np.pi

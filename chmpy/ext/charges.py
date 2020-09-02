@@ -29,6 +29,7 @@ EEM_PARAMETERS = {
 
 class EEM:
     "Class to handle calculation of electronegativity equilibration method charges"
+
     @staticmethod
     def calculate_charges(mol):
         """

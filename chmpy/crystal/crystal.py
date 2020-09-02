@@ -433,6 +433,7 @@ class Crystal:
         # sort by % of identity symop
         def order(x):
             return len(np.where(x.asym_symops == 16484)[0]) / len(x)
+
         for i, mol in enumerate(sorted(uc_molecules, key=order, reverse=True)):
             asym_atoms_in_g = np.unique(mol.properties["asymmetric_unit_atoms"])
             if np.all(asym_atoms[asym_atoms_in_g]):
@@ -453,10 +454,14 @@ class Crystal:
             else:
                 for asym_mol in molecules:
                     if np.all(mol.properties[ak] == asym_mol.properties[ak]):
-                        mol.properties["asym_mol_idx"] = asym_mol.properties["asym_mol_idx"]
+                        mol.properties["asym_mol_idx"] = asym_mol.properties[
+                            "asym_mol_idx"
+                        ]
                         break
                 else:
-                    LOG.warn("No equivalent asymmetric unit molecule found!? -- this should not happen!")
+                    LOG.warn(
+                        "No equivalent asymmetric unit molecule found!? -- this should not happen!"
+                    )
         return molecules
 
     def slab(self, bounds=((-1, -1, -1), (1, 1, 1))) -> dict:
@@ -507,8 +512,8 @@ class Crystal:
         pos = np.empty((ncells * n_uc, 3), dtype=np.float64)
         slab_cells = np.empty((ncells * n_uc, 3), dtype=np.float64)
         for i, cell in enumerate(cells):
-            pos[i * n_uc:(i + 1) * n_uc, :] = uc_pos + cell
-            slab_cells[i * n_uc:(i + 1) * n_uc] = cell
+            pos[i * n_uc : (i + 1) * n_uc, :] = uc_pos + cell
+            slab_cells[i * n_uc : (i + 1) * n_uc] = cell
         slab_dict = {
             k: np.tile(v, ncells) for k, v in uc_atoms.items() if not k.endswith("pos")
         }
@@ -1339,9 +1344,7 @@ class Crystal:
                     space_group = new_sg
                 except ValueError:
                     space_group.symmetry_operations = symops
-                    symbol = cif_data.get(
-                        "symmetry_space_group_name_H-M", "Unknown"
-                    )
+                    symbol = cif_data.get("symmetry_space_group_name_H-M", "Unknown")
                     space_group.international_tables_number = number
                     space_group.symbol = symbol
                     space_group.full_symbol = symbol
@@ -1412,6 +1415,7 @@ class Crystal:
     @classmethod
     def from_crystal17_opt_string(cls, string, **kwargs):
         from chmpy.fmt.crystal17 import load_crystal17_geometry_string
+
         data = load_crystal17_geometry_string(string)
         unit_cell = UnitCell(data["direct"])
         space_group = SpaceGroup.from_symmetry_operations(data["symmetry_operations"])
@@ -1679,7 +1683,10 @@ class Crystal:
         i = self.unit_cell.inverse
         for symop in self.symmetry_operations:
             cart_symops.append(
-                (np.dot(d.T,  np.dot(symop.rotation, i.T)).T, self.to_cartesian(symop.translation))
+                (
+                    np.dot(d.T, np.dot(symop.rotation, i.T)).T,
+                    self.to_cartesian(symop.translation),
+                )
             )
         return cart_symops
 
@@ -1701,6 +1708,7 @@ class Crystal:
         from chmpy.core.dimer import Dimer
         from copy import deepcopy
         from collections import defaultdict
+
         hklmax = np.array([-np.inf, -np.inf, -np.inf])
         hklmin = np.array([np.inf, np.inf, np.inf])
         frac_radius = radius / np.array(self.unit_cell.lengths)
@@ -1717,7 +1725,12 @@ class Crystal:
         )
 
         shifts = self.to_cartesian(shifts_frac)
-        LOG.debug("Looking in %d neighbouring cells: %s : %s", len(shifts), hklmin.astype(int), hklmax.astype(int))
+        LOG.debug(
+            "Looking in %d neighbouring cells: %s : %s",
+            len(shifts),
+            hklmin.astype(int),
+            hklmax.astype(int),
+        )
         all_dimers = []
         mol_dimers = []
         for mol_a in self.symmetry_unique_molecules():
@@ -1727,10 +1740,13 @@ class Crystal:
                     # shift_frac assumes the molecule is generated from the [0, 0, 0] cell, it's not
                     mol_bt = mol_b.translated(shift)
                     r = mol_a.distance_to(mol_bt, method=distance_method)
-                    if r > 1e-1 and r < radius: 
+                    if r > 1e-1 and r < radius:
                         d = Dimer(
-                            mol_a, mol_bt, separation=r, transform_ab="calculate",
-                            frac_shift=shift_frac
+                            mol_a,
+                            mol_bt,
+                            separation=r,
+                            transform_ab="calculate",
+                            frac_shift=shift_frac,
                         )
                         for i, dimer in enumerate(all_dimers):
                             if dimer.separation <= d.separation + 1e-3:
