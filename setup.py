@@ -85,7 +85,7 @@ setup(
     },
     ext_modules=ext_modules,
     entry_points={"console_scripts": ["chmpy-convert= chmpy.cmd.convert:main",]},
-    install_requires=["numpy", "scipy", "trimesh", "matplotlib"],
+    install_requires=["numpy", "scipy", "trimesh", "matplotlib", "seaborn"],
     extras_require={"sht": ["shtns"], "graph": ["graph_tool"],},
     zip_safe=True,
 )
