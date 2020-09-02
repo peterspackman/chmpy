@@ -19,3 +19,36 @@ plugins:
 
 markdown_extensions:
     - codehilite
+
+nav:
+    - Home: index.md
+    - Overview: 
+        - Shape Descriptors: shape_descriptors.md
+        - Notes on Parallelization: parallel.md
+    - Programming Interface (API):
+        - Core Interface:
+            - Crystal: API/crystal/crystal.md
+            - Molecule: API/core/molecule.md
+        - Crystal:
+            - Crystal: API/crystal/crystal.md
+            - Space Groups: API/crystal/space_group.md
+            - Symmetry Operations: API/crystal/symmetry_operation.md
+            - Unit Cell: API/crystal/unit_cell.md
+            - Asymmetric Unit: API/crystal/asymmetric_unit.md
+            - Elastic Tensors: API/ext/elastic_tensor.md
+        - Chemical Data:
+            - Element: API/core/element.md
+        - Shape Descriptors: 
+            - Shape Descriptors: API/shape_descriptors.md
+        - Sampling:
+            - Quasirandom Sampling: API/sampling.md
+        - Extensions:
+            - EEM Charges: API/ext/charges.md
+        - Utilities:
+            - Colors: API/util/color.md
+            - Numerics: API/util/num.md
+            - Text: API/util/text.md
+            - Meshes: API/util/mesh.md
+            - Dictionaries: API/util/dict.md
+
+
