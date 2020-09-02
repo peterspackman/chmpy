@@ -126,7 +126,7 @@ class Molecule:
         self.bonds = dok_matrix(self.bonds)
         try:
             self.bond_graph()
-        except ImportError:
+        except Exception:
             pass
 
     def connected_fragments(self) -> List:
