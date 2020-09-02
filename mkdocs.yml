@@ -1,4 +1,5 @@
 site_name: chmpy
+site_url: https://peterspackman.github.io/chmpy/
 
 theme:
     name: "material"
