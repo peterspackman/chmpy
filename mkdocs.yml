@@ -1,8 +1,12 @@
 site_name: chmpy
 site_url: https://peterspackman.github.io/chmpy/
+repo_name: peterspackman/chmpy
 
 theme:
-    name: "material"
+    name: material
+    palette:
+        primary: light green
+        scheme: default
 
 plugins:
     - search
