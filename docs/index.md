@@ -29,7 +29,7 @@ file, or a molecule from an XMOL (``.xyz``) file is straightforward:
 
 ``` python
 >>> from chmpy import Crystal, Molecule
->>> c = Crystal.load("tests/acetic_acid.cif")
+>>> c = Crystal.load("tests/test_files/acetic_acid.cif")
 >>> c
 <Crystal C2H4O2 Pna2_1>
 
@@ -37,7 +37,7 @@ file, or a molecule from an XMOL (``.xyz``) file is straightforward:
 >>> c.symmetry_unique_molecules()
 [<Molecule: C2H4O2(2.12,1.15,0.97)>]
 
->>> m = Molecule.load("tests/water.xyz")
+>>> m = Molecule.load("tests/test_files/water.xyz")
 >>> m
 <Molecule: H2O(-0.67,-0.00,0.01)>
 ```
@@ -66,6 +66,6 @@ class:
 # Surfaces can be saved via trimesh
 >>> surfaces[0].export("acetic_acid_trimesh.ply", "ply")
 # or a utility function provided in chmpy
->>> from chmpy.util import save_mesh
+>>> from chmpy.util.mesh import save_mesh
 >>> save_mesh(surfaces[0], "acetic_acid.ply")
 ```

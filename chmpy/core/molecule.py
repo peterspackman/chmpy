@@ -297,6 +297,39 @@ class Molecule:
         return cls.from_xyz_string(Path(filename).read_text(), **kwargs)
 
     @classmethod
+    def from_turbomole_string(cls, contents, **kwargs):
+        """
+        Construct a molecule from the provided turbomole file contents. kwargs
+        will be passed through to the Molecule constructor.
+
+        Args:
+            contents (str): the contents of the .xyz file to read
+            kwargs: keyword arguments passed ot the `Molecule` constructor
+
+        Returns:
+            Molecule: A new `Molecule` object
+        """
+        from chmpy.fmt.tmol import parse_tmol_string
+
+        elements, positions = parse_tmol_string(contents)
+        return cls(elements, np.asarray(positions), **kwargs)
+
+    @classmethod
+    def from_turbomole_file(cls, filename, **kwargs):
+        """
+        Construct a molecule from the provided turbomole file. kwargs
+        will be passed through to the Molecule constructor.
+
+        Args:
+            filename (str): the path to the .xyz file
+            kwargs: keyword arguments passed ot the `Molecule` constructor
+
+        Returns:
+            Molecule: A new `Molecule` object
+        """
+        return cls.from_turbomole_string(Path(filename).read_text(), **kwargs)
+
+    @classmethod
     def from_fchk_string(cls, fchk_contents, **kwargs):
         from chmpy.fmt.fchk import FchkFile
         from chmpy.util.unit import units
@@ -319,6 +352,7 @@ class Molecule:
             ".xyz": cls.from_xyz_file,
             ".sdf": cls.from_sdf_file,
             ".fchk": cls.from_fchk_file,
+            ".coord": cls.from_turbomole_file,
         }
 
     @classmethod

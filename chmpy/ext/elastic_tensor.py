@@ -13,8 +13,6 @@ See the page, and the source here:
 import numpy as np
 from scipy import optimize
 import random
-import matplotlib.pyplot as plt
-import seaborn as sns
 
 
 def angles_to_cartesian(theta, phi):
@@ -58,7 +56,7 @@ class ElasticTensor:
     """
 
     def __init__(self, mat):
-        mat = np.asarray(mat)
+        mat = np.asarray(mat, dtype=np.float64)
         if mat.shape != (6, 6):
             # Is it upper triangular?
             if list(map(len, mat)) == [6, 5, 4, 3, 2, 1]:
@@ -202,6 +200,8 @@ class ElasticTensor:
         }
 
     def plot2d(self, kind="youngs_modulus", axis="xy", npoints=100, **kwargs):
+        import matplotlib.pyplot as plt
+        import seaborn as sns
         u = np.linspace(0, np.pi * 2, npoints)
         v = np.zeros_like(u)
         f = getattr(self, kind + "_angular")
