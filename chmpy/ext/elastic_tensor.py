@@ -267,7 +267,10 @@ class ElasticTensor:
         sht = SHT(l_max=l_max)
         f = getattr(self, kind)
         points = sht.grid_cartesian
-        coeffs = sht.analyse(f(points))
+        vals = f(points)
+        if kwargs.get("normalize", False):
+            vals = vals / self.spackman_average(kind=kind)
+        coeffs = sht.analyse(vals)
         invariants = make_invariants(l_max, coeffs)
         if kwargs.get("coefficients", False):
             return coeffs, invariants
