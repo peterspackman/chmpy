@@ -6,11 +6,16 @@ from chmpy.util.path import dir_exists_or_is_creatable, path_exists_or_is_creata
 from pathlib import Path
 from subprocess import PIPE, Popen, TimeoutExpired, CalledProcessError, CompletedProcess
 import signal
+import sys
 
 
 LOG = logging.getLogger(__name__)
 ABC = abc.ABCMeta("ABC", (object,), {})
 
+if sys.platform == "win32":
+    _SIGNAL = None
+else:
+    _SIGNAL = signal.SIGKILL
 
 def run_subprocess(
     *popenargs,
@@ -18,7 +23,7 @@ def run_subprocess(
     capture_output=None,
     timeout=None,
     check=False,
-    signal=signal.SIGKILL,
+    signal=_SIGNAL,
     **kwargs,
 ):
     if input is not None:
@@ -38,11 +43,17 @@ def run_subprocess(
         try:
             stdout, stderr = process.communicate(input, timeout=timeout)
         except TimeoutExpired:
-            process.send_signal(signal)
+            if signal is None:
+                os.kill(process.pid)
+            else:
+                process.send_signal(signal)
             stdout, stderr = process.communicate()
             raise TimeoutExpired(process.args, timeout, output=stdout, stderr=stderr)
         except:
-            process.send_signal(signal)
+            if signal is None:
+                os.kill(process.pid)
+            else:
+                process.send_signal(signal)
             raise
         retcode = process.poll()
         if check and retcode:
