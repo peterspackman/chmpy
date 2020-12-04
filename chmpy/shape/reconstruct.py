@@ -20,7 +20,7 @@ def reconstruct(coefficients, real=True):
     return pts
 
 
-def reconstructed_surface(coefficients, real=True):
+def reconstructed_surface(coefficients, real=True, subdivisions=3):
     if real:
         n = len(coefficients)
         l_max = int((-3 + np.sqrt(8 * n + 1)) // 2)
@@ -31,7 +31,7 @@ def reconstructed_surface(coefficients, real=True):
     sht = SHT(l_max=l_max)
 
     from trimesh.creation import icosphere
-    sphere = icosphere(subdivisions=3)
+    sphere = icosphere(subdivisions=subdivisions)
     rtp = cartesian_to_spherical(sphere.vertices)
     for i in range(rtp.shape[0]):
         cost = np.cos(rtp[i, 2])
