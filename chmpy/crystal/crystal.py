@@ -1088,7 +1088,7 @@ class Crystal:
         )
 
     def molecular_shape_descriptors(
-        self, l_max=5, radius=6.0, with_property=None
+        self, l_max=5, radius=6.0, with_property=None, return_coefficients=False
     ) -> np.ndarray:
         """
         Calculate the molecular shape descriptors[1,2] for all symmetry unique
@@ -1100,6 +1100,7 @@ class Crystal:
             radius (float, optional): maximum distance (Angstroms) to include surroundings
                 in the shape description
             with_property (str, optional): name of the surface property to include in the shape description
+            return_coefficients (bool, optional): also return the spherical harmonic coefficients
 
         Returns:
             shape description vector
@@ -1113,6 +1114,7 @@ class Crystal:
         ```
         """
         descriptors = []
+        coeffs = []
         from chmpy.shape import SHT, stockholder_weight_descriptor
 
         sph = SHT(l_max=l_max)
@@ -1122,21 +1124,29 @@ class Crystal:
             c = np.array(mol.centroid, dtype=np.float32)
             dists = np.linalg.norm(mol.positions - c, axis=1)
             bounds = np.min(dists) / 2, np.max(dists) + 10.0
-            descriptors.append(
-                stockholder_weight_descriptor(
-                    sph,
-                    mol.atomic_numbers,
-                    mol.positions,
-                    neighbour_els,
-                    neighbour_pos,
-                    origin=c,
-                    bounds=bounds,
-                    with_property=with_property,
-                )
+            descriptor = stockholder_weight_descriptor(
+                sph,
+                mol.atomic_numbers,
+                mol.positions,
+                neighbour_els,
+                neighbour_pos,
+                origin=c,
+                bounds=bounds,
+                with_property=with_property,
+                coefficients=return_coefficients
             )
-        return np.asarray(descriptors)
 
-    def atomic_shape_descriptors(self, l_max=5, radius=3.8) -> np.ndarray:
+            if return_coefficients:
+                coeffs.append(descriptor[0])
+                descriptors.append(descriptor[1])
+            else:
+                descriptors.append(descriptor)
+        if return_coefficients:
+            return np.asarray(coeffs), np.asarray(descriptors)
+        else:
+            return np.asarray(descriptors)
+
+    def atomic_shape_descriptors(self, l_max=5, radius=3.8, return_coefficients=False) -> np.ndarray:
         """
         Calculate the shape descriptors[1,2] for all symmetry unique
         atoms in this crystal.
@@ -1146,6 +1156,7 @@ class Crystal:
                 transform of the molecular shape function.
             radius (float, optional): maximum distance (Angstroms) to include surroundings
                 in the shape description
+            return_coefficients (bool, optional): also return the spherical harmonic coefficients
 
         Returns:
             shape description vector
@@ -1159,6 +1170,7 @@ class Crystal:
         ```
         """
         descriptors = []
+        coeffs = []
         from chmpy.shape import SHT, stockholder_weight_descriptor
 
         sph = SHT(l_max=l_max)
@@ -1166,12 +1178,19 @@ class Crystal:
             radius=radius
         ):
             ubound = Element[n].vdw_radius * 3
-            descriptors.append(
-                stockholder_weight_descriptor(
-                    sph, [n], [pos], neighbour_els, neighbour_pos, bounds=(0.2, ubound)
-                )
+            desc = stockholder_weight_descriptor(
+                sph, [n], [pos], neighbour_els, neighbour_pos, bounds=(0.2, ubound),
+                coefficients=return_coefficients
             )
-        return np.asarray(descriptors)
+            if return_coefficients:
+                descriptors.append(desc[1])
+                coeffs.append(desc[0])
+            else:
+                descriptors.append(desc)
+        if return_coefficients:
+            return np.asarray(coeffs), np.asarray(descriptors)
+        else:
+            return np.asarray(descriptors)
 
     def atom_group_shape_descriptors(self, atoms, l_max=5, radius=3.8) -> np.ndarray:
         """Calculate the shape descriptors[1,2] for the given atomic
@@ -1208,6 +1227,17 @@ class Crystal:
                 sph, *inside, *outside, origin=c, bounds=bounds
             )
         )
+
+    def shape_descriptors(self, kind="molecular", **kwargs):
+        k = kind.lower()
+        if k == "molecular":
+            return self.molecular_shape_descriptors(**kwargs)
+        elif k == "molecule":
+            return self.molecule_shape_descriptors(**kwargs)
+        elif k == "atomic":
+            return self.atomic_shape_descriptors(**kwargs)
+        elif k == "atom group":
+            return self.atom_group_shape_descriptors(**kwargs)
 
     @property
     def site_labels(self):

@@ -69,6 +69,30 @@ def spherical_to_cartesian(rtp: np.ndarray, dtype=np.float64) -> np.ndarray:
 
     return xyz
 
+def cartesian_to_spherical(xyz: np.ndarray, dtype=np.float64) -> np.ndarray:
+    """
+    Given an N by 3 array of (x, y, z) spherical coordinates
+    return an N by 3 array of Cartesian(r, theta, phi) coordinates.
+
+    Uses the following convention::
+
+        x = r sin(theta) cos(phi)
+        y = r sin(theta) sin(phi)
+        z = r cos(theta)
+
+    Args:
+        rtp (array_like): (N,3) array of of r, theta, phi coordinates
+            in the above spherical coordinate system.
+        dtype: numpy datatype or string
+
+    Returns:
+        np.ndarray: (N,3) array of x,y,z Cartesian coordinates
+    """
+    rtp = np.empty(xyz.shape, dtype=dtype)
+    rtp[:, 0] = np.sqrt(xyz[:, 0] * xyz[:, 0] + xyz[:, 1] * xyz[:, 1] + xyz[:, 2] * xyz[:, 2]);
+    rtp[:, 1] = np.fmod(np.arctan2(xyz[:, 1], xyz[:, 0]) + 4 * np.pi, 2 * np.pi)
+    rtp[:, 2] = np.arccos(xyz[:, 2] / rtp[:, 0])
+    return rtp
 
 def rmsd_points(A, B, reorient="kabsch"):
     """

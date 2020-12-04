@@ -237,7 +237,8 @@ class ElasticTensor:
         sns.despine(ax=ax, offset=0)
         ax.spines["bottom"].set_position("zero")
         ax.spines["left"].set_position("zero")
-        ax.grid("minor", color="#BBBBBB", linewidth=0.5)
+        if kwargs.get("grid", False):
+            ax.grid("minor", color="#BBBBBB", linewidth=0.5)
         zero_tick = (len(ax.get_xticks()) - 1) // 2
         for tick in ax.get_xticklabels():
             tick.set_fontname(font)
