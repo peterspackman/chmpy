@@ -1146,7 +1146,7 @@ class Crystal:
         else:
             return np.asarray(descriptors)
 
-    def atomic_shape_descriptors(self, l_max=5, radius=3.8, return_coefficients=False) -> np.ndarray:
+    def atomic_shape_descriptors(self, l_max=5, radius=6.0, return_coefficients=False) -> np.ndarray:
         """
         Calculate the shape descriptors[1,2] for all symmetry unique
         atoms in this crystal.
@@ -1192,7 +1192,7 @@ class Crystal:
         else:
             return np.asarray(descriptors)
 
-    def atom_group_shape_descriptors(self, atoms, l_max=5, radius=3.8) -> np.ndarray:
+    def atom_group_shape_descriptors(self, atoms, l_max=5, radius=6.0) -> np.ndarray:
         """Calculate the shape descriptors[1,2] for the given atomic
         group in this crystal.
 

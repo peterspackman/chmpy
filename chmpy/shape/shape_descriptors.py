@@ -136,6 +136,8 @@ def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
     g[:, :] = sht.grid[:, :]
     o = kwargs.get("origin", np.mean(p_i, axis=0, dtype=np.float32))
     r = sphere_stockholder_radii(s.s, o, g, r_min, r_max, 1e-7, 30, isovalue)
+    if np.any(r < 0):
+        raise ValueError(f"Unable to find isovalue {isovalue:.2f} in all directions for bounds ({r_min:.2f}, {r_max:.2f})")
     real = True
     if property_function is not None:
         if property_function == "d_norm":
@@ -198,6 +200,8 @@ def promolecule_density_descriptor(sht, n_i, p_i, **kwargs):
     g[:, :] = sht.grid[:, :]
     o = kwargs.get("origin", np.mean(p_i, axis=0, dtype=np.float32))
     r = sphere_promolecule_radii(pro.dens, o, g, r_min, r_max, 1e-7, 30, isovalue)
+    if np.any(r < 0):
+        raise ValueError(f"Unable to find isovalue {isovalue:.2f} in all directions for bounds ({r_min:.2f}, {r_max:.2f})")
     real = True
     if property_function is not None:
         if property_function == "d_norm":
