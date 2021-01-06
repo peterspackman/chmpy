@@ -29,6 +29,32 @@ SG_FROM_NUMBER = {k: [_sgdata._make(x) for x in v] for k, v in _sgdata_dict.item
 
 SG_FROM_SYMOPS = {tuple(x.symops): x for k, sgs in SG_FROM_NUMBER.items() for x in sgs}
 SG_CHOICES = {int(k): [x.choice for x in v] for k, v in SG_FROM_NUMBER.items()}
+SG_DEFAULT_SETTING_CHOICE = {
+    48: '2',
+    50: '2',
+    59: '2',
+    68: '2',
+    70: '2',
+    85: '2',
+    88: '2',
+    86: '2',
+    125: '2',
+    126: '2',
+    129: '2',
+    130: '2',
+    133: '2',
+    134: '2',
+    137: '2',
+    138: '2',
+    141: '2',
+    142: '2',
+    201: '2',
+    203: '2',
+    222: '2',
+    224: '2',
+    227: '2',
+    228: '2',
+}
 
 
 class SpaceGroup:
@@ -52,6 +78,8 @@ class SpaceGroup:
         if international_tables_number < 1 or international_tables_number > 230:
             raise ValueError("Space group number must be between [1, 230]")
         self.international_tables_number = international_tables_number
+        if international_tables_number in SG_DEFAULT_SETTING_CHOICE and not choice:
+            choice = SG_DEFAULT_SETTING_CHOICE[international_tables_number]
         if not choice:
             sgdata = SG_FROM_NUMBER[str(international_tables_number)][0]
         else:
