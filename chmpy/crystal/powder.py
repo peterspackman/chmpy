@@ -12,7 +12,7 @@ class PowderPattern:
         self.source = kwargs.get(
             "source", "unknown" if self.wavelength != LAMBDA_Cu else "Cu"
         )
-        self.bins = kwargs.get("bins", 1000)
+        self.bins = kwargs.get("bins", (self.two_theta_range[1] - self.two_theta_range[0]) * 10)
         self.bin_edges, self.bin_heights = np.histogram(
             self.two_theta, bins=self.bins, weights=self.f2, range=self.two_theta_range
         )
@@ -20,10 +20,13 @@ class PowderPattern:
     def plot(self, ax=None, **kwargs):
         if ax is None:
             ax = plt.gca()
-        ax.hist(self.two_theta, bins=self.bins, weights=self.f2)
+        ax.hist(self.two_theta, bins=self.bins, weights=self.f2, range=self.two_theta_range)
         ax.set_xlabel(kwargs.get("xlabel", r"2$\theta$"))
         ax.set_ylabel(kwargs.get("ylabel", r"Intensity"))
         ax.set_title(
             kwargs.get("title", f"Powder pattern in range {self.two_theta_range}")
         )
         return ax
+
+    def binned(self):
+        return np.histogram(self.two_theta, bins=self.bins, weights=self.f2, range=self.two_theta_range)
