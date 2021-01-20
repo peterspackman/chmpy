@@ -19,6 +19,8 @@ def property_to_color(prop, cmap="viridis", **kwargs):
     Args:
         prop (array_like): the scalar array of property values
         cmap (str): the color map name or property name
+        vmin (float): the minimum value of the property color scale
+        vmax (float): the maximum value of the property color scale
         kwargs (dict): optional keyword arguments
 
     Returns:
@@ -29,17 +31,19 @@ def property_to_color(prop, cmap="viridis", **kwargs):
     midpoint = kwargs.get("midpoint", 0.0 if cmap in ("d_norm", "esp") else None)
     colormap = get_cmap(kwargs.get("colormap", DEFAULT_COLORMAPS.get(cmap, cmap)))
     norm = None
+    vmin = kwargs.get("vmin", prop.min())
+    vmax = kwargs.get("vmax", prop.max())
     if midpoint is not None:
         try:
             from matplotlib.colors import TwoSlopeNorm
         except ImportError:
             from matplotlib.colors import DivergingNorm as TwoSlopeNorm
-        vmin = prop.min()
-        vmax = prop.max()
-        if vmin >= 0.0:
-            vmin = -1.0
-        if vmax <= 0.0:
-            vmax = 1.0
+        assert(vmin <= midpoint)
+        assert(vmax >= midpoint)
         norm = TwoSlopeNorm(vmin=vmin, vcenter=midpoint, vmax=vmax)
         prop = norm(prop)
-    return colormap(prop)
+        return colormap(prop)
+    else:
+        import numpy as np
+        prop = np.clip(prop, vmin, vmax) - vmin
+        return colormap(prop)

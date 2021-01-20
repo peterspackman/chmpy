@@ -221,6 +221,14 @@ class Molecule:
             self._partial_charges = charges.astype(np.float32)
         return self._partial_charges
 
+    @partial_charges.setter
+    def partial_charges(self, charges):
+        self._partial_charges = charges
+
+    @partial_charges.deleter
+    def partial_charges(self):
+        del self._partial_charges
+
     def electrostatic_potential(self, positions) -> np.ndarray:
         """
         Calculate the electrostatic potential based on the partial
