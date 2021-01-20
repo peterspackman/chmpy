@@ -22,6 +22,40 @@ _FORM_FACTOR_KEYS = _FORM_FACTOR_DATA.f.keys
 _FORM_FACTOR_KEYS_LIST = _FORM_FACTOR_KEYS.tolist()
 _FORM_FACTOR_VALUES = _FORM_FACTOR_DATA.f.values
 
+cdef void fill_unique_plane_factors(const int[:, ::] hkl, const double[:] q, int[:] fac) nogil:
+    cdef int i, j
+    cdef int N
+    cdef int nh, nk, nl
+    cdef int hj, kj, lj
+    cdef double qj, qi
+    N = len(q)
+    for i in range(N):
+        if fac[i] < 1:
+            continue
+        qi = q[i]
+        nh = - hkl[i, 0]
+        nk = - hkl[i, 1]
+        nl = - hkl[i, 2]
+        for j in range(i + 1, N):
+            qj = q[j]
+            if (qj - qi) > 1e-7:
+                continue
+            hj = hkl[j, 0]
+            kj = hkl[j, 1]
+            lj = hkl[j, 2]
+            if hj == nh and kj == nk and lj == nl:
+                fac[i] += 1
+                fac[j] = 0
+
+
+cpdef calculate_unique_plane_factors(hkl, q):
+    factors = np.ones(q.shape, dtype=np.int32)
+    cdef const int[:, ::] hklview = hkl
+    cdef const double[:] qview = q
+    cdef int[:] facview = factors
+    fill_unique_plane_factors(hklview, qview, facview)
+    return factors
+
 
 def get_form_factor_index(key):
     return _FORM_FACTOR_KEYS_LIST.index(key)

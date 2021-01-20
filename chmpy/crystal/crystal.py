@@ -16,6 +16,21 @@ from trimesh import Trimesh
 
 LOG = logging.getLogger(__name__)
 
+def _nearest_molecule_idx(vertices, el, pos):
+    from scipy.sparse.csgraph import connected_components
+    import pandas as pd
+    from time import time
+    t1 = time()
+    m = Molecule.from_arrays(el, pos)
+    m.guess_bonds()
+    nfrag, labels = connected_components(m.bonds)
+    tree = KDTree(pos)
+    d, idxs = tree.query(vertices, k=1)
+    t2 = time()
+    l = labels[idxs]
+    u, idxs = np.unique(l, return_inverse=True)
+    print(f"Took {t2 - t1}s for fragment patch coloring")
+    return np.arange(len(u))[idxs]
 
 class Crystal:
     """
@@ -765,10 +780,25 @@ class Crystal:
         Returns:
             A list of meshes representing the promolecule density isosurfaces
         """
-        return [
-            mol.promolecule_density_isosurface(**kwargs)
-            for mol in self.symmetry_unique_molecules()
-        ]
+        if kwargs.get("color", None) == "fragment_patch":
+            color = kwargs.pop("color")
+            surfaces = [
+                mol.promolecule_density_isosurface(**kwargs)
+                for mol in self.symmetry_unique_molecules()
+            ]
+            radius = 6.0
+            from chmpy.util.color import property_to_color
+            for i, (mol, n_e, n_p) in enumerate(self.molecule_environments(radius=radius)):
+                surf = surfaces[i]
+                prop = _nearest_molecule_idx(surf.vertices, n_e, n_p)
+                color = property_to_color(prop, cmap=kwargs.get("colormap", color))
+                surf.visual.vertex_colors = color
+        else:
+            surfaces = [
+                mol.promolecule_density_isosurface(**kwargs)
+                for mol in self.symmetry_unique_molecules()
+            ]
+        return surfaces
 
     def asymmetric_unit_partial_charges(self) -> np.ndarray:
         """
@@ -928,7 +958,7 @@ class Crystal:
                     weight calculation
                 color: str, optional
                     surface property to use for vertex coloring, one of ('d_norm_i',
-                    'd_i', 'd_norm_e', 'd_e', 'd_norm')
+                    'd_i', 'd_norm_e', 'd_e', 'd_norm', 'fragment_patch')
                 colormap: str, optional
                     matplotlib colormap to use for surface coloring (default 'viridis_r')
                 midpoint: float, optional, default 0.0 if using d_norm
@@ -960,9 +990,11 @@ class Crystal:
                 iso = stockholder_weight_isosurface(s, isovalue=isovalue, sep=sep)
                 isos.append(iso)
         elif kind == "mol":
-            for mol, n_e, n_p in self.molecule_environments(radius=radius):
+            for i, (mol, n_e, n_p) in enumerate(self.molecule_environments(radius=radius)):
                 if vertex_color == "esp":
                     extra_props["esp"] = mol.electrostatic_potential
+                elif vertex_color == "fragment_patch":
+                    extra_props["fragment_patch"] = lambda x: _nearest_molecule_idx(x, n_e, n_p)
                 s = StockholderWeight.from_arrays(
                     mol.atomic_numbers, mol.positions, n_e, n_p
                 )

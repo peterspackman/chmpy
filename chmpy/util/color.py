@@ -7,6 +7,7 @@ DEFAULT_COLORMAPS = {
     "d_norm_i": "bwr",
     "d_norm_e": "bwr_r",
     "esp": "coolwarm_r",
+    "fragment_patch": "tab20"
 }
 
 
