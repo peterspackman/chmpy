@@ -8,13 +8,18 @@ class units:
     factors = {
         ("angstrom", "angstrom"): 1,
         ("au", "au"): 1,
+        ("au2", "au2"): 1,
         ("au", "bohr"): 1,
+        ("au2", "bohr2"): 1,
         ("bohr", "au"): 1,
         ("bohr", "bohr"): 1,
+        ("bohr2", "bohr2"): 1,
         ("kj_per_mol", "kj_per_mol"): 1,
         ("bohr", "angstrom"): BOHR_TO_ANGSTROM,
+        ("bohr2", "angstrom2"): BOHR_TO_ANGSTROM * BOHR_TO_ANGSTROM,
         ("au", "angstrom"): BOHR_TO_ANGSTROM,
         ("angstrom", "bohr"): 1 / BOHR_TO_ANGSTROM,
+        ("angstrom2", "bohr2"): 1 / (BOHR_TO_ANGSTROM * BOHR_TO_ANGSTROM),
         ("angstrom", "au"): 1 / BOHR_TO_ANGSTROM,
         ("au", "kj_per_mol"): AU_TO_KJ_PER_MOL,
         ("au", "ev"): AU_TO_EV,
@@ -50,6 +55,11 @@ class units:
     def bohr(cls, value, unit="au"):
         unit = cls._s_unit(unit)
         return value * cls._conversion_factor(unit, "bohr")
+
+    @classmethod
+    def bohr2(cls, value, unit="au2"):
+        unit = cls._s_unit(unit)
+        return value * cls._conversion_factor(unit, "bohr2")
 
     @classmethod
     def angstrom(cls, value, unit="au"):

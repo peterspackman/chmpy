@@ -815,6 +815,30 @@ class Molecule:
         )
         return mesh
 
+    def cosmo_surface(self, **kwargs):
+        from chmpy import PromoleculeDensity
+        from chmpy.surface import promolecule_density_isosurface
+        from chmpy.ext.cosmo import surface_charge
+        import trimesh
+
+        isovalue = kwargs.get("isovalue", 0.002)
+        solvent = kwargs.get("solvent", 4.0)
+        sep = kwargs.get("separation", kwargs.get("resolution", 0.5))
+        pro = PromoleculeDensity((self.atomic_numbers, self.positions))
+        iso = promolecule_density_isosurface(
+            pro, sep=sep, isovalue=isovalue
+        )
+        mesh = trimesh.Trimesh(
+            vertices=iso.vertices,
+            faces=iso.faces,
+            normals=iso.normals,
+        )
+        face_centers = np.sum(mesh.vertices[mesh.faces], axis=1) / 3
+        mesh.face_attributes["centroid"] = face_centers
+        mesh.face_attributes["esp"] = self.electrostatic_potential(face_centers)
+        mesh.face_attributes["area"] = mesh.area_faces
+        return mesh
+
     def to_mesh(self, **kwargs):
         """
         Convert this molecule to a mesh of spheres and
