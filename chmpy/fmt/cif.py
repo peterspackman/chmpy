@@ -105,7 +105,7 @@ def format_field(x):
 
 
 class Cif:
-    """Class to represent data extracted from a CIF 
+    """Class to represent data extracted from a CIF
     standard file format.
 
     Parameters

@@ -137,7 +137,9 @@ def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
     o = kwargs.get("origin", np.mean(p_i, axis=0, dtype=np.float32))
     r = sphere_stockholder_radii(s.s, o, g, r_min, r_max, 1e-7, 30, isovalue)
     if np.any(r < 0):
-        raise ValueError(f"Unable to find isovalue {isovalue:.2f} in all directions for bounds ({r_min:.2f}, {r_max:.2f})")
+        raise ValueError(
+            f"Unable to find isovalue {isovalue:.2f} in all directions for bounds ({r_min:.2f}, {r_max:.2f})"
+        )
     real = True
     if property_function is not None:
         if property_function == "d_norm":
@@ -179,13 +181,13 @@ def promolecule_density_descriptor(sht, n_i, p_i, **kwargs):
             Options include:
             ```
             isovalue (float): change the Hirshfeld weight value (default 0.5)
-            with_property (str): calculate the combined shape + surface 
-                property descriptor using the specified property on the 
+            with_property (str): calculate the combined shape + surface
+                property descriptor using the specified property on the
                 surface (e.g. d_norm, esp)
             bounds (Tuple): modify the lower/upper bounds on the search for
                 the isovalue (default 0.1, 20.0)
             coefficients (bool): also return the coefficients of the SHT
-            origin (np.ndarray): specify the center of the surface 
+            origin (np.ndarray): specify the center of the surface
                 (default is the geometric centroid of the atoms)
             kinds (str): the kinds of invariants to calculate (default 'NP')
             ```
@@ -201,7 +203,9 @@ def promolecule_density_descriptor(sht, n_i, p_i, **kwargs):
     o = kwargs.get("origin", np.mean(p_i, axis=0, dtype=np.float32))
     r = sphere_promolecule_radii(pro.dens, o, g, r_min, r_max, 1e-7, 30, isovalue)
     if np.any(r < 0):
-        raise ValueError(f"Unable to find isovalue {isovalue:.2f} in all directions for bounds ({r_min:.2f}, {r_max:.2f})")
+        raise ValueError(
+            f"Unable to find isovalue {isovalue:.2f} in all directions for bounds ({r_min:.2f}, {r_max:.2f})"
+        )
     real = True
     if property_function is not None:
         if property_function == "d_norm":

@@ -12,7 +12,7 @@ SYMM_STR_SYMBOL_REGEX = re.compile(r".*?([+-]*[xyz0-9\/\.]+)")
 
 
 LATTICE_TYPE_TRANSLATIONS = {
-    1: (), # P
+    1: (),  # P
     2: ((1 / 2, 1 / 2, 1 / 2),),  # I
     3: ((2 / 3, 1 / 3, 1 / 3), (1 / 3, 2 / 3, 2 / 3)),  # R
     4: ((0, 1 / 2, 1 / 2), (1 / 2, 0, 1 / 2), (1 / 2, 1 / 2, 0)),  # F
@@ -63,7 +63,7 @@ def decode_symm_str(s):
     Decode a symmetry operation represented in the string
     form e.g. '1/2 + x, y, -z -0.25' into a rotation matrix
     and translation vector.
-    
+
     >>> encode_symm_str(*decode_symm_str("x,y,z"))
     '+x,+y,+z'
     >>> encode_symm_str(*decode_symm_str("1/2 - x,y-0.3333333,z"))
@@ -109,8 +109,8 @@ def decode_symm_str(s):
 
 def decode_symm_int(coded_integer):
     """
-    Decode an integer encoded symmetry operation. 
-    
+    Decode an integer encoded symmetry operation.
+
     A space group operation is compressed using ternary numerical system for
     rotation and duodecimal system for translation. This is achieved because
     each element of rotation matrix can have only one of {-1,0,1}, and the
@@ -151,7 +151,7 @@ def encode_symm_int(rotation, translation):
     """
     Encode an integer encoded symmetry from a rotation matrix and translation
     vector.
-    
+
     A space group operation is compressed using ternary numerical system for
     rotation and duodecimal system for translation. This is achieved because
     each element of rotation matrix can have only one of {-1,0,1}, and the
@@ -243,7 +243,7 @@ class SymmetryOperation:
         return str(self)
 
     def inverted(self):
-        """"
+        """ "
         A copy of this symmetry operation under inversion
 
         Returns:
@@ -254,7 +254,7 @@ class SymmetryOperation:
     def __add__(self, value: np.ndarray):
         """
         Add a vector to this symmetry operation's translation vector.
-        
+
         Returns:
             SymmetryOperation: a copy of this symmetry operation under additional translation"
         """
@@ -263,7 +263,7 @@ class SymmetryOperation:
     def __sub__(self, value: np.ndarray):
         """
         Subtract a vector from this symmetry operation's translation.
-        
+
         Returns:
             SymmetryOperation: a copy of this symmetry operation under additional translation"
         """
@@ -272,7 +272,7 @@ class SymmetryOperation:
     def apply(self, coordinates: np.ndarray) -> np.ndarray:
         """
         Apply this symmetry operation to a set of fractional coordinates.
-        
+
         Args:
             coordinates (np.ndarray): (N,3) or (N,4) array of fractional coordinates or homogeneous
                 fractional coordinates.

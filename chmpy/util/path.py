@@ -7,8 +7,8 @@ ERR_INVALID_NAME = 123  # windows specific error code
 
 
 def is_valid_pathname(pathname):
-    """ Return `True` if the passed string is a valid
-    pathname for the current OS, `False` otherwise """
+    """Return `True` if the passed string is a valid
+    pathname for the current OS, `False` otherwise"""
     try:
         if not isinstance(pathname, str) or not pathname:
             return False

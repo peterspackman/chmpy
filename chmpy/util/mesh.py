@@ -62,15 +62,41 @@ def molecule_to_meshes(molecule, **kwargs):
             x3 = molecule.positions[b]
             cyl = cylinder(bond_thickness, d, segment=(x1, x3))
             cyl.visual.vertex_colors = np.repeat(
-                [(100, 100, 100, 255),], cyl.vertices.shape[0], axis=0
+                [
+                    (100, 100, 100, 255),
+                ],
+                cyl.vertices.shape[0],
+                axis=0,
             )
             bond_label = f"bond_{molecule.labels[a]}_{molecule.labels[b]}"
             meshes[bond_label] = cyl
     return meshes
 
 
-def color_mesh_vertices(scalar_func, mesh, cmap=None):
+def face_centroids(mesh):
+    import numpy as np
+
+    return np.sum(mesh.vertices[mesh.faces], axis=1) / mesh.faces.shape[1]
+
+
+def color_mesh(f, mesh, faces=False, **kwargs):
     from chmpy.util.color import property_to_color
 
-    prop = scalar_func(mesh.vertices)
-    mesh.visual.vertex_colors = property_to_color(prop, cmap=cmap)
+    is_function = hasattr(f, "__call__")
+
+    mesh.visual.face_colors = None
+    mesh.visual.vertex_colors = None
+
+    if faces:
+        if is_function:
+            pts = face_centroids(mesh)
+            prop = f(pts)
+        else:
+            prop = f
+        mesh.visual.face_colors = property_to_color(prop, **kwargs)
+    else:
+        if is_function:
+            prop = f(mesh.vertices)
+        else:
+            prop = f
+        mesh.visual.vertex_colors = property_to_color(prop, **kwargs)

@@ -211,7 +211,7 @@ class Molecule:
     @property
     def partial_charges(self) -> np.ndarray:
         """The partial charges associated with atoms in this molecule.
-        If `self._partial_charges` is not set, the charges will be 
+        If `self._partial_charges` is not set, the charges will be
         assigned based on EEM method."""
         assert len(self) > 0, "Must have at least one atom to calculate partial charges"
         if not hasattr(self, "_partial_charges"):
@@ -376,7 +376,7 @@ class Molecule:
     @classmethod
     def load(cls, filename, **kwargs):
         """
-        Construct a molecule from the provided file. 
+        Construct a molecule from the provided file.
 
         Args:
             filename (str): the path to the (xyz or SDF) file
@@ -399,7 +399,7 @@ class Molecule:
     def to_xyz_string(self, header=True) -> str:
         """
         Represent this molecule as a string in the format
-        of an xmol .xyz file. 
+        of an xmol .xyz file.
 
         Args:
             header (bool, optional):toggle whether or not to return the 'header' of the
@@ -660,7 +660,7 @@ class Molecule:
         Args:
             kwargs (dict): keyword arguments to be passed to isosurface
                 generation code
-                
+
                 Options are:
                 ```
                 background: float, optional
@@ -741,7 +741,7 @@ class Molecule:
 
     def shape_descriptors(self, l_max=5, **kwargs) -> np.ndarray:
         """
-        Calculate the molecular shape descriptors`[1,2]` for 
+        Calculate the molecular shape descriptors`[1,2]` for
         this molecule using the promolecule density.
 
         Args:
@@ -823,37 +823,13 @@ class Molecule:
         )
         return mesh
 
-    def cosmo_surface(self, **kwargs):
-        from chmpy import PromoleculeDensity
-        from chmpy.surface import promolecule_density_isosurface
-        from chmpy.ext.cosmo import surface_charge
-        import trimesh
-
-        isovalue = kwargs.get("isovalue", 0.002)
-        solvent = kwargs.get("solvent", 4.0)
-        sep = kwargs.get("separation", kwargs.get("resolution", 0.5))
-        pro = PromoleculeDensity((self.atomic_numbers, self.positions))
-        iso = promolecule_density_isosurface(
-            pro, sep=sep, isovalue=isovalue
-        )
-        mesh = trimesh.Trimesh(
-            vertices=iso.vertices,
-            faces=iso.faces,
-            normals=iso.normals,
-        )
-        face_centers = np.sum(mesh.vertices[mesh.faces], axis=1) / 3
-        mesh.face_attributes["centroid"] = face_centers
-        mesh.face_attributes["esp"] = self.electrostatic_potential(face_centers)
-        mesh.face_attributes["area"] = mesh.area_faces
-        return mesh
-
     def to_mesh(self, **kwargs):
         """
         Convert this molecule to a mesh of spheres and
         cylinders, colored by element. The origins of the spheres
         will be at the corresponding atomic position, and all units
         will be Angstroms.
-        
+
         Returns:
             dict: a dictionary of `trimesh.Trimesh` objects representing this molecule.
         """
@@ -905,9 +881,9 @@ class Molecule:
 
     def rotate(self, rotation, origin=(0, 0, 0)):
         """
-        Convenience method to rotate this molecule by a given 
+        Convenience method to rotate this molecule by a given
         rotation matrix
-        
+
         Args:
             rotation (np.ndarray): A (3, 3) rotation matrix
         """
@@ -923,7 +899,7 @@ class Molecule:
         """
         Convenience method to construct a new copy of thismolecule
         rotated by a given rotation matrix
-        
+
         Args:
             rotation (np.ndarray): A (3, 3) rotation matrix
 
@@ -938,9 +914,9 @@ class Molecule:
 
     def translate(self, translation):
         """
-        Convenience method to translate this molecule by a given 
+        Convenience method to translate this molecule by a given
         translation vector
-        
+
         Args:
             translation (np.ndarray): A (3,) vector of x, y, z coordinates of the translation
         """
@@ -950,7 +926,7 @@ class Molecule:
         """
         Convenience method to construct a new copy of this molecule
         translated by a given translation vector
-        
+
         Args:
             translation (np.ndarray): A (3,) vector of x, y, z coordinates of the translation
 
@@ -967,7 +943,7 @@ class Molecule:
         """
         Convenience method to transform this molecule
         by rotation and translation.
-        
+
         Args:
             rotation (np.ndarray): A (3,3) rotation matrix
             translation (np.ndarray): A (3,) vector of x, y, z coordinates of the translation
@@ -982,7 +958,7 @@ class Molecule:
         """
         Convenience method to transform this molecule
         by rotation and translation.
-        
+
         Args:
             rotation (np.ndarray): A (3,3) rotation matrix
             translation (np.ndarray): A (3,) vector of x, y, z coordinates of the translation

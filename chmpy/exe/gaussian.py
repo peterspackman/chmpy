@@ -70,7 +70,7 @@ class Gaussian(AbstractExecutable):
         self.job_file.write_text(self.input_file_contents)
 
     def resolve_dependencies(self):
-        """ Do whatever needs to be done before running
+        """Do whatever needs to be done before running
         the job (e.g. write input file etc.)"""
         self.write_inputs()
 

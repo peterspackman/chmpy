@@ -17,6 +17,7 @@ if sys.platform == "win32":
 else:
     _SIGNAL = signal.SIGKILL
 
+
 def run_subprocess(
     *popenargs,
     input=None,
@@ -114,13 +115,13 @@ class AbstractExecutable(ABC):
 
     @property
     def has_dependencies(self):
-        """ Does this job require some work before it
+        """Does this job require some work before it
         can be run?"""
         return self._has_dependencies
 
     @abc.abstractmethod
     def resolve_dependencies(self):
-        """ Do whatever needs to be done before running
+        """Do whatever needs to be done before running
         the job (e.g. write input file etc.)"""
         raise NotImplementedError
 

@@ -16,10 +16,12 @@ from trimesh import Trimesh
 
 LOG = logging.getLogger(__name__)
 
+
 def _nearest_molecule_idx(vertices, el, pos):
     from scipy.sparse.csgraph import connected_components
     import pandas as pd
     from time import time
+
     t1 = time()
     m = Molecule.from_arrays(el, pos)
     m.guess_bonds()
@@ -31,6 +33,7 @@ def _nearest_molecule_idx(vertices, el, pos):
     u, idxs = np.unique(l, return_inverse=True)
     print(f"Took {t2 - t1}s for fragment patch coloring")
     return np.arange(len(u))[idxs]
+
 
 class Crystal:
     """
@@ -788,7 +791,10 @@ class Crystal:
             ]
             radius = 6.0
             from chmpy.util.color import property_to_color
-            for i, (mol, n_e, n_p) in enumerate(self.molecule_environments(radius=radius)):
+
+            for i, (mol, n_e, n_p) in enumerate(
+                self.molecule_environments(radius=radius)
+            ):
                 surf = surfaces[i]
                 prop = _nearest_molecule_idx(surf.vertices, n_e, n_p)
                 color = property_to_color(prop, cmap=kwargs.get("colormap", color))
@@ -990,11 +996,15 @@ class Crystal:
                 iso = stockholder_weight_isosurface(s, isovalue=isovalue, sep=sep)
                 isos.append(iso)
         elif kind == "mol":
-            for i, (mol, n_e, n_p) in enumerate(self.molecule_environments(radius=radius)):
+            for i, (mol, n_e, n_p) in enumerate(
+                self.molecule_environments(radius=radius)
+            ):
                 if vertex_color == "esp":
                     extra_props["esp"] = mol.electrostatic_potential
                 elif vertex_color == "fragment_patch":
-                    extra_props["fragment_patch"] = lambda x: _nearest_molecule_idx(x, n_e, n_p)
+                    extra_props["fragment_patch"] = lambda x: _nearest_molecule_idx(
+                        x, n_e, n_p
+                    )
                 s = StockholderWeight.from_arrays(
                     mol.atomic_numbers, mol.positions, n_e, n_p
                 )
@@ -1165,7 +1175,7 @@ class Crystal:
                 origin=c,
                 bounds=bounds,
                 with_property=with_property,
-                coefficients=return_coefficients
+                coefficients=return_coefficients,
             )
 
             if return_coefficients:
@@ -1178,7 +1188,9 @@ class Crystal:
         else:
             return np.asarray(descriptors)
 
-    def atomic_shape_descriptors(self, l_max=5, radius=6.0, return_coefficients=False) -> np.ndarray:
+    def atomic_shape_descriptors(
+        self, l_max=5, radius=6.0, return_coefficients=False
+    ) -> np.ndarray:
         """
         Calculate the shape descriptors[1,2] for all symmetry unique
         atoms in this crystal.
@@ -1211,8 +1223,13 @@ class Crystal:
         ):
             ubound = Element[n].vdw_radius * 3
             desc = stockholder_weight_descriptor(
-                sph, [n], [pos], neighbour_els, neighbour_pos, bounds=(0.2, ubound),
-                coefficients=return_coefficients
+                sph,
+                [n],
+                [pos],
+                neighbour_els,
+                neighbour_pos,
+                bounds=(0.2, ubound),
+                coefficients=return_coefficients,
             )
             if return_coefficients:
                 descriptors.append(desc[1])
@@ -1756,7 +1773,7 @@ class Crystal:
         """
         Calculate the information for all molecule
         pairs surrounding the symmetry_unique_molecules
-        in this crystal within the given radius. 
+        in this crystal within the given radius.
 
         Args:
             radius (float, optional): Maximum distance in Angstroms between any atom in the molecule

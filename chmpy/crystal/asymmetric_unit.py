@@ -20,7 +20,7 @@ class AsymmetricUnit:
 
     def __init__(self, elements, positions, labels=None, **kwargs):
         """
-        Create an asymmetric unit object from a list of Elements and 
+        Create an asymmetric unit object from a list of Elements and
         an array of fractional coordinates.
 
 
@@ -30,7 +30,7 @@ class AsymmetricUnit:
             labels (array_like, optional): labels (array_like): N length array of string labels for each site
             **kwargs: Additional properties (will populate the properties member)
                 to store in this asymmetric unit
-        
+
         """
         self.elements = elements
         self.atomic_numbers = np.asarray([x.atomic_number for x in elements])
@@ -61,7 +61,7 @@ class AsymmetricUnit:
     @classmethod
     def from_records(cls, records):
         """Initialize an AsymmetricUnit from a list of dictionary like objects
-        
+
         Arguments:
             records (iterable): An iterable containing dict_like objects with `label`,
                 `element`, `position` and optionally `occupation` stored.

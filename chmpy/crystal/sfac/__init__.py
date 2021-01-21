@@ -79,7 +79,7 @@ def hklmax(uc, dmin):
 
 
 def reflections(crystal, wavelength=LAMBDA_Cu, dmin=LAMBDA_Cu / 2, sort=True):
-    """Calculate the unique reflections contributing to 
+    """Calculate the unique reflections contributing to
     diffraction for the given crystal, along with the q
     vector at the provided wavelength"""
     h_max, k_max, l_max = hklmax(crystal.unit_cell, dmin)

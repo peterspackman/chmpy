@@ -76,7 +76,7 @@ class Tonto(AbstractExecutable):
         self.stdin_file.write_text(self.input_file_contents)
 
     def resolve_dependencies(self):
-        """ Do whatever needs to be done before running
+        """Do whatever needs to be done before running
         the job (e.g. write input file etc.)"""
         self.write_inputs()
 
@@ -104,6 +104,8 @@ class Tonto(AbstractExecutable):
 
         env = deepcopy(environ)
         env.update(
-            {"TONTO_BASIS_SET_DIRECTORY": str(self.basis_set_directory),}
+            {
+                "TONTO_BASIS_SET_DIRECTORY": str(self.basis_set_directory),
+            }
         )
         self._run_raw()

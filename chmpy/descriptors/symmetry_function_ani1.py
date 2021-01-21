@@ -20,7 +20,7 @@ SYMF_DEFAULT_PARAMETERS = {
 
 
 class SymmetryFunctionsANI1:
-    """ Atomic environment symmetry functions, based on the ANI-1
+    """Atomic environment symmetry functions, based on the ANI-1
     descriptors [1]
 
     References

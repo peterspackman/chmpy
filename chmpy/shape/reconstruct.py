@@ -3,6 +3,7 @@ import numpy as np
 from .sht import SHT
 from trimesh import PointCloud
 from chmpy.util.num import cartesian_to_spherical
+
 LOG = logging.getLogger(__name__)
 
 
@@ -26,11 +27,14 @@ def reconstructed_surface(coefficients, real=True, subdivisions=3):
         l_max = int((-3 + np.sqrt(8 * n + 1)) // 2)
         func = "synth_real"
     else:
-        raise NotImplementedError("Complex reconstructed surface case not yet implemented")
+        raise NotImplementedError(
+            "Complex reconstructed surface case not yet implemented"
+        )
     LOG.debug("Reconstructing deduced l_max = %d", l_max)
     sht = SHT(l_max=l_max)
 
     from trimesh.creation import icosphere
+
     sphere = icosphere(subdivisions=subdivisions)
     rtp = cartesian_to_spherical(sphere.vertices)
     for i in range(rtp.shape[0]):

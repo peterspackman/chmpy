@@ -43,6 +43,7 @@ def parse_tmol_string(contents, filename=None):
     positions = np.array(positions)
     if not angstroms:
         from chmpy.util.unit import units
+
         positions = units.angstrom(positions)
     return elements, positions
 

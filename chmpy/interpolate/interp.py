@@ -33,7 +33,7 @@ class InterpolatorLog1D:
         ----------
         pts: array_like
             set of points where we wish to evaluate the function
-            
+
         Returns
         ________
         :obj:`np.ndarray`

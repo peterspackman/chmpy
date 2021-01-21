@@ -7,13 +7,13 @@ DEFAULT_COLORMAPS = {
     "d_norm_i": "bwr",
     "d_norm_e": "bwr_r",
     "esp": "coolwarm_r",
-    "fragment_patch": "tab20"
+    "fragment_patch": "tab20",
 }
 
 
 def property_to_color(prop, cmap="viridis", **kwargs):
     """
-    Convert a scalar array of property values to colors, 
+    Convert a scalar array of property values to colors,
     given a provided color map (or property name).
 
     Args:
@@ -38,12 +38,13 @@ def property_to_color(prop, cmap="viridis", **kwargs):
             from matplotlib.colors import TwoSlopeNorm
         except ImportError:
             from matplotlib.colors import DivergingNorm as TwoSlopeNorm
-        assert(vmin <= midpoint)
-        assert(vmax >= midpoint)
+        assert vmin <= midpoint
+        assert vmax >= midpoint
         norm = TwoSlopeNorm(vmin=vmin, vcenter=midpoint, vmax=vmax)
         prop = norm(prop)
         return colormap(prop)
     else:
         import numpy as np
+
         prop = np.clip(prop, vmin, vmax) - vmin
         return colormap(prop)

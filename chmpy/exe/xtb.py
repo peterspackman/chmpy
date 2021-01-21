@@ -53,7 +53,7 @@ class Xtb(AbstractExecutable):
         return join(self.working_directory, self._output_file)
 
     def resolve_dependencies(self):
-        """ Do whatever needs to be done before running
+        """Do whatever needs to be done before running
         the job (e.g. write input file etc.)"""
         LOG.debug("Writing input file to %s", self.input_file)
         with open(self.input_file, "w") as f:

@@ -21,9 +21,10 @@ class GaussianLogFile:
     @property
     def excitations(self):
         import re
+
         excitation_regex = re.compile(
-                r"Excited State\s+(\d+):\s+([\w\d\-\.]+)\s+([+1]?[\d\.]+)"
-                r"\s+eV\s+([+-]?[\d\.]+)\s+nm\s+f=([\d\.]+)\s+<S\*\*2>=([\d\.]+)"
+            r"Excited State\s+(\d+):\s+([\w\d\-\.]+)\s+([+1]?[\d\.]+)"
+            r"\s+eV\s+([+-]?[\d\.]+)\s+nm\s+f=([\d\.]+)\s+<S\*\*2>=([\d\.]+)"
         )
         matches = excitation_regex.findall("\n".join(self.content_lines))
         excitations = {
@@ -41,10 +42,7 @@ class GaussianLogFile:
             excitations["nm"].append(float(nm))
             excitations["f"].append(float(f))
             excitations["S2"].append(float(s2))
-        return {
-            k: np.array(v)
-            for k, v in excitations.items()
-        }
+        return {k: np.array(v) for k, v in excitations.items()}
 
     @property
     def geometries(self):
@@ -146,6 +144,3 @@ class GaussianLogFile:
         res = cls()
         res.content_lines = contents.splitlines()
         return res
-
-
-
