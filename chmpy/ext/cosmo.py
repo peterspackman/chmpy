@@ -1,6 +1,11 @@
+import logging
 import numpy as np
+from collections import namedtuple
 from scipy.spatial.distance import pdist
 from chmpy.util.unit import units
+
+LOG = logging.getLogger(__name__)
+COSMOResult = namedtuple('COSMOResult', "qinit qmin total_energy")
 
 WATER_EPSILON = 79.39
 
@@ -47,7 +52,7 @@ def minimize_cosmo_energy(points, areas, charges, **kwargs):
     N = qinit.shape[0]
 
     qcur = np.empty_like(qprev)
-    print("{:>3s} {:>14s} {:>9s} {:>16s}".format("N", "Energy", "Q", "Error"))
+    LOG.debug("{:>3s} {:>14s} {:>9s} {:>16s}".format("N", "Energy", "Q", "Error"))
 
     for k in range(1, kwargs.get("max_iter", 50)):
         vpot = np.sum(qprev * C, axis=1)
@@ -87,15 +92,11 @@ def minimize_cosmo_energy(points, areas, charges, **kwargs):
 
         rms_err = np.sqrt(dq.dot(dq) / N)
         e_q = -0.5 * qinit.dot(qcur)
-        print("{:3d} {:14.8f} {:9.5f} {:16.9f}".format(k, e_q, qcur.sum(), rms_err))
+        LOG.debug("{:3d} {:14.8f} {:9.5f} {:16.9f}".format(k, e_q, qcur.sum(), rms_err))
         if rms_err < convergence:
             break
         qprev[:] = qcur[:]
 
     G = -0.5 * qinit.dot(qcur)
-    G_kj = G * AU_TO_KJ_PER_MOL
-    G_kcal = 0.239006 * G_kj
-    print("Energy: {:16.9f} kJ/mol".format(G_kj))
-    print("Energy: {:16.9f} kcal/mol".format(G_kcal))
-
-    return qinit, qcur
+    LOG.debug("Energy: %16.9f kJ/mol", G_kj = G * AU_TO_KJ_PER_MOL)
+    return COSMOResult(qinit, qcur, G)
