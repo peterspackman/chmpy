@@ -2,58 +2,56 @@ import numpy as np
 from scipy.spatial.distance import pdist
 from chmpy.util.unit import units
 
+WATER_EPSILON = 79.39
 
 def surface_charge(charges, epsilon, x=0.5):
     return charges * (epsilon - 1) / (epsilon + x)
 
 
-def surface_interaction_matrix(points, areas, k=1.0694):
+def coulomb_matrix(points):
     N = points.shape[0]
-    Sij = np.empty((N, N))
-    Sij[np.triu_indices(N, k=1)] = 1 / pdist(points)
-    Sij += Sij.T
-    np.fill_diagonal(Sij, 0.0)
-    Sii = k * np.sqrt(4 * np.pi / areas)
-    return Sii, Sij
+    C = np.empty((N, N))
+    np.fill_diagonal(C, 0.0)
+    C[np.triu_indices(N, k=1)] = 1 / pdist(points)
+    C += C.T
+    return C
+
+def self_interaction_term(areas, k=1.0694):
+    Sii = 3.8 / np.sqrt(areas)
+    return Sii
 
 
-def minimize_cosmo_energy(
-    points,
-    areas,
-    charges,
-    unit="angstrom",
-    max_iter=50,
-    epsilon=78.39,
-    convergence=1e-5,
-):
+def minimize_cosmo_energy(points, areas, charges, **kwargs):
+
     from chmpy.util.unit import BOHR_TO_ANGSTROM, AU_TO_KJ_PER_MOL
-
-    if unit.lower() == "angstrom":
+    if kwargs.get("unit", "angstrom").lower() == "angstrom":
         points = points / BOHR_TO_ANGSTROM
         areas = areas / (BOHR_TO_ANGSTROM * BOHR_TO_ANGSTROM)
 
+    diis_tolerance = kwargs.get("diis_tolerance", 1e-6)
     diis_start = 1
     surface_area_minimum = 1.0e-6
-    threshold = 1.0e-9
-    initial_charge_scale_factor = 0.05
+    convergence = kwargs.get("convergence", 1.0e-6)
+    initial_charge_scale_factor = 0.0694
 
-    q = surface_charge(charges, epsilon)
-    Sii, Sij = surface_interaction_matrix(points, areas)
+    qinit = surface_charge(charges, kwargs.get("epsilon", WATER_EPSILON))
+    C = coulomb_matrix(points)
+    Sii = self_interaction_term(areas)
     d0 = 1.0 / Sii
 
-    qprev = initial_charge_scale_factor * q * d0
+    qprev = initial_charge_scale_factor * qinit * d0
 
     prev_q = []
     prev_dq = []
 
-    N = q.shape[0]
+    N = qinit.shape[0]
 
     qcur = np.empty_like(qprev)
     print("{:>3s} {:>14s} {:>9s} {:>16s}".format("N", "Energy", "Q", "Error"))
 
-    for k in range(1, max_iter):
-        vpot = np.sum(qprev * Sij, axis=1)
-        qcur = (q - vpot) * d0
+    for k in range(1, kwargs.get("max_iter", 50)):
+        vpot = np.sum(qprev * C, axis=1)
+        qcur = (qinit - vpot) * d0
         dq = qcur - qprev
 
         if k >= diis_start:
@@ -82,18 +80,22 @@ def minimize_cosmo_energy(
             for i in range(ndiis):
                 qcur += c[i] * prev_q[i]
 
-            sel = np.where(np.abs(c) < convergence)[0]
+            sel = np.where(np.abs(c) < diis_tolerance)[0]
             for i in reversed(sel):
                 prev_q.pop(i)
                 prev_dq.pop(i)
 
         rms_err = np.sqrt(dq.dot(dq) / N)
-        e_q = -0.5 * q.dot(qcur)
+        e_q = -0.5 * qinit.dot(qcur)
         print("{:3d} {:14.8f} {:9.5f} {:16.9f}".format(k, e_q, qcur.sum(), rms_err))
-        if rms_err < threshold:
+        if rms_err < convergence:
             break
         qprev[:] = qcur[:]
 
-    G = -0.5 * q.dot(qcur)
-    print("Energy: {:16.9f} kJ/mol".format(G * AU_TO_KJ_PER_MOL))
-    return qcur
+    G = -0.5 * qinit.dot(qcur)
+    G_kj = G * AU_TO_KJ_PER_MOL
+    G_kcal = 0.239006 * G_kj
+    print("Energy: {:16.9f} kJ/mol".format(G_kj))
+    print("Energy: {:16.9f} kcal/mol".format(G_kcal))
+
+    return qinit, qcur

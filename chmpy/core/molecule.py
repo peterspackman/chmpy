@@ -245,14 +245,12 @@ class Molecule:
         """
         from chmpy.util.unit import BOHR_TO_ANGSTROM
 
-        BOHR_PER_ANGSTROM = 1 / BOHR_TO_ANGSTROM
-
         v_pot = np.zeros(positions.shape[0])
         for charge, position in zip(self.partial_charges, self.positions):
             if charge == 0.0:
                 continue
             r = np.linalg.norm(positions - position[np.newaxis, :], axis=1)
-            v_pot += charge / (r * BOHR_PER_ANGSTROM)
+            v_pot += BOHR_TO_ANGSTROM * charge / r
         return v_pot
 
     @property
@@ -843,6 +841,20 @@ class Molecule:
         return self.properties.get(
             "GENERIC_NAME", self.properties.get("name", self.__class__.__name__)
         )
+
+    @property
+    def molecular_dipole_moment(self):
+        if "molecular_dipole" in self.properties:
+            return self.properties["molecular_dipole"]
+
+        if hasattr(self, "_partial_charges"):
+            from chmpy.util.unit import ANGSTROM_TO_BOHR
+            net_charge = np.sum(self.partial_charges)
+            if np.abs(net_charge) > 1e-3:
+                LOG.warn("Molecular dipole will be origin dependent: molecule has a net charge (%f)", net_charge)
+            r = ANGSTROM_TO_BOHR * (self.positions - self.center_of_mass)
+            return np.sum(r * self.partial_charges[:, np.newaxis], axis=0)
+        return np.zeros(3)
 
     @property
     def asym_symops(self):

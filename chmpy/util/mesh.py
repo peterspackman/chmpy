@@ -84,19 +84,16 @@ def color_mesh(f, mesh, faces=False, **kwargs):
 
     is_function = hasattr(f, "__call__")
 
-    mesh.visual.face_colors = None
-    mesh.visual.vertex_colors = None
-
     if faces:
         if is_function:
             pts = face_centroids(mesh)
             prop = f(pts)
         else:
             prop = f
-        mesh.visual.face_colors = property_to_color(prop, **kwargs)
+        mesh.visual.face_colors = property_to_color(prop, **kwargs) * 255
     else:
         if is_function:
             prop = f(mesh.vertices)
         else:
             prop = f
-        mesh.visual.vertex_colors = property_to_color(prop, **kwargs)
+        mesh.visual.vertex_colors = property_to_color(prop, **kwargs) * 255

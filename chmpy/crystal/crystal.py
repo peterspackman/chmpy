@@ -32,7 +32,7 @@ def _nearest_molecule_idx(vertices, el, pos):
     l = labels[idxs]
     u, idxs = np.unique(l, return_inverse=True)
     print(f"Took {t2 - t1}s for fragment patch coloring")
-    return np.arange(len(u))[idxs]
+    return np.arange(len(u), dtype=np.uint8)[idxs]
 
 
 class Crystal:
@@ -789,8 +789,9 @@ class Crystal:
                 mol.promolecule_density_isosurface(**kwargs)
                 for mol in self.symmetry_unique_molecules()
             ]
-            radius = 6.0
+            radius = kwargs.get("fragment_patch_radius", 6.0)
             from chmpy.util.color import property_to_color
+            from chmpy.util.mesh import face_centroids
 
             for i, (mol, n_e, n_p) in enumerate(
                 self.molecule_environments(radius=radius)
@@ -798,7 +799,10 @@ class Crystal:
                 surf = surfaces[i]
                 prop = _nearest_molecule_idx(surf.vertices, n_e, n_p)
                 color = property_to_color(prop, cmap=kwargs.get("colormap", color))
+                face_points = face_centroids(surf)
                 surf.visual.vertex_colors = color
+                surf.vertex_attributes["fragment_patch"] = prop
+                surf.face_attributes["fragment_patch"] = _nearest_molecule_idx(face_points, n_e, n_p)
         else:
             surfaces = [
                 mol.promolecule_density_isosurface(**kwargs)

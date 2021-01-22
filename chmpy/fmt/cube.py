@@ -70,7 +70,7 @@ class CubeData:
     @property
     def xyz(self):
         x, y, z = np.mgrid[0 : self.nx, 0 : self.ny, 0 : self.nz]
-        return np.c_[x.ravel(), y.ravel(), z.ravel()] @ self.basis - self.volume_origin
+        return np.c_[x.ravel(), y.ravel(), z.ravel()] @ self.basis + self.volume_origin
 
     def molecule(self):
         from chmpy import Molecule
