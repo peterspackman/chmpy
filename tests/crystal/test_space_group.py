@@ -174,5 +174,9 @@ class SpaceGroupTestCase(unittest.TestCase):
     def test_reduced_expand(self):
         for i in range(1, 231):
             sg = SpaceGroup(i)
-            self.assertEqual(SpaceGroup.from_symmetry_operations(sg.reduced_symmetry_operations(), sg.latt), sg)
-
+            self.assertEqual(
+                SpaceGroup.from_symmetry_operations(
+                    sg.reduced_symmetry_operations(), sg.latt
+                ),
+                sg,
+            )

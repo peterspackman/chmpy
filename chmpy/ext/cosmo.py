@@ -5,9 +5,10 @@ from scipy.spatial.distance import pdist
 from chmpy.util.unit import units
 
 LOG = logging.getLogger(__name__)
-COSMOResult = namedtuple('COSMOResult', "qinit qmin total_energy")
+COSMOResult = namedtuple("COSMOResult", "qinit qmin total_energy")
 
 WATER_EPSILON = 79.39
+
 
 def surface_charge(charges, epsilon, x=0.5):
     return charges * (epsilon - 1) / (epsilon + x)
@@ -21,6 +22,7 @@ def coulomb_matrix(points):
     C += C.T
     return C
 
+
 def self_interaction_term(areas, k=1.0694):
     Sii = 3.8 / np.sqrt(areas)
     return Sii
@@ -29,6 +31,7 @@ def self_interaction_term(areas, k=1.0694):
 def minimize_cosmo_energy(points, areas, charges, **kwargs):
 
     from chmpy.util.unit import BOHR_TO_ANGSTROM, AU_TO_KJ_PER_MOL
+
     if kwargs.get("unit", "angstrom").lower() == "angstrom":
         points = points / BOHR_TO_ANGSTROM
         areas = areas / (BOHR_TO_ANGSTROM * BOHR_TO_ANGSTROM)
@@ -98,5 +101,5 @@ def minimize_cosmo_energy(points, areas, charges, **kwargs):
         qprev[:] = qcur[:]
 
     G = -0.5 * qinit.dot(qcur)
-    LOG.debug("Energy: %16.9f kJ/mol", G_kj = G * AU_TO_KJ_PER_MOL)
+    LOG.debug("Energy: %16.9f kJ/mol", G_kj=G * AU_TO_KJ_PER_MOL)
     return COSMOResult(qinit, qcur, G)

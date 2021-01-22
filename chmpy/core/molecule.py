@@ -849,9 +849,13 @@ class Molecule:
 
         if hasattr(self, "_partial_charges"):
             from chmpy.util.unit import ANGSTROM_TO_BOHR
+
             net_charge = np.sum(self.partial_charges)
             if np.abs(net_charge) > 1e-3:
-                LOG.warn("Molecular dipole will be origin dependent: molecule has a net charge (%f)", net_charge)
+                LOG.warn(
+                    "Molecular dipole will be origin dependent: molecule has a net charge (%f)",
+                    net_charge,
+                )
             r = ANGSTROM_TO_BOHR * (self.positions - self.center_of_mass)
             return np.sum(r * self.partial_charges[:, np.newaxis], axis=0)
         return np.zeros(3)

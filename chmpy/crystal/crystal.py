@@ -802,7 +802,9 @@ class Crystal:
                 face_points = face_centroids(surf)
                 surf.visual.vertex_colors = color
                 surf.vertex_attributes["fragment_patch"] = prop
-                surf.face_attributes["fragment_patch"] = _nearest_molecule_idx(face_points, n_e, n_p)
+                surf.face_attributes["fragment_patch"] = _nearest_molecule_idx(
+                    face_points, n_e, n_p
+                )
         else:
             surfaces = [
                 mol.promolecule_density_isosurface(**kwargs)
@@ -1814,7 +1816,7 @@ class Crystal:
             hklmin.astype(int),
             hklmax.astype(int),
         )
-        all_dimers = []
+        unique_dimers = []
         mol_dimers = []
         for mol_a in self.symmetry_unique_molecules():
             dimers_a = []
@@ -1831,14 +1833,43 @@ class Crystal:
                             transform_ab="calculate",
                             frac_shift=shift_frac,
                         )
-                        for i, dimer in enumerate(all_dimers):
+                        for i, dimer in enumerate(unique_dimers):
                             if dimer.separation <= d.separation + 1e-3:
                                 if d == dimer:
-                                    dimers_a.append(i)
+                                    dimers_a.append((i, d))
                                     break
                         else:
-                            dimers_a.append(len(all_dimers))
-                            all_dimers.append(d)
-                        all_dimers = sorted(all_dimers, key=lambda x: x.separation)
+                            dimers_a.append((len(unique_dimers), d))
+                            unique_dimers.append(d)
+                        unique_dimers = sorted(
+                            unique_dimers, key=lambda x: x.separation
+                        )
             mol_dimers.append(dimers_a)
-        return all_dimers, mol_dimers
+        return unique_dimers, mol_dimers
+
+    def nearest_neighbour_info(self, points, mol_idx=0, **kwargs):
+        from scipy.spatial import cKDTree as KDTree
+        from collections import namedtuple
+
+        Neighbor = namedtuple("Neighbor", "asym_id generator_symop ab_symop")
+        unique_dimers, mol_dimers = self.symmetry_unique_dimers(**kwargs)
+        npos = []
+        nidx = []
+        dimers = mol_dimers[mol_idx]
+        neighbour_info = []
+        symm_string = lambda x: str(SymmetryOperation.from_integer_code(x[0]))
+        for i, (unique_idx, d) in enumerate(dimers):
+            npos.append(d.b.positions)
+            nidx.append(np.ones(len(d.b), dtype=np.uint8) * i)
+            neighbour_info.append(
+                Neighbor(
+                    d.b.properties["asym_mol_idx"],
+                    symm_string(d.b.properties["generator_symop"]),
+                    d.symm_str,
+                )
+            )
+        npos = np.vstack(npos)
+        nidx = np.hstack(nidx)
+        tree = KDTree(npos)
+        distances, idx = tree.query(points)
+        return neighbour_info, nidx[idx]

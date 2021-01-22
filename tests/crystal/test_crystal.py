@@ -260,5 +260,3 @@ class CifTestCase(unittest.TestCase):
         s = c.to_string()
         c2 = Cif.from_string(s)
         self.assertDictEqual(c.data, c2.data)
-
-
