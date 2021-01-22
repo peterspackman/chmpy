@@ -69,7 +69,7 @@ ext_modules += ext_modules_cython
 
 setup(
     name="chmpy",
-    version="1.0a2",
+    version="1.0b1",
     description="Molecules, crystals, promolecule and Hirshfeld surfaces using python",
     url="https://github.com/peterspackman/chmpy",
     keywords=["chemistry", "molecule", "crystal", "electron density", "isosurface"],
