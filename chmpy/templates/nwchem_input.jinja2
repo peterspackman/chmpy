@@ -1,0 +1,19 @@
+start
+title {{title}}
+
+{%- for block_name, block_contents in blocks.items() %}
+{{block_name}}
+{{block_contents}}
+end
+{% endfor -%}
+
+{% if charge != 0 -%}charge = {{charge}}{% endif %}
+{% if multiplicity != 1 -%}nopen = {{multiplicity - 1}}{% endif %}
+
+basis {{"cartesian" if cartesian_basis else ""}}
+* library {{basis_set}}
+end
+
+{%- for task_keywords in tasks %}
+task {{task_keywords}}
+{% endfor -%}

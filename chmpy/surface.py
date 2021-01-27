@@ -8,9 +8,19 @@ from .mc import marching_cubes
 IsosurfaceMesh = namedtuple("IsosurfaceMesh", "vertices faces normals vertex_prop")
 LOG = logging.getLogger(__name__)
 
+def smooth_laplacian(vertices, faces, **kwargs):
+    """Smooth vertices and faces using a Laplacian filter"""
+    from trimesh.smoothing import filter_humphrey
+    from trimesh import Trimesh
+    kwargs.setdefault("iterations", 2)
+    mesh = Trimesh(vertices, faces)
+    filter_humphrey(mesh, **kwargs)
+    return mesh.vertices, mesh.faces
+
 
 def promolecule_density_isosurface(
-    promol, isovalue=0.002, sep=0.2, props=True, extra_props=None
+    promol, isovalue=0.002, sep=0.2, props=True, extra_props=None,
+    smoothing="laplacian"
 ):
     """Calculate the promolecule density isosurface.
 
@@ -47,6 +57,10 @@ def promolecule_density_isosurface(
     LOG.debug("Max (x,y,z): %s", np.max(verts, axis=0))
     LOG.debug("Min (x,y,z): %s", np.min(verts, axis=0))
     vertex_props = {}
+
+    if smoothing == "laplacian":
+        verts, faces = smooth_laplacian(verts, faces)
+
     if props:
         if extra_props is not None:
             for k, func in extra_props.items():
@@ -62,7 +76,7 @@ def promolecule_density_isosurface(
 
 
 def stockholder_weight_isosurface(
-    s, isovalue=0.5, sep=0.2, props=True, extra_props=None
+    s, isovalue=0.5, sep=0.2, props=True, extra_props=None, smoothing="laplacian"
 ):
     """Calculate stockholder weight (Hirshfeld) surface.
 
@@ -93,6 +107,10 @@ def stockholder_weight_isosurface(
     verts, faces, normals, _ = marching_cubes(
         weights, isovalue, spacing=separations, gradient_direction="descent"
     )
+
+    if smoothing == "laplacian":
+        verts, faces = smooth_laplacian(verts, faces)
+
     LOG.debug("Separation (x,y,z): %s", separations)
     verts = np.c_[verts[:, 1], verts[:, 0], verts[:, 2]] + l
     LOG.debug("Surface centroid: %s", np.mean(verts, axis=0))

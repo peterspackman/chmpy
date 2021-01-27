@@ -594,6 +594,10 @@ class Molecule:
         )
         return [list(x.a) for x in matches]
 
+    def calculate_wavefunction(self, method="HF", basis_set="3-21G", program="nwchem"):
+        from chmpy.fmt.nwchem import to_nwchem_input
+        print(to_nwchem_input(self, method=method, basis_set=basis_set))
+
     def atomic_shape_descriptors(
         self, l_max=5, radius=6.0, background=1e-5
     ) -> np.ndarray:

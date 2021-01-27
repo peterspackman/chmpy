@@ -1851,7 +1851,7 @@ class Crystal:
         from scipy.spatial import cKDTree as KDTree
         from collections import namedtuple
 
-        Neighbor = namedtuple("Neighbor", "asym_id generator_symop ab_symop")
+        Neighbor = namedtuple("Neighbor", "asym_id generator_symop ab_symop separation")
         unique_dimers, mol_dimers = self.symmetry_unique_dimers(**kwargs)
         npos = []
         nidx = []
@@ -1866,6 +1866,7 @@ class Crystal:
                     d.b.properties["asym_mol_idx"],
                     symm_string(d.b.properties["generator_symop"]),
                     d.symm_str,
+                    d.com_separation
                 )
             )
         npos = np.vstack(npos)

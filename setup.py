@@ -97,7 +97,7 @@ setup(
             "chmpy-convert= chmpy.cmd.convert:main",
         ]
     },
-    install_requires=["numpy", "scipy", "trimesh", "matplotlib", "seaborn"],
+    install_requires=["numpy", "scipy", "trimesh", "matplotlib", "seaborn", "jinja2"],
     extras_require={
         "sht": ["shtns"],
         "graph": ["graph_tool"],

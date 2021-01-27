@@ -14,6 +14,7 @@ _ALL_TEMPLATES = {
     "crystal17": CHMPY_TEMPLATE_ENV.get_template("crystal17.jinja2"),
     "gaussian_scf": CHMPY_TEMPLATE_ENV.get_template("gaussian_scf.jinja2"),
     "tonto_pair_energy": CHMPY_TEMPLATE_ENV.get_template("tonto_pair_energy.jinja2"),
+    "nwchem_input": CHMPY_TEMPLATE_ENV.get_template("nwchem_input.jinja2"),
 }
 
 
