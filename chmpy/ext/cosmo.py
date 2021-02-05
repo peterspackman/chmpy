@@ -3,11 +3,10 @@ import numpy as np
 from collections import namedtuple
 from scipy.spatial.distance import pdist
 from chmpy.util.unit import units
+from chmpy.ext.solvation_parameters import DIELECTRIC_CONSTANTS
 
 LOG = logging.getLogger(__name__)
 COSMOResult = namedtuple("COSMOResult", "qinit qmin total_energy")
-
-WATER_EPSILON = 79.39
 
 
 def surface_charge(charges, epsilon, x=0.5):
@@ -42,7 +41,10 @@ def minimize_cosmo_energy(points, areas, charges, **kwargs):
     convergence = kwargs.get("convergence", 1.0e-6)
     initial_charge_scale_factor = 0.0694
 
-    qinit = surface_charge(charges, kwargs.get("epsilon", WATER_EPSILON))
+    solvent = kwargs.get("solvent", "water")
+    epsilon = DIELECTRIC_CONSTANTS.get(solvent, 0.0)
+    LOG.info("Using dielectric constant of %.2f for solvent '%s'", epsilon, solvent)
+    qinit = surface_charge(charges, epsilon)
     C = coulomb_matrix(points)
     Sii = self_interaction_term(areas)
     d0 = 1.0 / Sii
