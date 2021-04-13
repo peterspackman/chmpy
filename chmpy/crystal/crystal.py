@@ -1841,9 +1841,6 @@ class Crystal:
                         else:
                             dimers_a.append((len(unique_dimers), d))
                             unique_dimers.append(d)
-                        unique_dimers = sorted(
-                            unique_dimers, key=lambda x: x.separation
-                        )
             mol_dimers.append(dimers_a)
         return unique_dimers, mol_dimers
 

@@ -13,6 +13,8 @@ LOG = logging.getLogger("xtb")
 
 class Xtb(AbstractExecutable):
     _input_file = "xtb.coord"
+    _charge_file = ".CHRG"
+    _uhf_file = ".UHF"
     _output_file = "xtbopt.stdout"
     _executable_location = XTB_EXEC
     _timeout = 1800.0
@@ -49,6 +51,14 @@ class Xtb(AbstractExecutable):
         return join(self.working_directory, self._input_file)
 
     @property
+    def charge_file(self):
+        return join(self.working_directory, self._charge_file)
+
+    @property
+    def uhf_file(self):
+        return join(self.working_directory, self._charge_file)
+
+    @property
     def output_file(self):
         return join(self.working_directory, self._output_file)
 
@@ -70,6 +80,8 @@ class Xtb(AbstractExecutable):
             "opt_log": join(self.working_directory, "xtbopt.log"),
             "opt_coord": join(self.working_directory, "xtbopt.coord"),
             "trajectory": join(self.working_directory, "xtbopt.trj"),
+            "chg": self.charge_file,
+            "uhf": self.uhf_file
         }
         for k, loc in opt_files.items():
             if exists(loc):

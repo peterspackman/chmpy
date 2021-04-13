@@ -40,10 +40,10 @@ class XtbOptimizer:
         xtb_param_file = self.xtb_param_fmt.format(gfnstr)
         self.param_file_loc = join(xtb_path, xtb_param_file)
         home_param = exists(self.param_file_loc)
-        LOG.warn("Found %s: %s", self.param_file_loc, home_param)
+        LOG.debug("Found %s: %s", self.param_file_loc, home_param)
         if not home_param:
-            LOG.error("No parameter data for GFN%s-XTB, will likely fail", self.gfn)
-            raise RuntimeError(f"Missing parameter file for Xtb: {xtb_param_file}")
+            LOG.debug("No parameter data for GFN%s-XTB, will likely fail", self.gfn)
+            #raise RuntimeError(f"Missing parameter file for Xtb: {xtb_param_file}")
         self.name = name
         self.kwargs = kwargs
         self.last_output_contents = None
@@ -156,6 +156,9 @@ class XtbOptimizer:
                 **self.kwargs,
             )
             Path(exe.input_file).write_text(input_contents)
+            if(molecule.charge != 0): Path(exe.charge_file).write_text(str(molecule.charge))
+            if(molecule.multiplicity != 1): Path(exe.uhf_file).write_text(str(molecule.multiplicity))
+
             t1 = time.time()
             try:
                 exe.run()
@@ -174,9 +177,12 @@ class XtbOptimizer:
             if exe.opt and success:
                 result = load_turbomole_string(exe.opt_coord_contents)
                 result = Molecule(**result)
+                result.properties["name"] = molecule.name + "_xtbopt"
                 result.properties["scf_energy"] = final * 2625.499639
                 result.properties["scf_energy_units"] = "kj/mol"
                 result.properties["scf_energy_method"] = f"GFN{self.gfn}-XTB"
+                result.charge = molecule.charge
+                result.multiplicity = molecule.multiplicity
         return result
 
     def single_point_molecule(self, molecule, engine="rf"):

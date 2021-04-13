@@ -163,10 +163,12 @@ def kabsch_rotation_matrix(A, B):
 
     # Calculate the covariance matrix
     cov = np.dot(np.transpose(A), B)
+    print("Cov\n{}\n".format(cov))
 
     # Use singular value decomposition to calculate
     # the optimal rotation matrix
     v, s, w = np.linalg.svd(cov)
+    print("v\n{}\ns\n{}\nw\n{}\n".format(v, s, w))
 
     # check the determinant to ensure a right-handed
     # coordinate system
@@ -174,4 +176,5 @@ def kabsch_rotation_matrix(A, B):
         s[-1] = -s[-1]
         v[:, -1] = -v[:, -1]
     R = np.dot(v, w)
+    print("R\n{}\n", R)
     return R

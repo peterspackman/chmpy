@@ -15,7 +15,7 @@ def surface_charge(charges, epsilon, x=0.5):
 
 def coulomb_matrix(points):
     N = points.shape[0]
-    C = np.empty((N, N))
+    C = np.zeros((N, N))
     np.fill_diagonal(C, 0.0)
     C[np.triu_indices(N, k=1)] = 1 / pdist(points)
     C += C.T
@@ -50,7 +50,6 @@ def minimize_cosmo_energy(points, areas, charges, **kwargs):
     d0 = 1.0 / Sii
 
     qprev = initial_charge_scale_factor * qinit * d0
-
     prev_q = []
     prev_dq = []
 

@@ -923,6 +923,34 @@ class Molecule:
             np.dot(self.positions, rotation, out=self.positions)
             self.positions += origin
 
+    def axes(self, homogeneous=False, method="pca"):
+        if method == "pca":
+            axes, s, vh = np.linalg.svd((self.positions - self.center_of_mass).T)
+        else:
+            raise ValueError(f"Unknown molecular axis method '{method}'")
+        if homogeneous:
+            transform = np.eye(4)
+            transform[:3, :3] = axes
+            translation = -np.dot(axes, self.center_of_mass)
+            transform[:3, 3] = translation
+            transform[np.abs(transform) < 1e-15] = 0
+            return transform
+        return axes
+
+    def positions_in_molecular_axis_frame(self, method="pca"):
+        if method not in ("pca",):
+            raise NotImplementedError("Only pca implemented")
+        if len(self) == 1:
+            return np.array([[0.0, 0.0, 0.0]])
+        axis = self.axes(method=method)
+        return np.dot(self.positions - self.center_of_mass, axis.T)
+
+    def oriented(self, method="pca"):
+        from copy import deepcopy
+        result = deepcopy(self)
+        result.positions = self.positions_in_molecular_axis_frame(method=method)
+        return result
+
     def rotated(self, rotation, origin=(0, 0, 0)):
         """
         Convenience method to construct a new copy of thismolecule

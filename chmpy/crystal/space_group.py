@@ -103,6 +103,7 @@ class SpaceGroup:
         self.symmetry_operations = [
             SymmetryOperation.from_integer_code(s) for s in symops
         ]
+        self._sgdata = sgdata
 
     @property
     def cif_section(self) -> str:
@@ -111,6 +112,22 @@ class SpaceGroup:
             "{} {}".format(i, sym.cif_form)
             for i, sym in enumerate(self.symmetry_operations, start=1)
         )
+
+    def crystal17_spacegroup_symbol(self):
+        tokens = []
+        s = self._sgdata.international.upper()
+        if "=" in s: s = s.split("=")[-1]
+        s = iter(s)
+        for ch in s:
+            if ch == "_":
+                tokens[-1] += next(s)
+            elif ch == "/":
+                tokens[-1] += ch + next(s)
+            elif ch == "-":
+                tokens.append(ch + next(s))
+            else:
+                tokens.append(ch)
+        return " ".join(tokens)
 
     @property
     def crystal_system(self) -> str:

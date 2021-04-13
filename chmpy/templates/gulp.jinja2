@@ -1,0 +1,16 @@
+{{ keywords | join(' ') }}
+{% if spacegroup %}
+space
+{{spacegroup}}
+{% endif %}
+{% if cell %}
+cell
+{{cell}}
+{% endif %}
+{% if frac %}frac{% else %}cart{% endif %}
+{% for e, (x, y, z) in atoms -%}
+{{e}} core {{"%10.6f" | format(x)}} {{"%10.6f" | format(y)}} {{"%10.6f" | format(z)}}
+{% endfor -%}
+{% for keyword, argument in additional_keywords.items() %}
+{{keyword}} {{argument}}
+{% endfor %}
