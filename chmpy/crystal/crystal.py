@@ -31,7 +31,6 @@ def _nearest_molecule_idx(vertices, el, pos):
     t2 = time()
     l = labels[idxs]
     u, idxs = np.unique(l, return_inverse=True)
-    print(f"Took {t2 - t1}s for fragment patch coloring")
     return np.arange(len(u), dtype=np.uint8)[idxs]
 
 
@@ -1796,7 +1795,7 @@ class Crystal:
 
         hklmax = np.array([-np.inf, -np.inf, -np.inf])
         hklmin = np.array([np.inf, np.inf, np.inf])
-        frac_radius = radius / np.array(self.unit_cell.lengths)
+        frac_radius = radius * 2/ np.array(self.unit_cell.lengths)
 
         for pos in self.asymmetric_unit.positions:
             hklmax = np.maximum(hklmax, np.ceil(frac_radius + pos))

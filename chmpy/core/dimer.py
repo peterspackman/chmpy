@@ -1,6 +1,7 @@
 """Module for pairs of molecules, handling symmetry relations and more."""
 import numpy as np
 import logging
+from chmpy.core import Molecule
 
 LOG = logging.getLogger(__name__)
 
@@ -91,6 +92,12 @@ class Dimer:
             self.seitz_b[:3, 3] += self.frac_shift
             self.symm_str = encode_symm_str(self.seitz_b[:3, :3], self.seitz_b[:3, 3])
         return self.transform_ab
+
+    def supermolecule(self):
+        return Molecule.from_arrays(
+            np.hstack((self.a.atomic_numbers, self.b.atomic_numbers)),
+            np.vstack((self.a.positions, self.b.positions))
+        )
 
     @property
     def separations(self):

@@ -102,5 +102,5 @@ def minimize_cosmo_energy(points, areas, charges, **kwargs):
         qprev[:] = qcur[:]
 
     G = -0.5 * qinit.dot(qcur)
-    LOG.debug("Energy: %16.9f kJ/mol", G_kj=G * AU_TO_KJ_PER_MOL)
+    LOG.debug("Energy: %16.9f kJ/mol", G * AU_TO_KJ_PER_MOL)
     return COSMOResult(qinit, qcur, G)

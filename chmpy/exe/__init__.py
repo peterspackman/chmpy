@@ -1,4 +1,5 @@
 from .gaussian import Gaussian
+from .gulp import Gulp
 from .tonto import Tonto
 from .xtb import Xtb
 from .exe import run_subprocess, AbstractExecutable, ReturnCodeError

@@ -32,6 +32,7 @@ class Xtb(AbstractExecutable):
         self.opt_log_contents = None
         self.opt_coord_contents = None
         self.kwargs = kwargs.copy()
+        self.esp_contents = None
         self.working_directory = working_directory
         self.args = [self.input_file, "--gfn", str(self.gfn)]
         if self.solvent is not None:
@@ -62,6 +63,10 @@ class Xtb(AbstractExecutable):
     def output_file(self):
         return join(self.working_directory, self._output_file)
 
+    @property
+    def esp_file(self):
+        return join(self.working_directory, "xtb_esp.dat")
+
     def resolve_dependencies(self):
         """Do whatever needs to be done before running
         the job (e.g. write input file etc.)"""
@@ -87,6 +92,8 @@ class Xtb(AbstractExecutable):
             if exists(loc):
                 LOG.debug("Reading %s: %s", k, loc)
                 setattr(self, k + "_contents", Path(loc).read_text())
+        if exists(self.esp_file):
+            setattr(self, "esp_contents", Path(self.esp_file).read_text())
 
     def run(self, *args, **kwargs):
         LOG.debug("Running `xtb %s`", " ".join(self.args))
