@@ -6,6 +6,7 @@ from pathlib import Path
 from chmpy.util.exe import which
 import copy
 from tempfile import TemporaryFile
+import numpy as np
 
 XTB_EXEC = which("xtb")
 LOG = logging.getLogger("xtb")
@@ -14,6 +15,7 @@ LOG = logging.getLogger("xtb")
 class Xtb(AbstractExecutable):
     _input_file = "xtb.coord"
     _charge_file = ".CHRG"
+    _partial_charge_file = "charges"
     _uhf_file = ".UHF"
     _output_file = "xtbopt.stdout"
     _executable_location = XTB_EXEC
@@ -32,13 +34,13 @@ class Xtb(AbstractExecutable):
         self.opt_log_contents = None
         self.opt_coord_contents = None
         self.kwargs = kwargs.copy()
-        self.esp_contents = None
+        self.esp = None
         self.working_directory = working_directory
-        self.args = [self.input_file, "--gfn", str(self.gfn)]
+        self.args = [self.input_file, f"--gfn{self.gfn}"]
         if self.solvent is not None:
             self.args += ["--gbsa", self.solvent]
         LOG.debug(
-            "Initializing GFN%s-XTB calculation opt: %s, timeout: %ss",
+            "Initializing GFN%s-xTB calculation opt: %s, timeout: %ss",
             self.gfn,
             self.opt,
             self.timeout,
@@ -54,6 +56,10 @@ class Xtb(AbstractExecutable):
     @property
     def charge_file(self):
         return join(self.working_directory, self._charge_file)
+
+    @property
+    def partial_charge_file(self):
+        return join(self.working_directory, self._partial_charge_file)
 
     @property
     def uhf_file(self):
@@ -93,7 +99,10 @@ class Xtb(AbstractExecutable):
                 LOG.debug("Reading %s: %s", k, loc)
                 setattr(self, k + "_contents", Path(loc).read_text())
         if exists(self.esp_file):
-            setattr(self, "esp_contents", Path(self.esp_file).read_text())
+            setattr(self, "esp", np.loadtxt(self.esp_file))
+
+        if exists(self.partial_charge_file):
+            setattr(self, "partial_charges", np.loadtxt(self.partial_charge_file))
 
     def run(self, *args, **kwargs):
         LOG.debug("Running `xtb %s`", " ".join(self.args))

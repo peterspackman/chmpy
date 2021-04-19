@@ -1535,6 +1535,9 @@ class Crystal:
             data_block_name = self.titl
         if "cif_data" in self.properties:
             cif_data = self.properties["cif_data"]
+            cif_data["atom_site_fract_x"] = self.asymmetric_unit.positions[:, 0]
+            cif_data["atom_site_fract_y"] = self.asymmetric_unit.positions[:, 1]
+            cif_data["atom_site_fract_z"] = self.asymmetric_unit.positions[:, 2]
         else:
             cif_data = {
                 "audit_creation_method": f"chmpy python library version {version}",
@@ -1870,3 +1873,33 @@ class Crystal:
         tree = KDTree(npos)
         distances, idx = tree.query(points)
         return neighbour_info, nidx[idx]
+
+    def normalize_hydrogen_bondlengths(self):
+        BONDLENGTHS = {
+            "C": 1.083,
+            "N": 1.009,
+            "O": 0.983,
+            "B": 1.180,
+        }
+        nums = self.asymmetric_unit.atomic_numbers
+        pos_cart = self.to_cartesian(self.asymmetric_unit.positions)
+        H_idxs = np.where(nums == 1)[0]
+        conn, t = self.unit_cell_connectivity() 
+        d = 0.0
+        for key in conn.keys():
+            for h in H_idxs:
+                if h in key:
+                    at = key[1 if key.index(h) == 0 else 0]
+                    d = conn[key]
+                    break
+            else:
+                continue
+            el = str(Element[nums[at]])
+            if el in BONDLENGTHS:
+                v_xh = pos_cart[h, :] - pos_cart[at, :]
+                norm = np.linalg.norm(v_xh)
+                v_xh = BONDLENGTHS[el] * v_xh / norm
+                pos_cart[h, :] = pos_cart[at, :] + v_xh
+        self.asymmetric_unit.positions = self.to_fractional(pos_cart)
+        
+

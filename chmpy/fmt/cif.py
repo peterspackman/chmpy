@@ -100,6 +100,12 @@ def format_field(x):
     "format a field to fixed precision if float otherwise as a string"
     if isinstance(x, float):
         return f"{x:20.12f}"
+    elif isinstance(x, int):
+        return f"{x:20d}"
+    elif isinstance(x, str):
+        if needs_quote(x): return f"'{x}'"
+        else:
+            return x
     else:
         return str(x)
 
