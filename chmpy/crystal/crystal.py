@@ -1535,6 +1535,7 @@ class Crystal:
             data_block_name = self.titl
         if "cif_data" in self.properties:
             cif_data = self.properties["cif_data"]
+            cif_data["audit_creation_method"]: f"chmpy python library version {version}"
             cif_data["atom_site_fract_x"] = self.asymmetric_unit.positions[:, 0]
             cif_data["atom_site_fract_y"] = self.asymmetric_unit.positions[:, 1]
             cif_data["atom_site_fract_z"] = self.asymmetric_unit.positions[:, 2]
