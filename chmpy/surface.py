@@ -3,7 +3,7 @@ import numpy as np
 from collections import namedtuple
 import time
 import logging
-from .mc import marching_cubes
+from chmpy.mc import marching_cubes
 
 IsosurfaceMesh = namedtuple("IsosurfaceMesh", "vertices faces normals vertex_prop")
 LOG = logging.getLogger(__name__)
