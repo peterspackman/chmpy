@@ -1535,7 +1535,7 @@ class Crystal:
             data_block_name = self.titl
         if "cif_data" in self.properties:
             cif_data = self.properties["cif_data"]
-            cif_data["audit_creation_method"]: f"chmpy python library version {version}"
+            cif_data["audit_creation_method"] = f"chmpy python library version {version}"
             cif_data["atom_site_fract_x"] = self.asymmetric_unit.positions[:, 0]
             cif_data["atom_site_fract_y"] = self.asymmetric_unit.positions[:, 1]
             cif_data["atom_site_fract_z"] = self.asymmetric_unit.positions[:, 2]
@@ -1799,11 +1799,13 @@ class Crystal:
 
         hklmax = np.array([-np.inf, -np.inf, -np.inf])
         hklmin = np.array([np.inf, np.inf, np.inf])
-        frac_radius = radius * 2/ np.array(self.unit_cell.lengths)
+        frac_radius = radius * 2 / np.array(self.unit_cell.lengths)
 
         for pos in self.asymmetric_unit.positions:
             hklmax = np.maximum(hklmax, np.ceil(frac_radius + pos))
             hklmin = np.minimum(hklmin, np.floor(pos - frac_radius))
+        hklmin = np.minimum(hklmin, (-1, -1, -1))
+        hklmax = np.maximum(hklmax, (1, 1, 1))
 
         hmax, kmax, lmax = hklmax.astype(int)
         hmin, kmin, lmin = hklmin.astype(int)

@@ -1,9 +1,13 @@
 import errno
 import os
 import sys
+from pathlib import Path
 
 
 ERR_INVALID_NAME = 123  # windows specific error code
+
+def list_directory(pathname):
+    return "\n".join(f"{str(p):<60s} {p.lstat().st_size:>20d}B" for p in Path(pathname).iterdir())
 
 
 def is_valid_pathname(pathname):

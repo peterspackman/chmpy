@@ -121,9 +121,13 @@ class Xtb(AbstractExecutable):
                 tmp.seek(0)
                 self.error_contents = tmp.read().decode("utf-8")
         except ReturnCodeError as e:
+            from chmpy.util.path import list_directory
+            from shutil import copytree
             LOG.error("XTB failed: %s", e)
             self.post_process()
             LOG.error("output: %s", self.output_contents)
+            LOG.error("Directory contents\n%s", list_directory(self.working_directory))
+            copytree(self.working_directory, "failed_job")
             raise e
 
 

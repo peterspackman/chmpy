@@ -43,7 +43,7 @@ def minimize_cosmo_energy(points, areas, charges, **kwargs):
 
     solvent = kwargs.get("solvent", "water")
     epsilon = DIELECTRIC_CONSTANTS.get(solvent, 0.0)
-    LOG.info("Using dielectric constant of %.2f for solvent '%s'", epsilon, solvent)
+    LOG.debug("Using dielectric constant of %.2f for solvent '%s'", epsilon, solvent)
     qinit = surface_charge(charges, epsilon)
     C = coulomb_matrix(points)
     Sii = self_interaction_term(areas)

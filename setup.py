@@ -115,7 +115,8 @@ setup(
     ext_modules=ext_modules,
     entry_points={
         "console_scripts": [
-            "chmpy-convert= chmpy.cmd.convert:main",
+            "chmpy-convert = chmpy.cmd.convert:main",
+            "chmpy-interactions = chmpy.cmd.interactions:main",
         ]
     },
     install_requires=["numpy", "scipy", "trimesh", "matplotlib", "seaborn", "jinja2"],
