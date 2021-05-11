@@ -249,7 +249,9 @@ class Molecule:
             positions.
         """
         if "esp_cube" in self.properties:
-            return self.electrostatic_potential_from_cube(self.properties["esp_cube"], positions)
+            return self.electrostatic_potential_from_cube(
+                self.properties["esp_cube"], positions
+            )
 
         from chmpy.util.unit import BOHR_TO_ANGSTROM
 
@@ -604,6 +606,7 @@ class Molecule:
 
     def calculate_wavefunction(self, method="HF", basis_set="3-21G", program="nwchem"):
         from chmpy.fmt.nwchem import to_nwchem_input
+
         return to_nwchem_input(self, method=method, basis_set=basis_set)
 
     def atomic_shape_descriptors(
@@ -947,6 +950,7 @@ class Molecule:
 
     def oriented(self, method="pca"):
         from copy import deepcopy
+
         result = deepcopy(self)
         result.positions = self.positions_in_molecular_axis_frame(method=method)
         return result

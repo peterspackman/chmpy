@@ -6,12 +6,27 @@ from scipy.spatial.kdtree import cKDTree as KDTree
 LOG = logging.getLogger(__name__)
 
 SOLVENT_RADII = [
-    1.300, 1.638, 1.404, 1.053, 2.0475, 2.00,  
-    1.830, 1.720, 1.720, 1.8018, 1.755, 1.638,  
-    1.404, 2.457, 2.106, 2.160, 2.05
+    1.300,
+    1.638,
+    1.404,
+    1.053,
+    2.0475,
+    2.00,
+    1.830,
+    1.720,
+    1.720,
+    1.8018,
+    1.755,
+    1.638,
+    1.404,
+    2.457,
+    2.106,
+    2.160,
+    2.05,
 ]
 
 DEFAULT_RADIUS = 2.223
+
 
 def get_solvent_radii(atomic_numbers):
     radii = np.empty_like(atomic_numbers, dtype=np.float32)
@@ -22,6 +37,7 @@ def get_solvent_radii(atomic_numbers):
         else:
             radii[i] = DEFAULT_RADIUS
     return radii
+
 
 def solvent_surface(molecule, num_points_per_atom=140, delta=0.1):
     radii = get_solvent_radii(molecule.atomic_numbers)
@@ -51,7 +67,8 @@ def solvent_surface(molecule, num_points_per_atom=140, delta=0.1):
         mask[idxs] = False
 
     surface = surface[mask, :]
-    surface[:, :3] = np.dot(surface[:, :3], axes) + molecule.center_of_mass[np.newaxis, :]
+    surface[:, :3] = (
+        np.dot(surface[:, :3], axes) + molecule.center_of_mass[np.newaxis, :]
+    )
     atom_idx = atom_idx[mask]
     return surface
-

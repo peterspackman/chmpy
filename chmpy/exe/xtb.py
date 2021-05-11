@@ -92,7 +92,7 @@ class Xtb(AbstractExecutable):
             "opt_coord": join(self.working_directory, "xtbopt.coord"),
             "trajectory": join(self.working_directory, "xtbopt.trj"),
             "chg": self.charge_file,
-            "uhf": self.uhf_file
+            "uhf": self.uhf_file,
         }
         for k, loc in opt_files.items():
             if exists(loc):
@@ -123,6 +123,7 @@ class Xtb(AbstractExecutable):
         except ReturnCodeError as e:
             from chmpy.util.path import list_directory
             from shutil import copytree
+
             LOG.error("XTB failed: %s", e)
             self.post_process()
             LOG.error("output: %s", self.output_contents)

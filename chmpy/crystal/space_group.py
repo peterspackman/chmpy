@@ -116,7 +116,8 @@ class SpaceGroup:
     def crystal17_spacegroup_symbol(self):
         tokens = []
         s = self._sgdata.international.upper()
-        if "=" in s: s = s.split("=")[-1]
+        if "=" in s:
+            s = s.split("=")[-1]
         s = iter(s)
         for ch in s:
             if ch == "_":

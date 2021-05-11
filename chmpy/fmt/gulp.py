@@ -12,7 +12,7 @@ Cell = namedtuple("Cell", "a b c alpha beta gamma")
 
 
 def crystal_to_gulp_input(crystal, keywords=[], additional_keywords={}):
-    pos = crystal.asymmetric_unit.positions 
+    pos = crystal.asymmetric_unit.positions
     el = crystal.asymmetric_unit.elements
     return GULP_TEMPLATE.render(
         keywords=keywords,
@@ -25,7 +25,7 @@ def crystal_to_gulp_input(crystal, keywords=[], additional_keywords={}):
 
 
 def molecule_to_gulp_input(molecule, keywords=[], additional_keywords={}):
-    pos = molecule.positions 
+    pos = molecule.positions
     el = molecule.elements
     return GULP_TEMPLATE.render(
         keywords=keywords,
@@ -33,5 +33,3 @@ def molecule_to_gulp_input(molecule, keywords=[], additional_keywords={}):
         atoms=zip(el, pos),
         additional_keywords=additional_keywords,
     )
-
-

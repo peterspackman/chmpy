@@ -103,7 +103,8 @@ def format_field(x):
     elif isinstance(x, int):
         return f"{x:20d}"
     elif isinstance(x, str):
-        if needs_quote(x): return f"'{x}'"
+        if needs_quote(x):
+            return f"'{x}'"
         else:
             return x
     else:

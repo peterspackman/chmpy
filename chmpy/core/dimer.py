@@ -96,7 +96,7 @@ class Dimer:
     def supermolecule(self):
         return Molecule.from_arrays(
             np.hstack((self.a.atomic_numbers, self.b.atomic_numbers)),
-            np.vstack((self.a.positions, self.b.positions))
+            np.vstack((self.a.positions, self.b.positions)),
         )
 
     @property

@@ -27,9 +27,7 @@ def crystal_to_turbomole_string(crystal, **kwargs):
 
 def molecule_to_turbomole_string(molecule, **kwargs):
     return TMOL_TEMPLATE.render(
-        atoms=zip(molecule.positions, molecule.elements),
-        units="angs",
-        blocks=kwargs,
+        atoms=zip(molecule.positions, molecule.elements), units="angs", blocks=kwargs,
     )
 
 

@@ -1535,7 +1535,9 @@ class Crystal:
             data_block_name = self.titl
         if "cif_data" in self.properties:
             cif_data = self.properties["cif_data"]
-            cif_data["audit_creation_method"] = f"chmpy python library version {version}"
+            cif_data[
+                "audit_creation_method"
+            ] = f"chmpy python library version {version}"
             cif_data["atom_site_fract_x"] = self.asymmetric_unit.positions[:, 0]
             cif_data["atom_site_fract_y"] = self.asymmetric_unit.positions[:, 1]
             cif_data["atom_site_fract_z"] = self.asymmetric_unit.positions[:, 2]
@@ -1868,7 +1870,7 @@ class Crystal:
                     d.b.properties["asym_mol_idx"],
                     symm_string(d.b.properties["generator_symop"]),
                     d.symm_str,
-                    d.com_separation
+                    d.com_separation,
                 )
             )
         npos = np.vstack(npos)
@@ -1887,7 +1889,7 @@ class Crystal:
         nums = self.asymmetric_unit.atomic_numbers
         pos_cart = self.to_cartesian(self.asymmetric_unit.positions)
         H_idxs = np.where(nums == 1)[0]
-        conn, t = self.unit_cell_connectivity() 
+        conn, t = self.unit_cell_connectivity()
         d = 0.0
         for key in conn.keys():
             for h in H_idxs:
@@ -1904,5 +1906,3 @@ class Crystal:
                 v_xh = BONDLENGTHS[el] * v_xh / norm
                 pos_cart[h, :] = pos_cart[at, :] + v_xh
         self.asymmetric_unit.positions = self.to_fractional(pos_cart)
-        
-

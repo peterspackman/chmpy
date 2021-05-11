@@ -18,8 +18,11 @@ def load_grid(l_max):
 
     return grid
 
+
 def load_grid_num_points(num_points):
-    ordered_grids = sorted(((k, v) for k, v in _GRIDS_NUM_POINTS.items()), key=lambda x: x[1])
+    ordered_grids = sorted(
+        ((k, v) for k, v in _GRIDS_NUM_POINTS.items()), key=lambda x: x[1]
+    )
     for g, k in ordered_grids:
         if k > num_points:
             break

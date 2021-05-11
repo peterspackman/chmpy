@@ -62,11 +62,7 @@ def molecule_to_meshes(molecule, **kwargs):
             x3 = molecule.positions[b]
             cyl = cylinder(bond_thickness, d, segment=(x1, x3))
             cyl.visual.vertex_colors = np.repeat(
-                [
-                    (100, 100, 100, 255),
-                ],
-                cyl.vertices.shape[0],
-                axis=0,
+                [(100, 100, 100, 255),], cyl.vertices.shape[0], axis=0,
             )
             bond_label = f"bond_{molecule.labels[a]}_{molecule.labels[b]}"
             meshes[bond_label] = cyl

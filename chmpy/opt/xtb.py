@@ -43,7 +43,7 @@ class XtbOptimizer:
         LOG.debug("Found %s: %s", self.param_file_loc, home_param)
         if not home_param:
             LOG.debug("No parameter data for GFN%s-XTB, will likely fail", self.gfn)
-            #raise RuntimeError(f"Missing parameter file for Xtb: {xtb_param_file}")
+            # raise RuntimeError(f"Missing parameter file for Xtb: {xtb_param_file}")
         self.name = name
         self.kwargs = kwargs
         self.last_output_contents = None
@@ -91,11 +91,7 @@ class XtbOptimizer:
 
     def minimize_crystal(self, crystal, engine="inertial"):
         input_contents = turbomole_string(
-            crystal,
-            opt=dict(
-                engine=engine,
-                maxcycle=self.maxcycle,
-            ),
+            crystal, opt=dict(engine=engine, maxcycle=self.maxcycle,),
         )
         LOG.debug("Input contents:\n%s", input_contents)
         result = None
@@ -139,11 +135,7 @@ class XtbOptimizer:
 
     def minimize_molecule(self, molecule, engine="rf"):
         input_contents = turbomole_string(
-            molecule,
-            opt=dict(
-                engine=engine,
-                maxcycle=self.maxcycle,
-            ),
+            molecule, opt=dict(engine=engine, maxcycle=self.maxcycle,),
         )
         LOG.debug("Input contents:\n%s", input_contents)
         result = None
@@ -156,8 +148,10 @@ class XtbOptimizer:
                 **self.kwargs,
             )
             Path(exe.input_file).write_text(input_contents)
-            if(molecule.charge != 0): Path(exe.charge_file).write_text(str(molecule.charge))
-            if(molecule.multiplicity != 1): Path(exe.uhf_file).write_text(str(molecule.multiplicity))
+            if molecule.charge != 0:
+                Path(exe.charge_file).write_text(str(molecule.charge))
+            if molecule.multiplicity != 1:
+                Path(exe.uhf_file).write_text(str(molecule.multiplicity))
 
             t1 = time.time()
             try:

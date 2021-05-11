@@ -10,7 +10,7 @@ NWCHEM_INPUT_TEMPLATE = load_template("nwchem_input")
 
 def to_nwchem_input(molecule, **kwargs):
     blocks = {}
-    tasks = ("scf", )
+    tasks = ("scf",)
 
     method = kwargs.get("method", "scf")
     if method.lower() == "hf":
@@ -30,4 +30,3 @@ def to_nwchem_input(molecule, **kwargs):
         blocks=blocks,
         tasks=tasks,
     )
-

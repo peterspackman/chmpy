@@ -184,11 +184,7 @@ class ElasticTensor:
         GH = (GV + GR) / 2
 
         return {
-            "bulk_modulus_avg": {
-                "voigt": KV,
-                "reuss": KR,
-                "hill": KH,
-            },
+            "bulk_modulus_avg": {"voigt": KV, "reuss": KR, "hill": KH,},
             "shear_modulus_avg": {"voigt": GV, "reuss": GR, "hill": GH},
             "youngs_modulus_avg": {
                 "voigt": 1 / (1 / (3 * GV) + 1 / (9 * KV)),

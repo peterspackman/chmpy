@@ -8,10 +8,12 @@ from .mc import marching_cubes
 IsosurfaceMesh = namedtuple("IsosurfaceMesh", "vertices faces normals vertex_prop")
 LOG = logging.getLogger(__name__)
 
+
 def smooth_laplacian(vertices, faces, **kwargs):
     """Smooth vertices and faces using a Laplacian filter"""
     from trimesh.smoothing import filter_humphrey
     from trimesh import Trimesh
+
     kwargs.setdefault("iterations", 2)
     mesh = Trimesh(vertices, faces)
     filter_humphrey(mesh, **kwargs)
@@ -19,8 +21,7 @@ def smooth_laplacian(vertices, faces, **kwargs):
 
 
 def promolecule_density_isosurface(
-    promol, isovalue=0.002, sep=0.2, props=True, extra_props=None,
-    smoothing="laplacian"
+    promol, isovalue=0.002, sep=0.2, props=True, extra_props=None, smoothing="laplacian"
 ):
     """Calculate the promolecule density isosurface.
 
