@@ -2,7 +2,10 @@ import setuptools
 from setuptools.extension import Extension as Ext
 from numpy.distutils.core import setup, Extension as NumpyExt
 from numpy import get_include
-from Cython.Build import cythonize
+try:
+    from Cython.Build import cythonize
+except ImportError:
+    raise ImportError("Cython is required to build extensions")
 import sys
 
 _EXTRA_COMPILE_ARGS = ["-fopenmp"]
@@ -14,8 +17,10 @@ if sys.platform == "darwin":
 
 ext_modules = [
     NumpyExt(
-        "chmpy.interpolate.linterp",
-        sources=["chmpy/interpolate/linterp.c"],
+        "chmpy.interpolate._linterp",
+        sources=["chmpy/interpolate/_linterp.c"],
+        extra_compile_args=_EXTRA_COMPILE_ARGS,
+        extra_link_args=_EXTRA_LINK_ARGS,
         language="c",
     )
 ]

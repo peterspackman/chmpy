@@ -100,24 +100,24 @@ np_log_interp(PyObject* self, PyObject* args)
 }
 
 
-static PyMethodDef linterp_methods[] = {
+static PyMethodDef _linterp_methods[] = {
     {"log_interp", np_log_interp, METH_VARARGS,
         "Interpolate log spaced data into a new set of pts"
     },
     {NULL, NULL, 0, NULL}
 };
 
-static struct PyModuleDef linterp_mod = 
+static struct PyModuleDef _linterp_mod = 
 {
     PyModuleDef_HEAD_INIT,
-    "linterp", "module docstring",
+    "_linterp", "module docstring",
     -1,
-    linterp_methods
+    _linterp_methods
 };
 
 PyMODINIT_FUNC
-PyInit_linterp(void) 
+PyInit__linterp(void) 
 {
     import_array();
-    return PyModule_Create(&linterp_mod);
+    return PyModule_Create(&_linterp_mod);
 }
