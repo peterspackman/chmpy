@@ -117,6 +117,8 @@ setup(
         "chmpy.subgraphs": ["*.gt"],
         "chmpy.sampling": ["*.npz"],
     },
+    author="Peter Spackman",
+    author_email="peterspackman+chmpy@fastmail.com",
     ext_modules=ext_modules,
     entry_points={
         "console_scripts": [
