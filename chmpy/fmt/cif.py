@@ -3,7 +3,7 @@ from pathlib import Path
 import re
 
 LOG = logging.getLogger(__name__)
-NUM_ERR_REGEX = re.compile(r"([-+]?[0-9]+[.]?[0-9]*)(\(\d+\))?")
+NUM_ERR_REGEX = re.compile(r"([-+]?(\d+([.,]\d*)?|[.,]\d+)([eE][-+]?\d+)?)(\(\d+\))?")
 QUOTE_REGEX = r"{0}\s*([^{0}]*)\s*{0}"
 VALUES_REGEX = re.compile(r"""('.*?'|".*?"|;.*?;|\S+)""")
 
@@ -35,7 +35,8 @@ def parse_value(string, with_uncertainty=False):
     """
     match = NUM_ERR_REGEX.match(string)
     if match and match.span()[1] == len(string):
-        number, uncertainty = match.groups()
+        groups = match.groups()
+        number, uncertainty = groups[0], groups[-1]
         number = float(number)
         if number.is_integer():
             number = int(number)
