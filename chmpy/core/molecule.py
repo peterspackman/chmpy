@@ -940,6 +940,37 @@ class Molecule:
             return transform
         return axes
 
+    def inertia_tensor(self):
+        masses = np.asarray([x.mass for x in self.elements])
+        d = self.positions - self.center_of_mass
+        d2 = d ** 2
+        r2 = (d2).sum(axis=1)
+        tensor = np.empty((3, 3))
+        tensor[0, 0] = np.sum(masses * (d2[:, 1] + d2[:, 2]))
+        tensor[1, 1] = np.sum(masses * (d2[:, 0] + d2[:, 2]))
+        tensor[2, 2] = np.sum(masses * (d2[:, 0] + d2[:, 1]))
+        tensor[0, 1] = - np.sum(masses * d[:, 0] * d[:, 1])
+        tensor[1, 0] = tensor[0, 1]
+        tensor[0, 2] = - np.sum(masses * d[:, 0] * d[:, 2])
+        tensor[2, 0] = tensor[0, 2]
+        tensor[1, 2] = - np.sum(masses * d[:, 1] * d[:, 2])
+        tensor[2, 1] = tensor[1, 2]
+        return tensor
+
+    def principle_moments_of_inertia(self, units="amu angstrom^2"):
+        t = self.inertia_tensor()
+        return np.sort(np.linalg.eig(t)[0])
+
+    def rotational_constants(self, unit="MHz"):
+        from scipy.constants import Planck, speed_of_light, Avogadro
+        from chmpy.util.unit import BOHR_TO_ANGSTROM
+        # convert amu angstrom^2 to g cm^2
+        moments = self.principle_moments_of_inertia() / Avogadro / 1e16
+
+        # convert g cm^2 to kg m^2
+        return 1e5 * Planck / (8 * np.pi * np.pi * speed_of_light * moments)
+
+
     def positions_in_molecular_axis_frame(self, method="pca"):
         if method not in ("pca",):
             raise NotImplementedError("Only pca implemented")

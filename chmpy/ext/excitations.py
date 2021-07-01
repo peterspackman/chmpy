@@ -31,6 +31,7 @@ def plot_spectra(
     kind="gaussian",
     gamma=12.5,
     label=None,
+    **kwargs
 ):
     """Plot the (UV-Vis) spectra.
 
@@ -52,7 +53,7 @@ def plot_spectra(
 
     ax = plt.gca()
     total = total / np.max(total)
-    ax.plot(x, total, label=label)
+    ax.plot(x, total, label=label, **kwargs)
     ax.set_xlabel(r"$\lambda$ (nm)")
     ax.set_ylim(0, 1.1)
     ax.set_ylabel(r"Intensity")
