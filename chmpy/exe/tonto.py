@@ -46,9 +46,7 @@ class Tonto(AbstractExecutable):
         self.stderr_contents = None
         self.extra_inputs = extra_inputs
         self.extra_outputs = extra_outputs
-        self.basis_set_directory = (
-            "/home/uniwa/staff2/staff/00087762/linux/git/tonto/basis_sets"
-        )
+        self.basis_set_directory = ""
 
     @property
     def stdin_file(self):
