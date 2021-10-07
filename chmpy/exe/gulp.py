@@ -14,6 +14,7 @@ LOG = logging.getLogger("gulp")
 class Gulp(AbstractExecutable):
     _input_file = "gulp_job.gin"
     _output_file = "gulp_job.gout"
+    _drv_file = "gulp_job.drv"
     _executable_location = GULP_EXEC
     _timeout = 1800.0
 
@@ -42,17 +43,22 @@ class Gulp(AbstractExecutable):
     def output_file(self):
         return Path(self.working_directory, self._output_file)
 
+    @property
+    def drv_file(self):
+        return Path(self.working_directory, self._drv_file)
+
     def resolve_dependencies(self):
         """Do whatever needs to be done before running
         the job (e.g. write input file etc.)"""
         LOG.debug("Writing GULP input file to %s", self.input_file)
-        Path(self.input_file).write_text(self.input_contents)
+        Path(self.input_file).write_text(self.input_contents + f"\noutput drv {self.drv_file}")
 
     def result(self):
         return self.output_contents
 
     def post_process(self):
         self.output_contents = Path(self.output_file).read_text()
+        self.drv_contents = Path(self.drv_file).read_text()
 
     def run(self, *args, **kwargs):
         LOG.debug("Running %s %s", self._executable_location, self.arg)

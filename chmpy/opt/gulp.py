@@ -2,7 +2,7 @@ from chmpy import Crystal, Molecule
 from collections.abc import Iterable
 from chmpy.exe.gulp import Gulp
 from chmpy.exe import ReturnCodeError, TimeoutExpired
-from chmpy.fmt.gulp import crystal_to_gulp_input, molecule_to_gulp_input
+from chmpy.fmt.gulp import crystal_to_gulp_input, molecule_to_gulp_input, parse_gulp_output
 from pathlib import Path
 import os
 import logging
@@ -57,6 +57,8 @@ class GulpOptimizer:
             t2 = time.time()
             success = exe.output_contents is not None
             self.last_output_contents = exe.output_contents
+            self.last_drv_contents = exe.drv_contents
+            self.last_parsed_output = parse_gulp_output(self.last_output_contents)
             return success
 
 
