@@ -38,6 +38,8 @@ class GulpOptimizer:
         self.additional_keywords = {}
         if "temperature" in kwargs:
             self.additional_keywords["temperature"] = kwargs["temperature"]
+        if "supercell" in kwargs:
+            self.additional_keywords["supercell"] = "{} {} {}".format(*kwargs["supercell"])
 
     def _run_in_tempdir(self, input_contents):
       with TemporaryDirectory(prefix=self.prefix) as tmpdirname:
@@ -69,12 +71,7 @@ class GulpOptimizer:
                 additional_keywords=self.additional_keywords
         )
         LOG.debug("Input contents:\n%s", input_contents)
-        result = None
-        success = self._run_in_tempdir(input_contents)
-        if not success:
-            return None
-        results = find_outputs(self.last_output_contents)
-        return float(results["Total lattice energy"].split()[0])
+        return self._run_in_tempdir(input_contents)
 
     def minimize_crystal(self, crystal, **kwargs):
         input_contents = crystal_to_gulp_input(
@@ -82,12 +79,7 @@ class GulpOptimizer:
             keywords=self.keywords + ["opti"],
             additional_keywords=self.additional_keywords
         )
-        result = None
-        success = self._run_in_tempdir(input_contents)
-        if not success:
-            return None
-        results = find_outputs(self.last_output_contents)
-        return float(results["Total lattice energy"].split()[0])
+        return self._run_in_tempdir(input_contents)
 
     def minimize_molecule(self, molecule, **kwargs):
         input_contents = molecule_to_gulp_input(
@@ -95,12 +87,7 @@ class GulpOptimizer:
             keywords=self.keywords + ["opti"],
             additional_keywords=self.additional_keywords
         )
-        result = None
-        success = self._run_in_tempdir(input_contents)
-        if not success:
-            return None
-        results = find_outputs(self.last_output_contents)
-        return float(results["Total lattice energy"].split()[0])
+        return self._run_in_tempdir(input_contents)
 
     def single_point_molecule(self, molecule, **kwargs):
         input_contents = molecule_to_gulp_input(
@@ -108,13 +95,7 @@ class GulpOptimizer:
             keywords=self.keywords,
             additional_keywords=self.additional_keywords
         )
-        result = None
-        success = self._run_in_tempdir(input_contents)
-        if not success:
-            return None
-        results = find_outputs(self.last_output_contents)
-        return float(results["Total lattice energy"].split()[0])
-
+        return self._run_in_tempdir(input_contents)
 
     def minimize(self, obj, **kwargs):
         if isinstance(obj, Crystal):

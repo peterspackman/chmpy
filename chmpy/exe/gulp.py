@@ -16,7 +16,7 @@ class Gulp(AbstractExecutable):
     _output_file = "gulp_job.gout"
     _drv_file = "gulp_job.drv"
     _executable_location = GULP_EXEC
-    _timeout = 1800.0
+    _timeout = 86400.0
 
     def __init__(self, input_contents, *args, working_directory=".", **kwargs):
         self._timeout = kwargs.get("timeout", self._timeout)

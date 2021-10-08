@@ -39,19 +39,21 @@ def parse_value(string, with_units=False):
     12.566
     """
     match = NUMBER_REGEX.match(string)
-    if match:
-        groups = match.groups()
-        number = groups[0]
-        number = float(number)
-        if number.is_integer():
-            number = int(number)
-        if with_units and len(groups) > 1:
-            return number, groups[1]
-        return number
-    else:
-        s = string.strip()
-        if s[0] == s[-1] and s[0] in ("'", ";", '"'):
-            return parse_quote(string, delimiter=s[0])
+    try:
+        if match and match:
+            groups = match.groups()
+            number = groups[0]
+            number = float(number)
+            if number.is_integer():
+                number = int(number)
+            if with_units and len(groups) > 1:
+                return number, groups[1]
+            return number
+        else:
+            s = string.strip()
+            return s
+    except Exception as e:
+        print(e)
     return string
 
 
@@ -88,7 +90,6 @@ def parse_single_line(line):
 def parse_gulp_output(contents):
     lines = contents.splitlines()
     lines_iter = iter(lines)
-    print(lines_iter)
     outputs = {}
     for line in lines_iter:
         result = parse_single_line(line)
