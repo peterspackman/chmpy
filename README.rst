@@ -76,7 +76,7 @@ class:
     >>> surfaces
     [<trimesh.Trimesh(vertices.shape=(584, 3), faces.shape=(1164, 3))>]
     # Surfaces can be saved via trimesh, or a utility function provided in chmpy
-    >>> from chmpy.util import save_mesh
+    >>> from chmpy.util.mesh import save_mesh
     >>> save_mesh(surfaces[0], "acetic_acid.ply")
     
 The resulting surface should look something like this when visualized:
