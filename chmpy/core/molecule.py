@@ -363,12 +363,42 @@ class Molecule:
         return cls.from_fchk_string(Path(filename).read_text(), **kwargs)
 
     @classmethod
+    def from_mol2_string(cls, contents, **kwargs):
+        from chmpy.fmt.mol2 import parse_mol2_string
+        atoms, bonds = parse_mol2_string(contents)
+        elements = [Element[x] for x in atoms.pop("type")]
+
+        N = len(elements)
+
+        positions = np.array([
+            tuple(p) for p in zip(atoms.pop("x"), atoms.pop("y"), atoms.pop("z"))
+        ])
+
+        labels = None
+        if "name" in atoms:
+            labels = atoms.pop("name")
+
+        bondlist = None
+        if bonds != {}:
+            bondlist = dok_matrix((N, N))
+
+            for a, b, t in zip(bonds["origin"], bonds["target"], bonds["type"]):
+                bondlist[a - 1, b - 1] = int(t)
+
+        return cls(elements, positions, bonds=bondlist, labels=labels, **atoms, **kwargs)
+
+    @classmethod
+    def from_mol2_file(cls, filename, **kwargs):
+        return cls.from_mol2_string(Path(filename).read_text(), **kwargs)
+
+    @classmethod
     def _ext_load_map(cls):
         return {
             ".xyz": cls.from_xyz_file,
             ".sdf": cls.from_sdf_file,
             ".fchk": cls.from_fchk_file,
             ".coord": cls.from_turbomole_file,
+            ".mol2": cls.from_mol2_file,
         }
 
     @classmethod

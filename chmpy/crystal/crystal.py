@@ -1226,14 +1226,14 @@ class Crystal:
         for n, pos, neighbour_els, neighbour_pos in self.atomic_surroundings(
             radius=radius
         ):
-            ubound = Element[n].vdw_radius * 3
+            ubound = Element[n].vdw_radius * 3 + 2.0
             desc = stockholder_weight_descriptor(
                 sph,
                 [n],
                 [pos],
                 neighbour_els,
                 neighbour_pos,
-                bounds=(0.2, ubound),
+                bounds=(0.15, ubound),
                 coefficients=return_coefficients,
             )
             if return_coefficients:
@@ -1511,6 +1511,17 @@ class Crystal:
         p = Path(filename)
         titl = p.stem
         return cls.from_crystal17_opt_string(p.read_text(), titl=titl, **kwargs)
+
+    @classmethod
+    def from_molecule(cls, molecule, **kwargs):
+        unit_cell = UnitCell.cubic(1000)
+
+        asym = AsymmetricUnit(
+            elements=molecule.elements, positions=unit_cell.to_fractional(molecule.positions),
+            labels=molecule.labels
+        )
+        space_group = SpaceGroup(1)
+        return cls(unit_cell, space_group, asym)
 
     @property
     def name(self) -> str:

@@ -1,8 +1,7 @@
 from chmpy.crystal import Crystal
 from pathlib import Path
 from tqdm import tqdm
-import pickle
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed
 import logging
 import numpy as np
 
