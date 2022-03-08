@@ -1032,6 +1032,8 @@ class Crystal:
                 normals=iso.normals,
                 vertex_colors=color,
             )
+            for k, v in iso.vertex_prop.items():
+                mesh.vertex_attributes[k] = v
             meshes.append(mesh)
         return meshes
 
