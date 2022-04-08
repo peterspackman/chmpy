@@ -6,15 +6,6 @@ from chmpy.crystal import Crystal
 from .. import TEST_FILES
 
 
-try:
-    import shtns
-
-    HAVE_SHTNS = True
-except ImportError as e:
-    HAVE_SHTNS = False
-
-
-@unittest.skipUnless(HAVE_SHTNS, "requires SHTns library")
 class ShapeDescriptorTestCase(unittest.TestCase):
     def setUp(self):
         self.water = Crystal.load(TEST_FILES["iceII.cif"])

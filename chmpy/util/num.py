@@ -1,5 +1,6 @@
 import numpy as np
 from numbers import Number
+from typing import Tuple
 
 
 def is_perfect_square(value: Number) -> bool:
@@ -69,6 +70,32 @@ def spherical_to_cartesian(rtp: np.ndarray, dtype=np.float64) -> np.ndarray:
 
     return xyz
 
+def spherical_to_cartesian_mgrid(r: np.ndarray, t: np.ndarray, p: np.ndarray):
+    """
+    Given 3 arrays of (r, theta, phi) spherical coordinates
+    return 3 arrays of Cartesian(x, y, z) coordinates.
+
+    Uses the following convention::
+
+        x = r sin(theta) cos(phi)
+        y = r sin(theta) sin(phi)
+        z = r cos(theta)
+
+    Args:
+        r (array_like): array of of r coordinates
+            in the above spherical coordinate system.
+
+        t (array_like): array of of theta coordinates
+            in the above spherical coordinate system.
+
+        p (array_like): array of phi coordinates
+            in the above spherical coordinate system.
+        dtype: numpy datatype or string
+
+    Returns:
+        Tuple[np.ndarray]: 3 arrays of x,y,z Cartesian coordinates
+    """
+    return r * np.sin(t) * np.cos(p), r * np.sin(t) * np.sin(p), r * np.cos(t)
 
 def cartesian_to_spherical(xyz: np.ndarray, dtype=np.float64) -> np.ndarray:
     """

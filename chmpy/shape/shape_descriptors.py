@@ -132,10 +132,11 @@ def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
     property_function = kwargs.get("with_property", None)
     r_min, r_max = kwargs.get("bounds", (0.1, 20.0))
     s = StockholderWeight.from_arrays(n_i, p_i, n_e, p_e, background=background)
-    g = np.empty(sht.grid.shape, dtype=np.float32)
-    g[:, :] = sht.grid[:, :]
+    g = np.empty((sht.grid[0].size, 2), dtype=np.float32)
+    g[:, 0] = sht.grid[0].flatten()
+    g[:, 1] = sht.grid[1].flatten()
     o = kwargs.get("origin", np.mean(p_i, axis=0, dtype=np.float32))
-    r = sphere_stockholder_radii(s.s, o, g, r_min, r_max, 1e-7, 30, isovalue)
+    r = sphere_stockholder_radii(s.s, o, g, r_min, r_max, 1e-7, 30, isovalue).reshape(sht.grid[0].shape)
     if np.any(r < 0):
         raise ValueError(
             f"Unable to find isovalue {isovalue:.2f} in all directions for bounds ({r_min:.2f}, {r_max:.2f})"
@@ -152,17 +153,18 @@ def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
             property_function = Molecule.from_arrays(
                 s.dens_a.elements, s.dens_a.positions
             ).electrostatic_potential
-        xyz = sht.grid_cartesian * r[:, np.newaxis]
+        x, y, z = sht.grid_cartesian
+        xyz = np.c_[x.flatten(), y.flatten(), z.flatten()] * r.flatten()[:, np.newaxis]
         prop_values = property_function(xyz)
         r_cplx = np.empty(r.shape, dtype=np.complex128)
         r_cplx.real = r
-        r_cplx.imag = prop_values
+        r_cplx.imag = prop_values.reshape(r.shape)
         r = r_cplx
         real = False
-    l_max = sht.l_max
-    coeffs = sht.analyse(r)
+    l_max = sht.lmax
+    coeffs = sht.analysis(r)
     invariants = make_invariants(
-        l_max, coeffs, kinds=kwargs.get("kinds", "NP"), real=real
+        l_max, coeffs, kinds=kwargs.get("kinds", "NP"), real=False
     )
     if kwargs.get("coefficients", False):
         return coeffs, invariants

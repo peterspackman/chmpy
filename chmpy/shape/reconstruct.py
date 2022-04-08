@@ -16,12 +16,15 @@ def reconstruct(coefficients, real=True):
         l_max = int(np.sqrt(len(coefficients))) - 1
         func = "synth_cplx"
     LOG.debug("Reconstructing deduced l_max = %d", l_max)
-    sht = SHT(l_max=l_max)
-    pts = sht.grid_cartesian * getattr(sht, func)(coefficients)[:, np.newaxis]
+    sht = SHT(l_max)
+    x, y, z = sht.grid_cartesian
+    pts = np.c_[x.flatten(), y.flatten(), z.flatten()]
+    pts = sht.grid_cartesian * sht.synthesis(coefficients)[:, np.newaxis].real
     return pts
 
 
 def reconstructed_surface(coefficients, real=True, subdivisions=3):
+    raise NotImplementedError("Not implmented yet for new SHT yet")
     if real:
         n = len(coefficients)
         l_max = int((-3 + np.sqrt(8 * n + 1)) // 2)
@@ -31,7 +34,7 @@ def reconstructed_surface(coefficients, real=True, subdivisions=3):
             "Complex reconstructed surface case not yet implemented"
         )
     LOG.debug("Reconstructing deduced l_max = %d", l_max)
-    sht = SHT(l_max=l_max)
+    sht = SHT(l_max)
 
     from trimesh.creation import icosphere
 

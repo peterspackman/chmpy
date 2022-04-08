@@ -1,116 +1,190 @@
 import numpy as np
-from chmpy.util.num import spherical_to_cartesian
+from chmpy.util.num import spherical_to_cartesian_mgrid
+from .assoc_legendre import AssocLegendre
+from scipy.special import roots_legendre
+from scipy.fft import fft, ifft
+
 
 _SHT_CACHE = {}
 
-
 class SHT:
-    """Class encapsulating the logic of spherical harmonic transform implementations
+    def __init__(self, lm):
+        self.lmax = lm
+        self.plm = AssocLegendre(lm)
 
-    Parameters
-    ----------
-    l_max: int
-        maximum angular momentum for the transform
-    """
+        self.nphi = 2 * lm + 1
+        self.phi = np.arange(self.nphi) * 2 / self.nphi * np.pi - np.pi
+        self.ntheta = 1
+        while (self.ntheta <= self.nphi):
+            self.ntheta *= 2
+        
+        self.cos_theta, self.weights, self.total_weight = roots_legendre(self.ntheta, mu=True)
+        self.weights *= 4 * np.pi / self.total_weight
+        self.theta = np.arccos(self.cos_theta)
 
-    _shtns = None
-    _l_max = 2
-    _grid = None
-    _grid_cartesian = None
+        self.fft_work_array = np.empty(self.nphi, dtype=np.complex128)
+        self.plm_work_array = np.empty(self.nplm())
+        self._grid = None
+        self._grid_cartesian = None
 
-    def __init__(self, l_max):
-        import shtns
+    def idx_c(self, l, m):
+        return l * (l + 1) + m
 
-        self._l_max = l_max
-        if l_max not in _SHT_CACHE:
-            sht = shtns.sht(l_max, l_max)
-            ntheta, nphi = sht.set_grid()
-            _SHT_CACHE[l_max] = (sht, ntheta, nphi)
+    def nlm(self):
+        return (self.lmax + 1) * (self.lmax + 1)
 
-        self._shtns, self.ntheta, self.nphi = _SHT_CACHE[l_max]
+    def nplm(self):
+        return (self.lmax + 1) * (self.lmax + 2) // 2
 
-    @property
-    def mgrid(self):
-        return np.meshgrid(
-            np.arccos(self._shtns.cos_theta),
-            np.arange(self.nphi) * (2 * np.pi / self.nphi),
-        )
+    def compute_on_grid(self, func):
+        values = func(*self.grid)
+        return values
+
+    def analysis(self, values):
+        coeffs = np.zeros(self.nlm(), dtype=np.complex128)
+        for itheta, (ct, w) in enumerate(zip(self.cos_theta, self.weights)):
+            self.fft_work_array[:] = values[itheta, :]
+
+            fft(self.fft_work_array, norm="forward", overwrite_x=True) 
+            self.plm.evaluate_batch(ct, result=self.plm_work_array)
+            plm_idx = 0
+	        # m = 0 case
+            for l in range(self.lmax + 1):
+                l_offset = l * (l + 1)
+                p = self.plm_work_array[plm_idx]
+                coeffs[l_offset] += np.conj(self.fft_work_array[0]) * p * w
+                plm_idx += 1
+
+            for m in range(1, self.lmax + 1):
+                for l in range(m, self.lmax + 1):
+                    l_offset = l * (l + 1)
+                    p = self.plm_work_array[plm_idx]
+                    m_idx_neg = self.nphi - m
+                    m_idx_pos = m
+                    if m & 1:
+                        coeffs[l_offset - m] += self.fft_work_array[m_idx_neg] * p * w
+                        coeffs[l_offset + m] += self.fft_work_array[m_idx_pos] * p * w
+                    else:
+                        coeffs[l_offset - m] += np.conj(self.fft_work_array[m_idx_neg]) * p * w
+                        coeffs[l_offset + m] += np.conj(self.fft_work_array[m_idx_pos]) * p * w
+                    plm_idx += 1
+        return coeffs
+
+    def synthesis(self, coeffs):
+        values = np.zeros((self.ntheta, self.nphi), dtype=np.complex128)
+        for itheta, ct in enumerate(self.cos_theta):
+            self.fft_work_array[:] = 0
+            self.plm.evaluate_batch(ct, result=self.plm_work_array)
+
+            plm_idx = 0
+	        # m = 0 case
+            for l in range(self.lmax + 1):
+                l_offset = l * (l + 1)
+                p = self.plm_work_array[plm_idx]
+                self.fft_work_array[0] += coeffs[l_offset] * p
+                plm_idx += 1
+
+            for m in range(1, self.lmax + 1):
+                for l in range(m, self.lmax + 1):
+                    l_offset = l * (l + 1)
+                    p = self.plm_work_array[plm_idx]
+                    m_idx_neg = self.nphi - m
+                    m_idx_pos = m
+                    if m & 1:
+                        self.fft_work_array[m_idx_neg] += coeffs[l_offset - m] * p
+                        self.fft_work_array[m_idx_pos] += coeffs[l_offset + m] * p
+                    else:
+                        self.fft_work_array[m_idx_neg] += np.conj(coeffs[l_offset - m]) * p
+                        self.fft_work_array[m_idx_pos] += np.conj(coeffs[l_offset + m]) * p
+                    plm_idx += 1
+
+            ifft(self.fft_work_array, norm="forward", overwrite_x=True) 
+            values[itheta, :] = self.fft_work_array[:]
+        return values
 
     @property
     def grid(self):
-        "The set of angular grid points for this SHT"
-        if self._grid is None:
-            nphi = self.nphi
-            self.phi, self.theta = np.meshgrid(
-                np.arccos(self._shtns.cos_theta), np.arange(nphi) * (2 * np.pi / nphi)
-            )
-            self.phi = self.phi.flatten()
-            self.theta = self.theta.flatten()
-            self._grid = np.vstack((self.theta, self.phi)).transpose()
-            self._grid_cartesian = spherical_to_cartesian(
-                np.c_[np.ones(self._grid.shape[0]), self._grid[:, 1], self._grid[:, 0]]
-            )
-        return self._grid
+        return np.meshgrid(
+            self.theta,
+            self.phi, indexing="ij"
+        )
 
     @property
     def grid_cartesian(self):
         "The set of cartesian grid points for this SHT"
-        if self._grid_cartesian is None:
-            nphi = self.nphi
-            self.phi, self.theta = np.meshgrid(
-                np.arccos(self._shtns.cos_theta), np.arange(nphi) * (2 * np.pi / nphi)
-            )
-            self.phi = self.phi.flatten()
-            self.theta = self.theta.flatten()
-            self._grid = np.vstack((self.theta, self.phi)).transpose()
-            self._grid_cartesian = spherical_to_cartesian(
-                np.c_[np.ones(self._grid.shape[0]), self._grid[:, 1], self._grid[:, 0]]
-            )
-        return self._grid_cartesian
+        theta, phi = self.grid
+        r = np.ones_like(theta)
+        return spherical_to_cartesian_mgrid(r, theta, phi)
 
-    def analyse(self, values):
-        """Perform a spherical harmonic transform given a grid and a set of values
+def test_func(theta, phi):
+    return (1.0 + 0.01 * np.cos(theta) +
+                0.1 * (3.0 * np.cos(theta) * np.cos(theta) - 1.0) +
+                (np.cos(phi) + 0.3 * np.sin(phi)) * np.sin(theta) +
+                (np.cos(2.0 * phi) + 0.1 * np.sin(2.0 * phi)) * 
+                 np.sin(theta) * np.sin(theta) * (7.0 * np.cos(theta) * np.cos(theta) - 1.0) * 3.0/8.0
+           )
 
-        Parameters
-        ----------
-        values: :obj:`np.ndarray`
-            set of scalar function values associated with grid points
-        """
-        desired_shape = self._shtns.spat_shape[::-1]
-        grid = self._grid
-        if values.dtype == np.complex128:
-            return self._shtns.analys_cplx(values.reshape(desired_shape).transpose())
-        else:
-            return self._shtns.analys(values.reshape(desired_shape).transpose())
 
-    def synth_cplx(self, coefficients):
-        """Perform an inverse spherical harmonic transform given a set of coefficients
+if __name__ == "__main__":
 
-        Arguments
-        ----------
-        coefficients: :obj:`np.ndarray`
-            set of spherical harmonic coefficient
-        """
-        max_coeff = (self.l_max + 1) ** 2
-        return self._shtns.synth_cplx(coefficients[:max_coeff]).transpose().flatten()
+    plm = AssocLegendre(4)
 
-    def synth_real(self, coefficients):
-        """Perform an inverse spherical harmonic transform given a set of coefficients
+    expected_plm = np.array([
+        0.28209479177387814,
+        0.24430125595145993,
+        -0.07884789131313,
+        -0.326529291016351,
+        -0.24462907724141,
+        0.2992067103010745,
+        0.33452327177864455,
+        0.06997056236064664,
+        -0.25606603842001846,
+        0.2897056515173922,
+        0.3832445536624809,
+        0.18816934037548755,
+        0.27099482274755193,
+        0.4064922341213279,
+        0.24892463950030275,
+    ])
 
-        Arguments
-        ----------
-        coefficients: :obj:`np.ndarray`
-            set of spherical harmonic coefficient
-        """
+    print("Plm correct: ", np.allclose(expected_plm, plm.evaluate_batch(0.5)))
 
-        max_coeff = (self._l_max + 2) * (self._l_max + 1) // 2
-        return self._shtns.synth(coefficients[:max_coeff]).transpose().flatten()
 
-    @property
-    def l_max(self):
-        """Maximum angular momenta used in this SHT"""
-        return self._l_max
+    s = SHT(4)
+    coeffs = s.analysis(test_func)
 
+    expected = np.array([
+        np.sqrt(4 * np.pi), # 0 0 
+        -np.sqrt(2 * np.pi / 3) - 0.3 * np.sqrt(2 * np.pi / 3) *1j, # 1 -1
+	    0.01 * np.sqrt(4 * np.pi / 3.0), # 1 0
+        -np.sqrt(2 * np.pi / 3) + 0.3 * np.sqrt(2 * np.pi / 3) *1j, # 1 1
+        0.0, # 2 -2
+        0.0, # 2 -1
+        0.1 * np.sqrt(16 * np.pi / 5.0), # 2  0
+        0.0, # 2  1
+        0.0, # 2  2
+        0.0, # 3 -3
+        0.0, # 3 -2
+        0.0, # 3 -1
+        0.0, # 3  0
+        0.0, # 3  1
+        0.0, # 3  2
+        0.0, # 3  3
+        0.0, # 4 -4
+        0.0, # 4 -3
+        0.5 * np.sqrt(2 * np.pi / 5.0) - 0.05 * np.sqrt(2.0 * np.pi / 5.0) * 1j, # 4  2
+        0.0, # 4 -1
+        0.0, # 4  0
+        0.0, # 4  1
+        0.5 * np.sqrt(2 * np.pi / 5.0) + 0.05 * np.sqrt(2.0 * np.pi / 5.0) * 1j, # 4  2
+        0.0, # 4  3
+        0.0, # 4  4
+    ], dtype=np.complex128)
+
+    if not np.allclose(expected, coeffs):
+        print(coeffs - expected)
+    else:
+        print("Coeffs correct: true")
 
 def plot_sphere(name, grid, values):
     """Plot a function on a spherical surface.

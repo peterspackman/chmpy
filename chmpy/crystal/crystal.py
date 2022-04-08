@@ -1065,7 +1065,7 @@ class Crystal:
         descriptors = []
         from chmpy.shape import SHT, stockholder_weight_descriptor
 
-        sph = SHT(l_max=l_max)
+        sph = SHT(l_max)
         for (
             in_els,
             in_pos,
@@ -1118,7 +1118,7 @@ class Crystal:
         """
         from chmpy.shape import SHT, stockholder_weight_descriptor
 
-        sph = SHT(l_max=l_max)
+        sph = SHT(l_max)
         mol, neighbour_els, neighbour_pos = self.molecule_environment(
             mol, radius=radius
         )
@@ -1166,7 +1166,7 @@ class Crystal:
         coeffs = []
         from chmpy.shape import SHT, stockholder_weight_descriptor
 
-        sph = SHT(l_max=l_max)
+        sph = SHT(l_max)
         for mol, neighbour_els, neighbour_pos in self.molecule_environments(
             radius=radius
         ):
@@ -1224,7 +1224,7 @@ class Crystal:
         coeffs = []
         from chmpy.shape import SHT, stockholder_weight_descriptor
 
-        sph = SHT(l_max=l_max)
+        sph = SHT(l_max)
         for n, pos, neighbour_els, neighbour_pos in self.atomic_surroundings(
             radius=radius
         ):
@@ -1272,7 +1272,7 @@ class Crystal:
         """
         from chmpy.shape import SHT, stockholder_weight_descriptor
 
-        sph = SHT(l_max=l_max)
+        sph = SHT(l_max)
         inside, outside = self.atom_group_surroundings(atoms, radius=radius)
         m = Molecule.from_arrays(*inside)
         c = np.array(m.centroid, dtype=np.float32)
