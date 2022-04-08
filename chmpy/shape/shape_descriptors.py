@@ -73,6 +73,15 @@ def make_invariants(l_max, coefficients, kinds="NP") -> np.ndarray:
     return np.hstack(invariants)
 
 
+def _compute_property_in_j_channel(sht, r, property_function):
+    x, y, z = sht.grid_cartesian
+    xyz = np.c_[x.flatten(), y.flatten(), z.flatten()] * r.flatten()[:, np.newaxis]
+    prop_values = property_function(xyz)
+    r_cplx = np.empty(r.shape, dtype=np.complex128)
+    r_cplx.real = r
+    r_cplx.imag = prop_values.reshape(r.shape)
+    return r_cplx
+
 def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
     """
     Calculate the 'stockholder weight' shape descriptors based on the
@@ -108,11 +117,14 @@ def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
     background = kwargs.get("background", 0.0)
     property_function = kwargs.get("with_property", None)
     r_min, r_max = kwargs.get("bounds", (0.1, 20.0))
-    s = StockholderWeight.from_arrays(n_i, p_i, n_e, p_e, background=background)
-    g = np.empty((sht.grid[0].size, 2), dtype=np.float32)
-    g[:, 0] = sht.grid[0].flatten()
-    g[:, 1] = sht.grid[1].flatten()
     o = kwargs.get("origin", np.mean(p_i, axis=0, dtype=np.float32))
+    s = StockholderWeight.from_arrays(n_i, p_i, n_e, p_e, background=background)
+    g = np.empty((sht.grid[0].size, 3), dtype=np.float32)
+    x, y, z = sht.grid_cartesian
+    g[:, 0] = x.flatten()
+    g[:, 1] = y.flatten()
+    g[:, 2] = z.flatten()
+
     r = sphere_stockholder_radii(s.s, o, g, r_min, r_max, 1e-7, 30, isovalue).reshape(sht.grid[0].shape)
     if np.any(r < 0):
         raise ValueError(
@@ -130,13 +142,7 @@ def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
             property_function = Molecule.from_arrays(
                 s.dens_a.elements, s.dens_a.positions
             ).electrostatic_potential
-        x, y, z = sht.grid_cartesian
-        xyz = np.c_[x.flatten(), y.flatten(), z.flatten()] * r.flatten()[:, np.newaxis]
-        prop_values = property_function(xyz)
-        r_cplx = np.empty(r.shape, dtype=np.complex128)
-        r_cplx.real = r
-        r_cplx.imag = prop_values.reshape(r.shape)
-        r = r_cplx
+        r = _compute_property_in_j_channel(sht, r, property_function)
         real = False
     l_max = sht.lmax
     coeffs = sht.analysis(r)
@@ -180,12 +186,14 @@ def promolecule_density_descriptor(sht, n_i, p_i, **kwargs):
     property_function = kwargs.get("with_property", None)
     r_min, r_max = kwargs.get("bounds", (0.4, 20.0))
     pro = PromoleculeDensity((n_i, p_i))
-    g = np.empty((sht.grid[0].size, 2), dtype=np.float32)
-    g[:, 0] = sht.grid[0].flatten()
-    g[:, 1] = sht.grid[1].flatten()
+    g = np.empty((sht.grid[0].size, 3), dtype=np.float32)
+    x, y, z = sht.grid_cartesian
+    g[:, 0] = x.flatten()
+    g[:, 1] = y.flatten()
+    g[:, 2] = z.flatten()
 
     o = kwargs.get("origin", np.mean(p_i, axis=0, dtype=np.float32))
-    r = sphere_promolecule_radii(pro.dens, o, g, r_min, r_max, 1e-7, 30, isovalue).reshape(sht.grid[0].shape)
+    r = sphere_promolecule_radii(pro.dens, o, g, r_min, r_max, 1e-12, 30, isovalue).reshape(sht.grid[0].shape)
     if np.any(r < 0):
         raise ValueError(
             f"Unable to find isovalue {isovalue:.2f} in all directions for bounds ({r_min:.2f}, {r_max:.2f})"
@@ -200,14 +208,7 @@ def promolecule_density_descriptor(sht, n_i, p_i, **kwargs):
             els = pro.elements
             pos = pro.positions
             property_function = Molecule.from_arrays(els, pos).electrostatic_potential
-
-        x, y, z = sht.grid_cartesian
-        xyz = np.c_[x.flatten(), y.flatten(), z.flatten()] * r.flatten()[:, np.newaxis]
-        prop_values = property_function(xyz)
-        r_cplx = np.empty(r.shape, dtype=np.complex128)
-        r_cplx.real = r
-        r_cplx.imag = prop_values.reshape(r.shape)
-        r = r_cplx
+        r = _compute_property_in_j_channel(sht, r, property_function)
         real = False
     l_max = sht.lmax
     coeffs = sht.analysis(r)

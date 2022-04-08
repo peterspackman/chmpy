@@ -10,12 +10,16 @@ from scipy.fft import fft, ifft
 _SHT_CACHE = {}
 
 class SHT:
-    def __init__(self, lm):
+    def __init__(self, lm, nphi=None):
         self.lmax = lm
         self.plm = AssocLegendre(lm)
 
-        self.nphi = 2 * lm + 1
-        self.phi = np.arange(self.nphi) * 2 / self.nphi * np.pi - np.pi
+        if nphi is None:
+            self.nphi = 2 * lm + 2
+        else:
+            self.nphi = nphi
+        # avoid the poles
+        self.phi = np.arange(0, self.nphi) * 2 * np.pi / self.nphi + np.pi * (0.5) / self.nphi
         self.ntheta = 1
         while (self.ntheta <= self.nphi):
             self.ntheta *= 2

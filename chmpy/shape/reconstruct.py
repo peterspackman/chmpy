@@ -19,8 +19,11 @@ def reconstruct(coefficients, real=True):
     sht = SHT(l_max)
     x, y, z = sht.grid_cartesian
     pts = np.c_[x.flatten(), y.flatten(), z.flatten()]
-    pts = sht.grid_cartesian * sht.synthesis(coefficients)[:, np.newaxis].real
-    return pts
+    pts = pts * sht.synthesis(coefficients).flatten()[:, np.newaxis].real
+    g = np.empty((sht.grid[0].size, 2), dtype=np.float32)
+    g[:, 0] = sht.grid[0].flatten()
+    g[:, 1] = sht.grid[1].flatten()
+    return np.c_[pts, g]
 
 
 def reconstructed_surface(coefficients, real=True, subdivisions=3):
