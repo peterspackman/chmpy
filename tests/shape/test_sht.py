@@ -81,6 +81,7 @@ class SHTTestCase(unittest.TestCase):
 
     def test_analysis_and_reconstruction(self):
         values = self.sht.compute_on_grid(function_to_test)
+        values = values.astype(np.complex128)
         expected = np.array([
             np.sqrt(4 * np.pi), # 0 0 
             -np.sqrt(2 * np.pi / 3) - 0.3 * np.sqrt(2 * np.pi / 3) *1j, # 1 -1

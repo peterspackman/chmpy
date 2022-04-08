@@ -1,9 +1,11 @@
 import numpy as np
 from chmpy.util.num import spherical_to_cartesian_mgrid
-from .assoc_legendre import AssocLegendre
+from ._sht import (
+    AssocLegendre, analysis_kernel_real, analysis_kernel_cplx,
+    synthesis_kernel_real, synthesis_kernel_cplx
+)
 from scipy.special import roots_legendre
 from scipy.fft import fft, ifft
-
 
 _SHT_CACHE = {}
 
@@ -40,7 +42,8 @@ class SHT:
         values = func(*self.grid)
         return values
 
-    def analysis(self, values):
+    def analysis_pure_python(self, values):
+        """much slower"""
         coeffs = np.zeros(self.nlm(), dtype=np.complex128)
         for itheta, (ct, w) in enumerate(zip(self.cos_theta, self.weights)):
             self.fft_work_array[:] = values[itheta, :]
@@ -70,7 +73,7 @@ class SHT:
                     plm_idx += 1
         return coeffs
 
-    def synthesis(self, coeffs):
+    def synthesis_pure_python(self, coeffs):
         values = np.zeros((self.ntheta, self.nphi), dtype=np.complex128)
         for itheta, ct in enumerate(self.cos_theta):
             self.fft_work_array[:] = 0
@@ -81,7 +84,7 @@ class SHT:
             for l in range(self.lmax + 1):
                 l_offset = l * (l + 1)
                 p = self.plm_work_array[plm_idx]
-                self.fft_work_array[0] += coeffs[l_offset] * p
+                self.fft_work_array[0] += np.conj(coeffs[l_offset]) * p
                 plm_idx += 1
 
             for m in range(1, self.lmax + 1):
@@ -100,6 +103,43 @@ class SHT:
 
             ifft(self.fft_work_array, norm="forward", overwrite_x=True) 
             values[itheta, :] = self.fft_work_array[:]
+        return values
+
+    def analysis(self, values):
+        real = not np.iscomplexobj(values)
+        if real:
+            kernel = analysis_kernel_real
+            coeffs = np.zeros(self.nplm(), dtype=np.complex128)
+        else:
+            kernel = analysis_kernel_cplx
+            coeffs = np.zeros(self.nlm(), dtype=np.complex128)
+        for itheta, (ct, w) in enumerate(zip(self.cos_theta, self.weights)):
+            self.fft_work_array[:] = values[itheta, :]
+
+            fft(self.fft_work_array, norm="forward", overwrite_x=True) 
+            self.plm.evaluate_batch(ct, result=self.plm_work_array)
+            kernel(self, w, coeffs)
+        return coeffs
+
+    def synthesis(self, coeffs):
+        real = (coeffs.size == self.nplm())
+        if real:
+            kernel = synthesis_kernel_real
+            values = np.zeros(self.grid[0].shape)
+        else:
+            kernel = synthesis_kernel_cplx
+            values = np.zeros(self.grid[0].shape, dtype=np.complex128)
+
+        for itheta, ct in enumerate(self.cos_theta):
+            self.fft_work_array[:] = 0
+            self.plm.evaluate_batch(ct, result=self.plm_work_array)
+            kernel(self, coeffs)
+            ifft(self.fft_work_array, norm="forward", overwrite_x=True) 
+
+            if real:
+                values[itheta, :] = self.fft_work_array[:].real
+            else:
+                values[itheta, :] = self.fft_work_array[:]
         return values
 
     @property
@@ -123,68 +163,6 @@ def test_func(theta, phi):
                 (np.cos(2.0 * phi) + 0.1 * np.sin(2.0 * phi)) * 
                  np.sin(theta) * np.sin(theta) * (7.0 * np.cos(theta) * np.cos(theta) - 1.0) * 3.0/8.0
            )
-
-
-if __name__ == "__main__":
-
-    plm = AssocLegendre(4)
-
-    expected_plm = np.array([
-        0.28209479177387814,
-        0.24430125595145993,
-        -0.07884789131313,
-        -0.326529291016351,
-        -0.24462907724141,
-        0.2992067103010745,
-        0.33452327177864455,
-        0.06997056236064664,
-        -0.25606603842001846,
-        0.2897056515173922,
-        0.3832445536624809,
-        0.18816934037548755,
-        0.27099482274755193,
-        0.4064922341213279,
-        0.24892463950030275,
-    ])
-
-    print("Plm correct: ", np.allclose(expected_plm, plm.evaluate_batch(0.5)))
-
-
-    s = SHT(4)
-    coeffs = s.analysis(test_func)
-
-    expected = np.array([
-        np.sqrt(4 * np.pi), # 0 0 
-        -np.sqrt(2 * np.pi / 3) - 0.3 * np.sqrt(2 * np.pi / 3) *1j, # 1 -1
-	    0.01 * np.sqrt(4 * np.pi / 3.0), # 1 0
-        -np.sqrt(2 * np.pi / 3) + 0.3 * np.sqrt(2 * np.pi / 3) *1j, # 1 1
-        0.0, # 2 -2
-        0.0, # 2 -1
-        0.1 * np.sqrt(16 * np.pi / 5.0), # 2  0
-        0.0, # 2  1
-        0.0, # 2  2
-        0.0, # 3 -3
-        0.0, # 3 -2
-        0.0, # 3 -1
-        0.0, # 3  0
-        0.0, # 3  1
-        0.0, # 3  2
-        0.0, # 3  3
-        0.0, # 4 -4
-        0.0, # 4 -3
-        0.5 * np.sqrt(2 * np.pi / 5.0) - 0.05 * np.sqrt(2.0 * np.pi / 5.0) * 1j, # 4  2
-        0.0, # 4 -1
-        0.0, # 4  0
-        0.0, # 4  1
-        0.5 * np.sqrt(2 * np.pi / 5.0) + 0.05 * np.sqrt(2.0 * np.pi / 5.0) * 1j, # 4  2
-        0.0, # 4  3
-        0.0, # 4  4
-    ], dtype=np.complex128)
-
-    if not np.allclose(expected, coeffs):
-        print(coeffs - expected)
-    else:
-        print("Coeffs correct: true")
 
 def plot_sphere(name, grid, values):
     """Plot a function on a spherical surface.

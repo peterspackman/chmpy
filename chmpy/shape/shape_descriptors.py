@@ -1,6 +1,5 @@
 from chmpy import StockholderWeight, PromoleculeDensity
-from chmpy.util.num import spherical_to_cartesian
-from scipy.optimize import minimize_scalar
+from chmpy.shape._sht import expand_coeffs_to_full
 from chmpy.interpolate._density import (
     sphere_stockholder_radii,
     sphere_promolecule_radii,
@@ -13,46 +12,29 @@ LOG = logging.getLogger(__name__)
 _HAVE_WARNED_ABOUT_LMAX_P = False
 
 
-def make_N_invariants(coefficients, real=True) -> np.ndarray:
+def make_N_invariants(coefficients) -> np.ndarray:
     """
     Construct the `N` type invariants from SHT coefficients.
     If coefficients is of length n, the size of the result will be sqrt(n)
 
     Arguments:
         coefficients (np.ndarray): the set of spherical harmonic coefficients
-        real (bool, optional): whether to assume the coefficients are from a
-            real SHT (true) or a complex SHT (false)
 
     Returns:
         np.ndarray the `N` type rotational invariants based on these coefficients
     """
-    if real:
-        # n = (l_max +2)(l_max+1)/2
-        n = len(coefficients)
-        size = int((-3 + np.sqrt(8 * n + 1)) // 2) + 1
-        lower = 0
-        invariants = np.empty(shape=(size), dtype=np.float64)
-        for i in range(0, size):
-            x = i + 1
-            upper = lower + x
-            invariants[i] = np.sum(
-                coefficients[lower : upper + 1]
-                * np.conj(coefficients[lower : upper + 1])
-            ).real
-            lower += x
-    else:
-        size = int(np.sqrt(len(coefficients)))
-        invariants = np.empty(shape=(size), dtype=np.float64)
-        for i in range(0, size):
-            lower, upper = i ** 2, (i + 1) ** 2
-            invariants[i] = np.sum(
-                coefficients[lower : upper + 1]
-                * np.conj(coefficients[lower : upper + 1])
-            ).real
+    size = int(np.sqrt(len(coefficients)))
+    invariants = np.empty(shape=(size), dtype=np.float64)
+    for i in range(0, size):
+        lower, upper = i ** 2, (i + 1) ** 2
+        invariants[i] = np.sum(
+            coefficients[lower : upper + 1]
+            * np.conj(coefficients[lower : upper + 1])
+        ).real
     return np.sqrt(invariants)
 
 
-def make_invariants(l_max, coefficients, kinds="NP", real=True) -> np.ndarray:
+def make_invariants(l_max, coefficients, kinds="NP") -> np.ndarray:
     """
     Construct the `N` and/or `P` type invariants from SHT coefficients.
 
@@ -60,8 +42,6 @@ def make_invariants(l_max, coefficients, kinds="NP", real=True) -> np.ndarray:
         l_max (int): the maximum angular momentum of the coefficients
         coefficients (np.ndarray): the set of spherical harmonic coefficients
         kinds (str, optional): which kinds of invariants to include
-        real (bool, optional): whether to assume the coefficients are from a
-            real SHT (true) or a complex SHT (false)
 
     Returns:
         np.ndarray the `N` and/or `P` type rotational invariants based on these coefficients
@@ -70,14 +50,14 @@ def make_invariants(l_max, coefficients, kinds="NP", real=True) -> np.ndarray:
     global _HAVE_WARNED_ABOUT_LMAX_P
     invariants = []
     if "N" in kinds:
-        invariants.append(make_N_invariants(coefficients, real=real))
+        invariants.append(make_N_invariants(coefficients))
     if "P" in kinds:
         # Because we only have factorial precision (double precision)
         # in our clebsch implementation up to 70! l_max for P type
         # invariants is restricted to <= 23
         # TODO use a better clebsch gordan coefficients implementation
         # e.g. that in https://github.com/GXhelsinki/Clebsch-Gordan-Coefficients-
-        pfunc = p_invariants_r if real else p_invariants_c
+        pfunc = p_invariants_c
         MAX_L_MAX = 23
         if l_max > MAX_L_MAX:
             if not _HAVE_WARNED_ABOUT_LMAX_P:
@@ -86,10 +66,7 @@ def make_invariants(l_max, coefficients, kinds="NP", real=True) -> np.ndarray:
                     "will only using N type invariants beyond that."
                 )
                 _HAVE_WARNED_ABOUT_LMAX_P = True
-            if real:
-                c = coefficients[: ((MAX_L_MAX + 2) * (MAX_L_MAX + 1)) // 2]
-            else:
-                c = coefficients[: (MAX_L_MAX * MAX_L_MAX)]
+            c = coefficients[: MAX_L_MAX * MAX_L_MAX]
             invariants.append(pfunc(c))
         else:
             invariants.append(pfunc(coefficients))
@@ -163,9 +140,12 @@ def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
         real = False
     l_max = sht.lmax
     coeffs = sht.analysis(r)
+
+    coeff4inv = expand_coeffs_to_full(l_max, coeffs) if real else coeffs
     invariants = make_invariants(
-        l_max, coeffs, kinds=kwargs.get("kinds", "NP"), real=False
+        l_max, coeff4inv, kinds=kwargs.get("kinds", "NP")
     )
+
     if kwargs.get("coefficients", False):
         return coeffs, invariants
     return invariants
@@ -200,10 +180,12 @@ def promolecule_density_descriptor(sht, n_i, p_i, **kwargs):
     property_function = kwargs.get("with_property", None)
     r_min, r_max = kwargs.get("bounds", (0.4, 20.0))
     pro = PromoleculeDensity((n_i, p_i))
-    g = np.empty(sht.grid.shape, dtype=np.float32)
-    g[:, :] = sht.grid[:, :]
+    g = np.empty((sht.grid[0].size, 2), dtype=np.float32)
+    g[:, 0] = sht.grid[0].flatten()
+    g[:, 1] = sht.grid[1].flatten()
+
     o = kwargs.get("origin", np.mean(p_i, axis=0, dtype=np.float32))
-    r = sphere_promolecule_radii(pro.dens, o, g, r_min, r_max, 1e-7, 30, isovalue)
+    r = sphere_promolecule_radii(pro.dens, o, g, r_min, r_max, 1e-7, 30, isovalue).reshape(sht.grid[0].shape)
     if np.any(r < 0):
         raise ValueError(
             f"Unable to find isovalue {isovalue:.2f} in all directions for bounds ({r_min:.2f}, {r_max:.2f})"
@@ -218,18 +200,22 @@ def promolecule_density_descriptor(sht, n_i, p_i, **kwargs):
             els = pro.elements
             pos = pro.positions
             property_function = Molecule.from_arrays(els, pos).electrostatic_potential
-        xyz = sht.grid_cartesian * r[:, np.newaxis]
+
+        x, y, z = sht.grid_cartesian
+        xyz = np.c_[x.flatten(), y.flatten(), z.flatten()] * r.flatten()[:, np.newaxis]
         prop_values = property_function(xyz)
         r_cplx = np.empty(r.shape, dtype=np.complex128)
         r_cplx.real = r
-        r_cplx.imag = prop_values
+        r_cplx.imag = prop_values.reshape(r.shape)
         r = r_cplx
         real = False
-    l_max = sht.l_max
-    coeffs = sht.analyse(r)
+    l_max = sht.lmax
+    coeffs = sht.analysis(r)
+    coeff4inv = expand_coeffs_to_full(l_max, coeffs) if real else coeffs
     invariants = make_invariants(
-        l_max, coeffs, kinds=kwargs.get("kinds", "NP"), real=real
+        l_max, coeff4inv, kinds=kwargs.get("kinds", "NP")
     )
+
     if kwargs.get("coefficients", False):
         return coeffs, invariants
     return invariants

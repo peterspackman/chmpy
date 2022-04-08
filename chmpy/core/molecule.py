@@ -670,7 +670,7 @@ class Molecule:
         descriptors = []
         from chmpy.shape import SHT, stockholder_weight_descriptor
 
-        sph = SHT(l_max=l_max)
+        sph = SHT(l_max)
         elements = self.atomic_numbers
         positions = self.positions
         dists = self.distance_matrix
@@ -811,7 +811,7 @@ class Molecule:
         """
         from chmpy.shape import SHT, promolecule_density_descriptor
 
-        sph = SHT(l_max=l_max)
+        sph = SHT(l_max)
         return promolecule_density_descriptor(
             sph, self.atomic_numbers, self.positions, **kwargs
         )

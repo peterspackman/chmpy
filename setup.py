@@ -42,6 +42,13 @@ ext_modules_cython = cythonize(
             include_dirs=[get_include()],
         ),
         Ext(
+            "chmpy.shape._sht",
+            sources=["chmpy/shape/_sht.pyx"],
+            extra_compile_args=_EXTRA_COMPILE_ARGS,
+            extra_link_args=_EXTRA_LINK_ARGS,
+            include_dirs=[get_include()],
+        ),
+        Ext(
             "chmpy.crystal.sfac._sfac",
             sources=["chmpy/crystal/sfac/_sfac.pyx"],
             extra_compile_args=_EXTRA_COMPILE_ARGS,
