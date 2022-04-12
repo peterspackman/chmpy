@@ -85,29 +85,34 @@ cdef void analysis_cython_cplx(const int lmax, const int nphi,
                           const double[:] plm_work_array,
                           const double w,
                           double complex[:] coeffs) nogil:
-        cdef int plm_idx, l_offset, l, m, m_idx_neg, m_idx_pos
+        cdef int plm_idx, l_offset, l, m, m_idx_neg, m_idx_pos, sign
         cdef double p
-        cdef double complex pw, tmp
+        cdef double complex pw, tmp, ii, rr
         plm_idx = 0
-        # m = 0 case
+
         for l in range(lmax + 1):
             l_offset = l * (l + 1)
             pw = plm_work_array[plm_idx] * w
-            coeffs[l_offset] = coeffs[l_offset] + fft[0].conjugate() * pw
+            coeffs[l_offset] = coeffs[l_offset] + fft[0] * pw
             plm_idx += 1
 
+        # because we don't include a phase factor (-1)^m in our
+        # Associated Legendre Polynomials, we need a factor here.
+        # which alternates with m
         for m in range(1, lmax + 1):
+            sign = -1 if m & 1 else 1
             for l in range(m, lmax + 1):
                 l_offset = l * (l + 1)
                 pw = plm_work_array[plm_idx] * w
                 m_idx_neg = nphi - m
                 m_idx_pos = m
+                rr = sign * fft[m_idx_pos] * pw
+                ii = sign * fft[m_idx_neg] * pw
                 if m & 1:
-                    coeffs[l_offset - m] = coeffs[l_offset - m] + fft[m_idx_neg] * pw
-                    coeffs[l_offset + m] = coeffs[l_offset + m] + fft[m_idx_pos] * pw
-                else:
-                    coeffs[l_offset - m] = coeffs[l_offset - m] + fft[m_idx_neg].conjugate() * pw
-                    coeffs[l_offset + m] = coeffs[l_offset + m] + fft[m_idx_pos].conjugate() * pw
+                    ii = - ii
+
+                coeffs[l_offset - m] = coeffs[l_offset - m] + ii
+                coeffs[l_offset + m] = coeffs[l_offset + m] + rr
                 plm_idx += 1
 
 
@@ -116,59 +121,64 @@ cdef void synthesis_cython_cplx(const int lmax, const int nphi,
                                 const double complex[:] coeffs,
                                 const double[:] plm_work_array,
                                 double complex[:] fft) nogil:
-    cdef int plm_idx, l_offset, l, m, m_idx_neg, m_idx_pos
+    cdef int plm_idx, l_offset, l, m, m_idx_neg, m_idx_pos, sign
     cdef double p
+    cdef double complex ii, rr
 
     plm_idx = 0
-	# m = 0 case
+    # m = 0 case
     for l in range(lmax + 1):
         l_offset = l * (l + 1)
         p = plm_work_array[plm_idx]
-        fft[0] = fft[0] + coeffs[l_offset].conjugate() * p
+        fft[0] = fft[0] + coeffs[l_offset] * p
         plm_idx += 1
 
+    # because we don't include a phase factor (-1)^m in our
+    # Associated Legendre Polynomials, we need a factor here.
+    # which alternates with m
+
     for m in range(1, lmax + 1):
+        sign = -1 if m & 1 else 1
         for l in range(m, lmax + 1):
+
             l_offset = l * (l + 1)
             p = plm_work_array[plm_idx]
             m_idx_neg = nphi - m
             m_idx_pos = m
+            rr = sign * coeffs[l_offset + m] * p
+            ii = sign * coeffs[l_offset - m] * p
             if m & 1:
-                fft[m_idx_neg] = fft[m_idx_neg] + coeffs[l_offset - m] * p
-                fft[m_idx_pos] = fft[m_idx_pos] + coeffs[l_offset + m] * p
-            else:
-                fft[m_idx_neg] = fft[m_idx_neg] + coeffs[l_offset - m].conjugate() * p
-                fft[m_idx_pos] = fft[m_idx_pos] + coeffs[l_offset + m].conjugate() * p
+                ii = - ii
+            fft[m_idx_neg] = fft[m_idx_neg] + ii
+            fft[m_idx_pos] = fft[m_idx_pos] + rr
             plm_idx += 1
+
+
 
 @cython.cdivision(True)
 cdef void synthesis_cython_real(const int lmax, const int nphi,
                                 const double complex[:] coeffs,
                                 const double[:] plm_work_array,
                                 double complex[:] fft) nogil:
-    cdef int plm_idx, l_offset, l, m, m_idx_neg, m_idx_pos
-    cdef double p
-    cdef double complex pw, tmp
+    cdef int plm_idx, l_offset, l, m, m_idx_neg, m_idx_pos, sign
 
+    cdef double p
+    cdef double complex rr
     plm_idx = 0
-	# m = 0 case
+    # m = 0 case
     for l in range(lmax + 1):
         p = plm_work_array[plm_idx]
-        fft[0] = fft[0] + coeffs[plm_idx].conjugate() * p
+        fft[0] = fft[0] + coeffs[plm_idx] * p
         plm_idx += 1
 
     for m in range(1, lmax + 1):
+        sign = -1 if m & 1 else 1
         for l in range(m, lmax + 1):
             p = plm_work_array[plm_idx]
-            m_idx_neg = nphi - m
-            m_idx_pos = m
-            if m & 1:
-                fft[m_idx_neg] = fft[m_idx_neg] + coeffs[plm_idx].conjugate() * p
-                fft[m_idx_pos] = fft[m_idx_pos] + coeffs[plm_idx] * p
-            else:
-                fft[m_idx_neg] = fft[m_idx_neg] + coeffs[plm_idx] * p
-                fft[m_idx_pos] = fft[m_idx_pos] + coeffs[plm_idx].conjugate() * p
+            rr = 2 * sign * coeffs[plm_idx] * p
+            fft[m] = fft[m] + rr
             plm_idx += 1
+
 
 @cython.cdivision(True)
 cdef void analysis_cython_real(const int lmax, const int nphi,
@@ -178,33 +188,41 @@ cdef void analysis_cython_real(const int lmax, const int nphi,
                           double complex[:] coeffs) nogil:
         cdef int plm_idx, l_offset, l, m, m_idx_neg, m_idx_pos
         cdef double complex pw, tmp
+        cdef int sign
+
         plm_idx = 0
         # m = 0 case
         for l in range(lmax + 1):
             pw = plm_work_array[plm_idx] * w
-            coeffs[plm_idx] = coeffs[l] + fft[0].conjugate() * pw
+            coeffs[plm_idx] = coeffs[plm_idx] + fft[0] * pw
             plm_idx += 1
 
+        # because we don't include a phase factor (-1)^m in our
+        # Associated Legendre Polynomials, we need a factor here.
+        # which alternates with m and l
+        sign = -1
         for m in range(1, lmax + 1):
             for l in range(m, lmax + 1):
                 pw = plm_work_array[plm_idx] * w
-                if m & 1:
-                    coeffs[plm_idx] = coeffs[plm_idx] + fft[m] * pw
-                else:
-                    coeffs[plm_idx] = coeffs[plm_idx] + fft[m].conjugate() * pw
+                coeffs[plm_idx] = coeffs[plm_idx] + sign * fft[m] * pw
                 plm_idx += 1
+                sign *= -1
+            sign *= -1
+
 
 
 @cython.cdivision(True)
 cdef void expand_coeffs_cython(const int lmax, const double complex[:] cin, double complex[:] cout) nogil:
     cdef int l, m, plm_idx, l_offset
+    cdef int sign
     plm_idx = 0
     for m in range(lmax + 1):
         for l in range(m, lmax + 1):
             l_offset = l * (l + 1)
             cout[l_offset + m] = cin[plm_idx]
             if m != 0:
-                cout[l_offset - m] = cin[plm_idx].conjugate()
+                sign = -1 if l & 1 else 1
+                cout[l_offset - m] = sign * cin[plm_idx].conjugate()
             plm_idx += 1
 
 

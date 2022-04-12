@@ -2,7 +2,8 @@ import numpy as np
 from chmpy.util.num import spherical_to_cartesian_mgrid
 from ._sht import (
     AssocLegendre, analysis_kernel_real, analysis_kernel_cplx,
-    synthesis_kernel_real, synthesis_kernel_cplx
+    synthesis_kernel_real, synthesis_kernel_cplx,
+    expand_coeffs_to_full
 )
 from scipy.special import roots_legendre
 from scipy.fft import fft, ifft
@@ -15,11 +16,11 @@ class SHT:
         self.plm = AssocLegendre(lm)
 
         if nphi is None:
-            self.nphi = 2 * lm + 2
+            self.nphi = 2 * lm + 1
         else:
             self.nphi = nphi
         # avoid the poles
-        self.phi = np.arange(0, self.nphi) * 2 * np.pi / self.nphi + np.pi * (0.5) / self.nphi
+        self.phi = np.arange(0, self.nphi) * 2 * np.pi / self.nphi
         self.ntheta = 1
         while (self.ntheta <= self.nphi):
             self.ntheta *= 2
@@ -48,7 +49,7 @@ class SHT:
 
     def analysis_pure_python(self, values):
         """much slower"""
-        coeffs = np.zeros(self.nlm(), dtype=np.complex128)
+        coeffs = np.zeros(self.nplm(), dtype=np.complex128)
         for itheta, (ct, w) in enumerate(zip(self.cos_theta, self.weights)):
             self.fft_work_array[:] = values[itheta, :]
 
@@ -57,27 +58,61 @@ class SHT:
             plm_idx = 0
 	        # m = 0 case
             for l in range(self.lmax + 1):
-                l_offset = l * (l + 1)
                 p = self.plm_work_array[plm_idx]
-                coeffs[l_offset] += np.conj(self.fft_work_array[0]) * p * w
+                coeffs[plm_idx] += self.fft_work_array[0] * p * w
                 plm_idx += 1
 
+            # because we don't include a phase factor (-1)^m in our
+            # Associated Legendre Polynomials, we need a factor here.
+            # which alternates with m and l
             for m in range(1, self.lmax + 1):
+                sign = -1 if m & 1 else 1
                 for l in range(m, self.lmax + 1):
-                    l_offset = l * (l + 1)
                     p = self.plm_work_array[plm_idx]
-                    m_idx_neg = self.nphi - m
-                    m_idx_pos = m
-                    if m & 1:
-                        coeffs[l_offset - m] += self.fft_work_array[m_idx_neg] * p * w
-                        coeffs[l_offset + m] += self.fft_work_array[m_idx_pos] * p * w
-                    else:
-                        coeffs[l_offset - m] += np.conj(self.fft_work_array[m_idx_neg]) * p * w
-                        coeffs[l_offset + m] += np.conj(self.fft_work_array[m_idx_pos]) * p * w
+                    coeffs[plm_idx] += sign * self.fft_work_array[m] * p * w
                     plm_idx += 1
         return coeffs
 
-    def synthesis_pure_python(self, coeffs):
+    def analysis_pure_python_cplx(self, values):
+        """much slower"""
+        coeffs = np.zeros(self.nlm(), dtype=np.complex128)
+        rlm = np.zeros(self.nlm(), dtype=np.complex128)
+        ilm = np.zeros(self.nlm(), dtype=np.complex128)
+        for itheta, (ct, w) in enumerate(zip(self.cos_theta, self.weights)):
+            self.fft_work_array[:] = values[itheta, :]
+
+            fft(self.fft_work_array, norm="forward", overwrite_x=True) 
+            self.plm.evaluate_batch(ct, result=self.plm_work_array)
+
+            plm_idx = 0
+            for l in range(self.lmax + 1):
+                l_offset = l * (l + 1)
+                pw = self.plm_work_array[plm_idx] * w
+                coeffs[l_offset] = coeffs[l_offset] + self.fft_work_array[0] * pw
+                plm_idx += 1
+
+            # because we don't include a phase factor (-1)^m in our
+            # Associated Legendre Polynomials, we need a factor here.
+            # which alternates with m
+            for m in range(1, self.lmax + 1):
+                sign = -1 if m & 1 else 1
+                for l in range(m, self.lmax + 1):
+                    l_offset = l * (l + 1)
+                    pw = self.plm_work_array[plm_idx] * w
+                    m_idx_neg = self.nphi - m
+                    m_idx_pos = m
+                    rr = sign * self.fft_work_array[m_idx_pos] * pw
+                    ii = sign * self.fft_work_array[m_idx_neg] * pw
+                    if m & 1:
+                        ii = - ii
+
+                    coeffs[l_offset - m] = coeffs[l_offset - m] + ii
+                    coeffs[l_offset + m] = coeffs[l_offset + m] + rr
+                    plm_idx += 1
+        return coeffs
+
+
+    def synthesis_pure_python_cplx(self, coeffs):
         values = np.zeros((self.ntheta, self.nphi), dtype=np.complex128)
         for itheta, ct in enumerate(self.cos_theta):
             self.fft_work_array[:] = 0
@@ -88,26 +123,54 @@ class SHT:
             for l in range(self.lmax + 1):
                 l_offset = l * (l + 1)
                 p = self.plm_work_array[plm_idx]
-                self.fft_work_array[0] += np.conj(coeffs[l_offset]) * p
+                self.fft_work_array[0] += coeffs[l_offset] * p
                 plm_idx += 1
 
             for m in range(1, self.lmax + 1):
+                sign = -1 if m & 1 else 1
                 for l in range(m, self.lmax + 1):
+
                     l_offset = l * (l + 1)
                     p = self.plm_work_array[plm_idx]
                     m_idx_neg = self.nphi - m
                     m_idx_pos = m
+                    rr = sign * coeffs[l_offset + m] * p
+                    ii = sign * coeffs[l_offset - m] * p
                     if m & 1:
-                        self.fft_work_array[m_idx_neg] += coeffs[l_offset - m] * p
-                        self.fft_work_array[m_idx_pos] += coeffs[l_offset + m] * p
-                    else:
-                        self.fft_work_array[m_idx_neg] += np.conj(coeffs[l_offset - m]) * p
-                        self.fft_work_array[m_idx_pos] += np.conj(coeffs[l_offset + m]) * p
+                        ii = - ii
+                    self.fft_work_array[m_idx_neg] += ii
+                    self.fft_work_array[m_idx_pos] += rr
                     plm_idx += 1
 
             ifft(self.fft_work_array, norm="forward", overwrite_x=True) 
             values[itheta, :] = self.fft_work_array[:]
         return values
+
+    def synthesis_pure_python(self, coeffs):
+        values = np.zeros((self.ntheta, self.nphi))
+        for itheta, ct in enumerate(self.cos_theta):
+            self.fft_work_array[:] = 0
+            self.plm.evaluate_batch(ct, result=self.plm_work_array)
+
+            plm_idx = 0
+	        # m = 0 case
+            for l in range(self.lmax + 1):
+                p = self.plm_work_array[plm_idx]
+                self.fft_work_array[0] += coeffs[plm_idx] * p
+                plm_idx += 1
+
+            for m in range(1, self.lmax + 1):
+                sign = -1 if m & 1 else 1
+                for l in range(m, self.lmax + 1):
+                    p = self.plm_work_array[plm_idx]
+                    rr = 2 * sign * coeffs[plm_idx] * p
+                    self.fft_work_array[m] += rr
+                    plm_idx += 1
+
+            ifft(self.fft_work_array, norm="forward", overwrite_x=True) 
+            values[itheta, :] = self.fft_work_array[:].real
+        return values
+
 
     def analysis(self, values):
         real = not np.iscomplexobj(values)
@@ -145,6 +208,66 @@ class SHT:
             else:
                 values[itheta, :] = self.fft_work_array[:]
         return values
+
+    def _eval_at_points_real(self, coeffs, theta, phi):
+        # verified
+        cos_theta = np.cos(theta)
+        result = 0.0
+        self.plm.evaluate_batch(cos_theta, result=self.plm_work_array)
+        plm_idx = 0
+        for l in range(0, self.lmax + 1):
+            result += self.plm_work_array[plm_idx] * coeffs[plm_idx].real
+            plm_idx += 1
+
+
+        mv = 2 * np.exp(1j * np.arange(1, self.lmax + 1) * phi)
+        sign = 1
+        for m in range(1, self.lmax + 1):
+            tmp = 0.0
+            sign *= -1
+            for l in range(m, self.lmax + 1):
+                # m +ve and m -ve
+                tmp += sign * self.plm_work_array[plm_idx] * coeffs[plm_idx]
+                plm_idx += 1
+            
+            result += (tmp.real * mv[m - 1].real + tmp.imag * mv[m - 1].imag)
+        return result
+
+    def _eval_at_points_cplx(self, coeffs, theta, phi):
+        cos_theta = np.cos(theta)
+        result = 0.0
+        self.plm.evaluate_batch(cos_theta, result=self.plm_work_array)
+
+        plm_idx = 0
+        for l in range(0, self.lmax + 1):
+            l_offset = l * (l + 1)
+            result += self.plm_work_array[plm_idx] * coeffs[l_offset]
+            plm_idx += 1
+
+        mv = np.exp(1j * np.arange(-self.lmax, self.lmax + 1) * phi)
+        for m in range(1, self.lmax + 1):
+            tmpp = 0.0
+            tmpn = 0.0
+            for l in range(m, self.lmax + 1):
+                l_offset = l * (l + 1)
+                tmpp += self.plm_work_array[plm_idx] * coeffs[l_offset + m]
+                tmpn += self.plm_work_array[plm_idx] * coeffs[l_offset - m]
+                plm_idx += 1
+            result += tmpp * mv[self.lmax + m]
+            result += tmpn * np.conj(mv[self.lmax - m])
+        return result
+
+    def evaluate_at_points(self, coeffs, theta, phi):
+        real = (coeffs.size == self.nplm())
+        if real:
+            return self._eval_at_points_real(coeffs, theta, phi)
+        # assumes coeffs are the real transform order
+        else:
+            return self._eval_at_points_cplx(coeffs, theta, phi)
+
+
+    def complete_coefficients(self, coeffs):
+        return expand_coeffs_to_full(self.lmax, coeffs)
 
     @property
     def grid(self):
