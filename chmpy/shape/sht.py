@@ -11,7 +11,7 @@ from scipy.fft import fft, ifft
 _SHT_CACHE = {}
 
 class SHT:
-    def __init__(self, lm, nphi=None):
+    def __init__(self, lm, nphi=None, ntheta=None):
         self.lmax = lm
         self.plm = AssocLegendre(lm)
 
@@ -21,9 +21,14 @@ class SHT:
             self.nphi = nphi
         # avoid the poles
         self.phi = np.arange(0, self.nphi) * 2 * np.pi / self.nphi
-        self.ntheta = 1
-        while (self.ntheta <= self.nphi):
-            self.ntheta *= 2
+
+        if ntheta is None:
+            n = self.lmax + 1
+            n += (n & 1)
+            n = ((n + 3) // 4) * 4
+            self.ntheta = n
+        else:
+            self.ntheta = ntheta
         
         self.cos_theta, self.weights, self.total_weight = roots_legendre(self.ntheta, mu=True)
         self.weights *= 4 * np.pi / self.total_weight

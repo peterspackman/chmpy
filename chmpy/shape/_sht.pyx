@@ -200,14 +200,12 @@ cdef void analysis_cython_real(const int lmax, const int nphi,
         # because we don't include a phase factor (-1)^m in our
         # Associated Legendre Polynomials, we need a factor here.
         # which alternates with m and l
-        sign = -1
         for m in range(1, lmax + 1):
+            sign = -1 if m & 1 else 1
             for l in range(m, lmax + 1):
                 pw = plm_work_array[plm_idx] * w
                 coeffs[plm_idx] = coeffs[plm_idx] + sign * fft[m] * pw
                 plm_idx += 1
-                sign *= -1
-            sign *= -1
 
 
 
