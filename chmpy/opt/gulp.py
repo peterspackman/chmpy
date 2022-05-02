@@ -63,12 +63,11 @@ class GulpOptimizer:
             self.last_parsed_output = parse_gulp_output(self.last_output_contents)
             return success
 
-
     def single_point_crystal(self, crystal, **kwargs):
         input_contents = crystal_to_gulp_input(
-                crystal,
-                keywords=self.keywords,
-                additional_keywords=self.additional_keywords
+            crystal,
+            keywords=self.keywords,
+            additional_keywords=self.additional_keywords
         )
         LOG.debug("Input contents:\n%s", input_contents)
         return self._run_in_tempdir(input_contents)
@@ -76,24 +75,28 @@ class GulpOptimizer:
     def minimize_crystal(self, crystal, **kwargs):
         input_contents = crystal_to_gulp_input(
             crystal,
-            keywords=self.keywords + ["opti"],
+            keywords=self.keywords + ["opti", "rfo"],
             additional_keywords=self.additional_keywords
         )
         return self._run_in_tempdir(input_contents)
 
     def minimize_molecule(self, molecule, **kwargs):
+        mol_kws = self.additional_keywords.copy()
+        mol_kws.pop("supercell")
         input_contents = molecule_to_gulp_input(
             molecule,
             keywords=self.keywords + ["opti"],
-            additional_keywords=self.additional_keywords
+            additional_keywords=mol_kws,
         )
         return self._run_in_tempdir(input_contents)
 
     def single_point_molecule(self, molecule, **kwargs):
+        mol_kws = self.additional_keywords.copy()
+        mol_kws.pop("supercell")
         input_contents = molecule_to_gulp_input(
             molecule,
             keywords=self.keywords,
-            additional_keywords=self.additional_keywords
+            additional_keywords=mol_kws,
         )
         return self._run_in_tempdir(input_contents)
 

@@ -10,13 +10,47 @@ from scipy.fft import fft, ifft
 
 _SHT_CACHE = {}
 
+def _next_power_of_2(n):
+  i = 1
+  while i < n: i *= 2
+  return i
+
+
+def _closest_int_with_only_prime_factors_up_to_fmax(n, fmax=7):
+    if (n <= fmax):
+        return n
+    if (fmax < 2):
+        return 0
+    if (fmax == 2):
+        return _next_power_of_2(n);
+
+    n -= 2 - (n & 1)
+    f = 2
+    while (f != n):
+        n += 2
+        f = 2
+        while ((2*f <= n) and ((n & f) == 0)):
+            f *= 2 # no divisions for factor 2.
+        k = 3
+        while ((k<=fmax) and (k*f <= n)):
+            while ((k*f <= n) and (n%(k*f)==0)):
+                f *= k
+            k += 2
+
+    k = _next_power_of_2(n) # what is the closest power of 2 ?
+
+    if ((k - n) * 33 < n):
+        return k # rather choose power of 2 if not too far (3%)
+    return n
+
+
 class SHT:
     def __init__(self, lm, nphi=None, ntheta=None):
         self.lmax = lm
         self.plm = AssocLegendre(lm)
 
         if nphi is None:
-            self.nphi = 2 * lm + 1
+            self.nphi = _closest_int_with_only_prime_factors_up_to_fmax(2 * lm + 1)
         else:
             self.nphi = nphi
         # avoid the poles
@@ -25,7 +59,7 @@ class SHT:
         if ntheta is None:
             n = self.lmax + 1
             n += (n & 1)
-            n = ((n + 3) // 4) * 4
+            n = ((n + 7) // 8) * 8
             self.ntheta = n
         else:
             self.ntheta = ntheta
