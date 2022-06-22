@@ -28,6 +28,7 @@ with open(os.path.join(os.path.dirname(__file__), "sgdata.json")) as f:
 SG_FROM_NUMBER = {k: [_sgdata._make(x) for x in v] for k, v in _sgdata_dict.items()}
 
 SG_FROM_SYMOPS = {tuple(x.symops): x for k, sgs in SG_FROM_NUMBER.items() for x in sgs}
+SG_FROM_SYMBOL = {x.international.split("=")[-1]: x for k, sgs in SG_FROM_NUMBER.items() for x in sgs}
 SG_CHOICES = {int(k): [x.choice for x in v] for k, v in SG_FROM_NUMBER.items()}
 SG_DEFAULT_SETTING_CHOICE = {
     48: "2",
@@ -168,7 +169,7 @@ class SpaceGroup:
     @property
     def symbol_unicode(self) -> str:
         "the space group symbol with unicode subscripts"
-        symbol = deepcopy(self.symbol)
+        symbol = deepcopy(self.full_symbol)
         if "_" in symbol:
             tokens = symbol.split("_")
             symbol = tokens[0] + "".join(subscript(x[0]) + x[1:] for x in tokens[1:])
@@ -303,7 +304,7 @@ class SpaceGroup:
 
     def __repr__(self):
         return "<{} {}: {}>".format(
-            self.__class__.__name__, self.international_tables_number, self.symbol
+            self.__class__.__name__, self.international_tables_number, self.full_symbol
         )
 
     def __eq__(self, other):
@@ -353,3 +354,32 @@ class SpaceGroup:
         else:
             sgdata = SG_FROM_SYMOPS[encoded]
             return SpaceGroup(sgdata.number, choice=sgdata.choice)
+
+    @classmethod
+    def from_symbol(cls, symbol):
+        sgdata = SG_FROM_SYMBOL.get(symbol, None)
+        special_cases = {
+            "P21/a": "P12_1/a1",
+            "P21/n": "P12_1/n1",
+        }
+        symbol = special_cases.get(symbol, symbol)
+        if sgdata is None:
+            for number, groups in SG_FROM_NUMBER.items():
+                if int(number) > 14:
+                    continue
+                for g in groups:
+                    intl = g.international.split("=")[-1]
+                    if symbol == intl:
+                        sgdata = g
+                        break
+                    elif symbol == intl.replace("_", ""):
+                        sgdata = g
+                        break
+                if sgdata is not None:
+                    break
+            else:
+                raise ValueError("Could not find matching space group for '{}'".format(symbol))
+
+            
+        return SpaceGroup(sgdata.number, choice=sgdata.choice)
+

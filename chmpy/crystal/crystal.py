@@ -1327,6 +1327,7 @@ class Crystal:
             ".cif": cls.from_cif_file,
             ".res": cls.from_shelx_file,
             ".vasp": cls.from_vasp_file,
+            ".pdb": cls.from_pdb_file,
         }
 
     def _ext_save_map(self):
@@ -1460,6 +1461,22 @@ class Crystal:
         if len(keys) == 1:
             return crystals[keys[0]]
         return crystals
+
+    @classmethod
+    def from_pdb_file(cls, filename):
+        from chmpy.fmt.pdb import Pdb
+        pdb = Pdb.from_file(filename)
+        uc = UnitCell.from_lengths_and_angles(
+                [pdb.unit_cell["a"], pdb.unit_cell["b"], pdb.unit_cell["c"]],
+                [pdb.unit_cell["alpha"], pdb.unit_cell["beta"], pdb.unit_cell["gamma"]],
+                unit="degrees")
+        pos_cart = np.c_[pdb.atoms["x"], pdb.atoms["y"], pdb.atoms["z"]]
+        pos_frac = uc.to_fractional(pos_cart)
+        elements = [Element.from_string(x) for x in pdb.atoms["element"]]
+        labels = pdb.atoms["name"]
+        asym = AsymmetricUnit(elements, pos_frac, labels=labels)
+        sg = SpaceGroup.from_symbol(pdb.space_group)
+        return Crystal(uc, sg, asym)
 
     @classmethod
     def from_cif_string(cls, file_content, **kwargs):
