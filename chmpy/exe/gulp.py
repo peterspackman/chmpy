@@ -15,8 +15,9 @@ class Gulp(AbstractExecutable):
     _input_file = "gulp_job.gin"
     _output_file = "gulp_job.gout"
     _drv_file = "gulp_job.drv"
+    _res_file = "gulp_job.res"
     _executable_location = GULP_EXEC
-    _timeout = 86400.0
+    _timeout = 10086400.0
 
     def __init__(self, input_contents, *args, working_directory=".", **kwargs):
         self._timeout = kwargs.get("timeout", self._timeout)
@@ -58,7 +59,10 @@ class Gulp(AbstractExecutable):
 
     def post_process(self):
         self.output_contents = Path(self.output_file).read_text()
-        self.drv_contents = Path(self.drv_file).read_text()
+        if Path(self.drv_file).exists():
+            self.drv_contents = Path(self.drv_file).read_text()
+        else:
+            self.drv_contents = ""
 
     def run(self, *args, **kwargs):
         LOG.debug("Running %s %s", self._executable_location, self.arg)
