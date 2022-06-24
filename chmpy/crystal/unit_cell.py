@@ -93,23 +93,20 @@ class UnitCell:
         ca, cb, cg = np.cos(self.angles)
         sg = np.sin(self.angles[2])
         v = self.volume()
-        self.direct = np.transpose(
-            [
-                [a, b * cg, c * cb],
-                [0, b * sg, c * (ca - cb * cg) / sg],
-                [0, 0, v / (a * b * sg)],
-            ]
-        )
-        r = [
-            [1 / a, 0.0, 0.0],
-            [-cg / (a * sg), 1 / (b * sg), 0],
-            [
+        self.direct = np.array((
+            (a, 0, 0),
+            (b * cg, b * sg, 0),
+            (c * cb, c * (ca - cb * cg) / sg, v / (a * b * sg))
+        ))
+        self.inverse = np.array((
+            (1.0 / a, 0.0, 0.0),
+            (-cg / (a * sg), 1 / (b * sg), 0),
+            (
                 b * c * (ca * cg - cb) / v / sg,
                 a * c * (cb * cg - ca) / v / sg,
                 a * b * sg / v,
-            ],
-        ]
-        self.inverse = np.array(r)
+            )
+        ))
         self._set_cell_type()
 
     def set_vectors(self, vectors):

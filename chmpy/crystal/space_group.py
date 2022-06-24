@@ -357,6 +357,7 @@ class SpaceGroup:
 
     @classmethod
     def from_symbol(cls, symbol):
+        symbol = symbol.replace(" ", "")
         sgdata = SG_FROM_SYMBOL.get(symbol, None)
         special_cases = {
             "P21/a": "P12_1/a1",
