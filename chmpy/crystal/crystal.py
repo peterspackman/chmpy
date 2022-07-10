@@ -11,7 +11,7 @@ from .asymmetric_unit import AsymmetricUnit
 from chmpy.core.element import Element
 from chmpy.core.molecule import Molecule
 from chmpy.util.num import cartesian_product
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Dict
 from trimesh import Trimesh
 
 LOG = logging.getLogger(__name__)
@@ -565,7 +565,7 @@ class Crystal:
         result["uc_atom"] = np.tile(np.arange(slab["n_uc"]), slab["n_cells"])[idxs]
         return result
 
-    def atomic_surroundings(self, radius=6.0) -> List[Tuple]:
+    def atomic_surroundings(self, radius=6.0) -> List[Dict]:
         """
         Calculate all atoms within the given `radius` of
         each atomic site in the asymmetric unit.
@@ -589,13 +589,26 @@ class Crystal:
         slab = self.slab(bounds=((hmin, kmin, lmin), (hmax, kmax, lmax)))
         tree = KDTree(slab["cart_pos"])
         results = []
-        for n, pos in zip(self.asymmetric_unit.elements, cart_asym):
+        for i, (n, pos) in enumerate(zip(self.asymmetric_unit.elements, cart_asym)):
             idxs = tree.query_ball_point(pos, radius)
             positions = slab["cart_pos"][idxs]
             elements = slab["element"][idxs]
+            asym = slab["asym_atom"][idxs]
             d = np.linalg.norm(positions - pos, axis=1)
             keep = np.where(d > 1e-3)[0]
-            results.append((n.atomic_number, pos, elements[keep], positions[keep]))
+            results.append({
+                    "centre": {
+                        "element": n.atomic_number,
+                        "cart_pos": pos,
+                        "asym_atom": i,
+                    },
+                    "neighbours": {
+                        "element": elements[keep],
+                        "cart_pos": positions[keep],
+                        "distance": d[keep],
+                        "asym_atom": asym[keep],
+                    }
+                })
         return results
 
     def atom_group_surroundings(self, atoms, radius=6.0) -> Tuple:
@@ -992,9 +1005,11 @@ class Crystal:
         extra_props = {}
         isos = []
         if kind == "atom":
-            for n, pos, neighbour_els, neighbour_pos in self.atomic_surroundings(
-                radius=radius
-            ):
+            for surrounds in self.atomic_surroundings(radius=radius):
+                n = surrounds["centre"]["element"]
+                pos = surrounds["centre"]["cart_pos"]
+                neighbour_els = surrounds["neighbours"]["element"]
+                neighbour_pos = surrounds["neighbours"]["cart_pos"]
                 s = StockholderWeight.from_arrays(
                     [n], [pos], neighbour_els, neighbour_pos
                 )
@@ -1225,9 +1240,12 @@ class Crystal:
         from chmpy.shape import SHT, stockholder_weight_descriptor
 
         sph = SHT(l_max)
-        for n, pos, neighbour_els, neighbour_pos in self.atomic_surroundings(
-            radius=radius
-        ):
+        for surrounds in self.atomic_surroundings(radius=radius):
+            n = surrounds["centre"]["element"]
+            pos = surrounds["centre"]["cart_pos"]
+            neighbour_els = surrounds["neighbours"]["element"]
+            neighbour_pos = surrounds["neighbours"]["cart_pos"]
+
             ubound = Element[n].vdw_radius * 3 + 2.0
             desc = stockholder_weight_descriptor(
                 sph,
