@@ -1,4 +1,9 @@
+import sys
 import collections
+if sys.version_info.major == 3 and sys.version_info.minor >= 10:
+    from collections.abc import MutableMapping, Mapping
+else:
+    from collections import MutableMapping, Mapping
 
 
 def recursive_dict_update(dict_to, dict_from):
@@ -20,7 +25,7 @@ def recursive_dict_update(dict_to, dict_from):
         {'test': {'test_val': 5}, 'other': 3}
     """
     for key, val in dict_from.items():
-        if isinstance(val, collections.Mapping):
+        if isinstance(val, Mapping):
             dict_to[key] = recursive_dict_update(dict_to.get(key, {}), val)
         else:
             dict_to[key] = val
@@ -54,7 +59,7 @@ def nested_dict_delete(root, key, sep="."):
     levels = key.split(sep)
     level_key = levels[0]
     if level_key in root:
-        if isinstance(root[level_key], collections.MutableMapping):
+        if isinstance(root[level_key], MutableMapping):
             nested_dict_delete(root[level_key], sep.join(levels[1:]), sep=sep)
             if not root[level_key]:
                 del root[level_key]

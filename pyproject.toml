@@ -1,5 +1,36 @@
-[build-system]
-requires = ["setuptools", "wheel", "cython", "numpy"]
+[tool.poetry]
+name = "chmpy"
+version = "1.0b1"
+description = "Molecules, crystals, promolecule and Hirshfeld surfaces using python."
+authors = ["Peter Spackman <peterspackman@fastmail.com>"]
+homepage = "https://github.com/peterspackman/chmpy"
+repository = "https://github.com/peterspackman/chmpy"
+documentation = "https://peterspackman.github.io/chmpy/"
+license = "GPL-3.0-or-later"
+include = ["chmpy/**/*.so", "chmpy/**/*.jinja2", "chmpy/**/*.gt", "chmpy/**/*.json", "chmpy/**/*.npz"]
 
-[tool.pyright]
-include = ["chmpy"]
+[tool.poetry.build]
+script = "build.py"
+generate-setup-file = false
+
+[tool.poetry.dependencies]
+python = ">=3.8,<3.11"
+numpy = "^1.12"
+scipy = "^1.8.1"
+trimesh = "^3.12.9"
+matplotlib = "^3.5.2"
+seaborn = "^0.11.2"
+Jinja2 = "^3.1.2"
+
+[tool.poetry.dev-dependencies]
+Cython = "^0.29.30"
+pytest = "^7.1.2"
+flake8 = "^4.0.1"
+
+[tool.poetry.extras]
+graph = ["graph_tool"]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+

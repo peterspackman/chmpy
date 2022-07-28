@@ -10,7 +10,7 @@ jobs:
       max-parallel: 4
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: [3.7, 3.8, 3.9]
+        python-version: ['3.8', '3.9', '3.10']
 
     steps:
     - uses: actions/checkout@v1
@@ -24,7 +24,7 @@ jobs:
       if: startsWith(runner.os, 'Linux')
       with:
         path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/setup.py') }}
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
         restore-keys: |
           ${{ runner.os }}-pip-
 
@@ -33,7 +33,7 @@ jobs:
       if: startsWith(runner.os, 'macOS')
       with:
         path: ~/Library/Caches/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/setup.py') }}
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
         restore-keys: |
           ${{ runner.os }}-pip-
 
@@ -42,26 +42,31 @@ jobs:
       if: startsWith(runner.os, 'Windows')
       with:
         path: ~\AppData\Local\pip\Cache
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/setup.py') }}
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
         restore-keys: |
           ${{ runner.os }}-pip-
 
+    - name: Install poetry
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install poetry
+
+    - name: Setup poetry config
+      run: |
+        python -m poetry config virtualenvs.create false
+
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip cython numpy
-        pip install -e .
+        python -m poetry install --no-root
+        python -m poetry install
 
     - name: Lint (flake8)
       run: |
-        pip install flake8
         # stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        poetry run flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        poetry run flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
     - name: Run tests
       run: |
-        pip install pytest
-        pytest
-
-
+        poetry run pytest

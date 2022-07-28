@@ -43,7 +43,8 @@ import base64
 import numpy as np
 
 from . import lookup_tables
-from . import _mc_lewiner
+from ._mc_lewiner import marching_cubes as _marching_cubes
+from ._mc_lewiner import remove_degenerate_faces, LutProvider
 
 
 def marching_cubes(
@@ -183,7 +184,7 @@ def marching_cubes(
     L = _get_lookup_tables()
 
     # Apply algorithm
-    func = _mc_lewiner.marching_cubes
+    func = _marching_cubes
     vertices, faces, normals, values = func(volume, level, L, step_size, use_classic)
 
     if not len(vertices):
@@ -209,7 +210,7 @@ def marching_cubes(
     if allow_degenerate:
         return vertices, faces, normals, values
     else:
-        fun = _mc_lewiner.remove_degenerate_faces
+        fun = remove_degenerate_faces
         return fun(vertices.astype(np.float32), faces, normals, values)
 
 
@@ -283,7 +284,7 @@ EDGETORELATIVEPOSZ = np.array(
 def _get_lookup_tables():
     """Kind of lazy obtaining of the lookup tables."""
     if not hasattr(lookup_tables, "THE_LUTS"):
-        lookup_tables.THE_LUTS = _mc_lewiner.LutProvider(
+        lookup_tables.THE_LUTS = LutProvider(
             EDGETORELATIVEPOSX,
             EDGETORELATIVEPOSY,
             EDGETORELATIVEPOSZ,
