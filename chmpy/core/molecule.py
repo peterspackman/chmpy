@@ -48,8 +48,7 @@ class Molecule:
             positions (array_like): (N, 3) array of site positions in Cartesian coordinates
             bonds (dok_matrix, optional): if bonds are already calculated provide them here
             labels (array_like, optional): labels (array_like): N length array of string labels for each site
-            kwargs: Additional properties (will populate the properties member)
-                to store in this molecule
+            **kwargs: Additional properties (will populate the properties member) to store in this molecule
         """
         self.positions = positions
         self.elements = elements
@@ -659,13 +658,11 @@ class Molecule:
         Returns:
             shape description vector
 
-        References
-        ```
-        [1] PR Spackman et al. Sci. Rep. 6, 22204 (2016)
-            https://dx.doi.org/10.1038/srep22204
-        [2] PR Spackman et al. Angew. Chem. 58 (47), 16780-16784 (2019)
-            https://dx.doi.org/10.1002/anie.201906602
-        ```
+        References:
+            [1] PR Spackman et al. Sci. Rep. 6, 22204 (2016)
+                https://dx.doi.org/10.1038/srep22204
+            [2] PR Spackman et al. Angew. Chem. 58 (47), 16780-16784 (2019)
+                https://dx.doi.org/10.1002/anie.201906602
         """
         descriptors = []
         from chmpy.shape import SHT, stockholder_weight_descriptor
@@ -700,32 +697,26 @@ class Molecule:
         Calculate the stockholder weight isosurfaces for the atoms
         in this molecule, with the provided background density.
 
-        Args:
-            kwargs (dict): keyword arguments to be passed to isosurface
-                generation code
-
-                Options are:
-                ```
-                background: float, optional
-                    'background' density to ensure closed surfaces for isolated atoms
-                    (default=1e-5)
-                isovalue: float, optional
-                    level set value for the isosurface (default=0.5). Must be between
-                    0 and 1, but values other than 0.5 probably won't make sense anyway.
-                separation: float, optional
-                    separation between density grid used in the surface calculation
-                    (default 0.2) in Angstroms.
-                radius: float, optional
-                    maximum distance for contributing neighbours for the stockholder
-                    weight calculation
-                color: str, optional
-                    surface property to use for vertex coloring, one of ('d_norm_i',
-                    'd_i', 'd_norm_e', 'd_e', 'd_norm')
-                colormap: str, optional
-                    matplotlib colormap to use for surface coloring (default 'viridis_r')
-                midpoint: float, optional, default 0.0 if using d_norm
-                    use the midpoint norm (as is used in CrystalExplorer)
-                ```
+        Keyword Args:
+            background: float, optional
+                'background' density to ensure closed surfaces for isolated atoms
+                (default=1e-5)
+            isovalue: float, optional
+                level set value for the isosurface (default=0.5). Must be between
+                0 and 1, but values other than 0.5 probably won't make sense anyway.
+            separation: float, optional
+                separation between density grid used in the surface calculation
+                (default 0.2) in Angstroms.
+            radius: float, optional
+                maximum distance for contributing neighbours for the stockholder
+                weight calculation
+            color: str, optional
+                surface property to use for vertex coloring, one of ('d_norm_i',
+                'd_i', 'd_norm_e', 'd_e', 'd_norm')
+            colormap: str, optional
+                matplotlib colormap to use for surface coloring (default 'viridis_r')
+            midpoint: float, optional, default 0.0 if using d_norm
+                use the midpoint norm (as is used in CrystalExplorer)
 
         Returns:
             List[trimesh.Trimesh]: A list of meshes representing the stockholder weight isosurfaces
@@ -788,26 +779,22 @@ class Molecule:
         this molecule using the promolecule density.
 
         Args:
-            kwargs: keyword arguments passed to `promolecule_density_descriptor`
-                Options are:
-                ```
-                l_max (int, optional): maximum level of angular momenta to include in the spherical harmonic
-                    transform of the molecular shape function.
-                with_property (str, optional): describe the combination of the radial shape function and a surface
-                    property in the real, imaginary channels of a complex function
-                isovalue (float, optional): the isovalue for the promolecule density surface (default 0.0002 au)
-                ```
+            l_max (int, optional): maximum level of angular momenta to include in the spherical harmonic
+                transform of the molecular shape function.
+
+        Keyword Args:
+            with_property (str, optional): describe the combination of the radial shape function and a surface
+                property in the real, imaginary channels of a complex function
+            isovalue (float, optional): the isovalue for the promolecule density surface (default 0.0002 au)
 
         Returns:
             shape description vector
 
         References:
-        ```
-        [1] PR Spackman et al. Sci. Rep. 6, 22204 (2016)
-            https://dx.doi.org/10.1038/srep22204
-        [2] PR Spackman et al. Angew. Chem. 58 (47), 16780-16784 (2019)
-            https://dx.doi.org/10.1002/anie.201906602
-        ```
+            [1] PR Spackman et al. Sci. Rep. 6, 22204 (2016)
+                https://dx.doi.org/10.1038/srep22204
+            [2] PR Spackman et al. Angew. Chem. 58 (47), 16780-16784 (2019)
+                https://dx.doi.org/10.1002/anie.201906602
         """
         from chmpy.shape import SHT, promolecule_density_descriptor
 
@@ -820,23 +807,20 @@ class Molecule:
         """
         Calculate promolecule electron density isosurface
         for this molecule.
-        Args:
-            kwargs: keyword arguments passed to `promolecule_density_isosurface`
-                Options are:
-                ```
-                isovalue: float, optional
-                    level set value for the isosurface (default=0.002) in au.
-                separation: float, optional
-                    separation between density grid used in the surface calculation
-                    (default 0.2) in Angstroms.
-                color: str, optional
-                    surface property to use for vertex coloring, one of ('d_norm_i',
-                    'd_i', 'd_norm_e', 'd_e')
-                colormap: str, optional
-                    matplotlib colormap to use for surface coloring (default 'viridis_r')
-                midpoint: float, optional, default 0.0 if using d_norm
-                    use the midpoint norm (as is used in CrystalExplorer)
-                ```
+
+        Keyword Args:
+            isovalue: float, optional
+                level set value for the isosurface (default=0.002) in au.
+            separation: float, optional
+                separation between density grid used in the surface calculation
+                (default 0.2) in Angstroms.
+            color: str, optional
+                surface property to use for vertex coloring, one of ('d_norm_i',
+                'd_i', 'd_norm_e', 'd_e')
+            colormap: str, optional
+                matplotlib colormap to use for surface coloring (default 'viridis_r')
+            midpoint: float, optional, default 0.0 if using d_norm
+                use the midpoint norm (as is used in CrystalExplorer)
 
         Returns:
             trimesh.Trimesh: A mesh representing the promolecule density isosurface

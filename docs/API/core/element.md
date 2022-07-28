@@ -1,2 +1,0 @@
-# element
-::: chmpy.core.element

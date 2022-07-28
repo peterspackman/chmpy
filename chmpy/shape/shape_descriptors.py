@@ -94,22 +94,20 @@ def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
         p_i (np.ndarray): Cartesian coordinates of the interior atoms
         n_e (np.ndarray): atomic numbers of the exterior atoms
         p_e (np.ndarray): Cartesian coordinates of the exterior atoms
-        kwargs (dict): keyword arguments for optional settings.
-            Options include:
-            ```
-            isovalue (float): change the Hirshfeld weight value (default 0.5)
-            background (float): include an optional 'background' electron
-                density (default 0.0)
-            with_property (str): calculate the combined shape + surface
-                property descriptor using the specified property on the
-                surface (e.g. d_norm, esp)
-            bounds (Tuple): modify the lower/upper bounds on the search for
-                the isovalue (default 0.1, 20.0)
-            coefficients (bool): also return the coefficients of the SHT
-            origin (np.ndarray): specify the center of the surface
-                (default is the geometric centroid of the interior atoms)
-            kinds (str): the kinds of invariants to calculate (default 'NP')
-            ```
+
+    Keyword Args:
+        isovalue (float): change the Hirshfeld weight value (default 0.5)
+        background (float): include an optional 'background' electron
+            density (default 0.0)
+        with_property (str): calculate the combined shape + surface
+            property descriptor using the specified property on the
+            surface (e.g. d_norm, esp)
+        bounds (Tuple): modify the lower/upper bounds on the search for
+            the isovalue (default 0.1, 20.0)
+        coefficients (bool): also return the coefficients of the SHT
+        origin (np.ndarray): specify the center of the surface
+            (default is the geometric centroid of the interior atoms)
+        kinds (str): the kinds of invariants to calculate (default 'NP')
     Returns:
         np.ndarray: the rotation invariant descriptors of the Hirshfeld surface shape
     """
@@ -165,20 +163,18 @@ def promolecule_density_descriptor(sht, n_i, p_i, **kwargs):
         sht (SHT): the spherical harmonic transform object handle
         n_i (np.ndarray): atomic numbers of the atoms
         p_i (np.ndarray): Cartesian coordinates of the atoms
-        kwargs (dict): keyword arguments for optional settings.
-            Options include:
-            ```
-            isovalue (float): change the Hirshfeld weight value (default 0.5)
-            with_property (str): calculate the combined shape + surface
-                property descriptor using the specified property on the
-                surface (e.g. d_norm, esp)
-            bounds (Tuple): modify the lower/upper bounds on the search for
-                the isovalue (default 0.1, 20.0)
-            coefficients (bool): also return the coefficients of the SHT
-            origin (np.ndarray): specify the center of the surface
-                (default is the geometric centroid of the atoms)
-            kinds (str): the kinds of invariants to calculate (default 'NP')
-            ```
+        **kwargs: keyword arguments for optional settings.
+    Keyword Args:
+        isovalue (float): change the Hirshfeld weight value (default 0.5)
+        with_property (str): calculate the combined shape + surface
+            property descriptor using the specified property on the
+            surface (e.g. d_norm, esp)
+        bounds (Tuple): modify the lower/upper bounds on the search for
+            the isovalue (default 0.1, 20.0)
+        coefficients (bool): also return the coefficients of the SHT
+        origin (np.ndarray): specify the center of the surface
+            (default is the geometric centroid of the atoms)
+        kinds (str): the kinds of invariants to calculate (default 'NP')
     Returns:
         np.ndarray: the rotation invariant descriptors of the promolecule surface shape
     """

@@ -1,2 +1,0 @@
-# Sampling
-::: chmpy.sampling

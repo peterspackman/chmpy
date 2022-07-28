@@ -172,13 +172,12 @@ def kabsch_rotation_matrix(A, B):
     `A` onto `B`, minimising root-mean-square deviation so that
     this may be then calculated.
 
-    See: https://en.wikipedia.org/wiki/Kabsch_algorithm
+    See https://en.wikipedia.org/wiki/Kabsch_algorithm
 
-    Reference:
-    ```
-    Kabsch, W. Acta Cryst. A, 32, 922-923, (1976)
-    DOI: http://dx.doi.org/10.1107/S0567739476001873
-    ```
+    References:
+        Kabsch, W. Acta Cryst. A, 32, 922-923, (1976)
+            DOI: http://dx.doi.org/10.1107/S0567739476001873
+
     Args:
         A (np.ndarray): (N,D) matrix where N is the number of vectors and D
             is the dimension of each vector

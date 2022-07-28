@@ -1,5 +1,13 @@
 # chmpy
 
+```{toctree}
+:hidden:
+:maxdepth: 2
+shape_descriptors.md
+parallel.md
+api/index.md
+```
+
 A library for computational chemistry in python. Featuring support for
 molecules, crystals, Hirshfeld & promolecule density isosurfaces,
 spherical harmonic shape descriptors and much more...
