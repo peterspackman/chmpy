@@ -12,12 +12,16 @@ Installation
 
 Basic installation can be done through the python package manager ``pip``::
 
-    pip install git+https://github.com/peterspackman/chmpy.git
+    pip install chmpy
 
-If you wish to utilise the spherical harmonic shape descriptors, you will
-need to install the wonderful SHTns library <https://nschaeff.bitbucket.io/shtns/>
-library. Be sure to cite the SHTns library if you use shape descriptors in any
-publication.
+
+If you wish to develop/modify the code, then you should use ``poetry``::
+
+    poetry install --no-root
+    poetry install
+
+The first poetry install appears to be required as poetry does not install dev dependencies before building,
+and this package uses Cython.
 
 Features
 ========
