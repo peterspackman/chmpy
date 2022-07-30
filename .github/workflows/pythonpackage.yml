@@ -58,6 +58,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m poetry install --no-root
+        python -m poetry build --format wheel
         python -m poetry install
 
     - name: Lint (flake8)
@@ -71,8 +72,6 @@ jobs:
       run: |
         poetry run pytest
 
-    - name: Publish
-      uses: JRubics/poetry-publish@v1.12
-      with:
-        pypi_token: ${{ secrets.PYPI_TOKEN }}
-        build_format: wheel
+    - name: Publish package to PyPI
+      run: | 
+        python -m poetry publish -u __token__ -p ${{ secrets.PYPI_TOKEN }}

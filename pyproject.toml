@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "chmpy"
-version = "1.0b2"
+version = "1.0b5"
 description = "Molecules, crystals, promolecule and Hirshfeld surfaces using python."
 authors = ["Peter Spackman <peterspackman@fastmail.com>"]
 homepage = "https://github.com/peterspackman/chmpy"
