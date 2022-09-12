@@ -224,7 +224,7 @@ class Crystal:
         )
         return getattr(self, "_unit_cell_atom_dict")
 
-    def unit_cell_connectivity(self, tolerance=0.4, neighbouring_cells=1) -> Tuple:
+    def unit_cell_connectivity(self, tolerance=0.4, neighbouring_cells=1, **kwargs) -> Tuple:
         """
         Periodic connectiviy for the unit cell, populates _uc_graph
         with a networkx.Graph object, where nodes are indices into the
@@ -260,9 +260,10 @@ class Crystal:
         uc_nums = slab["element"][:n_uc]
         neighbour_pos = slab["frac_pos"][n_uc:]
         cart_uc_pos = self.to_cartesian(uc_pos)
-        unique_elements = {x: Element.from_atomic_number(x) for x in np.unique(uc_nums)}
+        covalent_radii_dict = {x: Element.from_atomic_number(x).cov for x in np.unique(uc_nums)}
+        covalent_radii_dict.update(kwargs.get("covalent_radii", {}))
         # first establish all connections in the unit cell
-        covalent_radii = np.array([unique_elements[x].cov for x in uc_nums])
+        covalent_radii = np.array([covalent_radii_dict[x] for x in uc_nums])
         max_cov = np.max(covalent_radii)
         # TODO this needs to be sped up for large cells, tends to slow for > 1000 atoms
         # and the space storage will become a problem
@@ -300,11 +301,14 @@ class Crystal:
         setattr(self, "_uc_graph", (uc_graph, properties))
         return getattr(self, "_uc_graph")
 
-    def unit_cell_molecules(self) -> List[Molecule]:
+    def unit_cell_molecules(self, bond_tolerance=0.4, **kwargs) -> List[Molecule]:
         """
         Calculate the molecules for all sites in the unit cell,
         where the number of molecules will be equal to number of
         symmetry unique molecules times number of symmetry operations.
+
+        Args:
+            bond_tolerance (float, optional): Bonding tolerance (bonded if d < cov_a + cov_b + bond_tolerance)
 
         Returns:
             A list of all connected molecules in this crystal, which
@@ -315,7 +319,7 @@ class Crystal:
 
         if hasattr(self, "_unit_cell_molecules"):
             return getattr(self, "_unit_cell_molecules")
-        uc_graph, edge_cells = self.unit_cell_connectivity()
+        uc_graph, edge_cells = self.unit_cell_connectivity(tolerance=bond_tolerance, **kwargs)
         n_uc_mols, uc_mols = csgraph.connected_components(
             csgraph=uc_graph, directed=False, return_labels=True
         )
@@ -420,7 +424,7 @@ class Crystal:
             result[f].append(m)
         return result
 
-    def symmetry_unique_molecules(self, bond_tolerance=0.4) -> List[Molecule]:
+    def symmetry_unique_molecules(self, bond_tolerance=0.4, **kwargs) -> List[Molecule]:
         """
         Calculate a list of connected molecules which contain
         every site in the asymmetric_unit
@@ -443,7 +447,7 @@ class Crystal:
 
         if hasattr(self, "_symmetry_unique_molecules"):
             return getattr(self, "_symmetry_unique_molecules")
-        uc_molecules = self.unit_cell_molecules()
+        uc_molecules = self.unit_cell_molecules(bond_tolerance=bond_tolerance, **kwargs)
         asym_atoms = np.zeros(len(self.asymmetric_unit), dtype=bool)
         molecules = []
 
@@ -1927,7 +1931,7 @@ class Crystal:
         distances, idx = tree.query(points)
         return neighbour_info, nidx[idx]
 
-    def normalize_hydrogen_bondlengths(self):
+    def normalize_hydrogen_bondlengths(self, bond_tolerance=0.4, **kwargs):
         BONDLENGTHS = {
             "C": 1.083,
             "N": 1.009,
@@ -1937,7 +1941,7 @@ class Crystal:
         nums = self.asymmetric_unit.atomic_numbers
         pos_cart = self.to_cartesian(self.asymmetric_unit.positions)
         H_idxs = np.where(nums == 1)[0]
-        conn, t = self.unit_cell_connectivity()
+        conn, t = self.unit_cell_connectivity(bond_tolerance=bond_tolerance, **kwargs)
         d = 0.0
         for key in conn.keys():
             for h in H_idxs:
