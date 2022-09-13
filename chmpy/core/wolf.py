@@ -5,7 +5,7 @@ def wolf_sum(crystal, cutoff=16.0, eta=0.2, charges=None):
 
     Arguments:
         crystal (Crystal): the crystal for which to compute the Wolf sum.
-        cutoff (float, optional): the cutoff radius (in Angstroms) for which to compute the 
+        cutoff (float, optional): the cutoff radius (in Angstroms) for which to compute the
             neighbouring charges (default=16)
         eta (float, optional): the eta parameter (1/Angstroms), if unsure just leave this at
             its default (default=0.2)
@@ -37,7 +37,7 @@ def wolf_sum(crystal, cutoff=16.0, eta=0.2, charges=None):
     self_term = 0
     pair_term = 0
 
-    for surrounds in crystal.atomic_surroundings(radius=cutoff): # angstroms here
+    for surrounds in crystal.atomic_surroundings(radius=cutoff):  # angstroms here
         i = surrounds["centre"]["asym_atom"]
         qi = charges[i]
         self_term += qi * qi
@@ -45,6 +45,6 @@ def wolf_sum(crystal, cutoff=16.0, eta=0.2, charges=None):
         rij = ANGSTROM_TO_BOHR * surrounds["neighbours"]["distance"]
         pair_term += np.sum(qi * qj * (erfc(eta * rij) / rij - trc))
 
-    self_term *= (0.5 * trc + eta / sqrt_pi)
+    self_term *= 0.5 * trc + eta / sqrt_pi
 
     return 0.5 * pair_term - self_term

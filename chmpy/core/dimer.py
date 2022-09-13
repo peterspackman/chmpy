@@ -99,6 +99,14 @@ class Dimer:
             np.vstack((self.a.positions, self.b.positions)),
         )
 
+    def scale_separation(self, scale_factor):
+        v_a = self.a.centroid
+        v_b = self.b.centroid
+        v_ab = v_b - v_a
+        self.b.positions -= v_ab
+        v_ab *= scale_factor
+        self.b.positions += v_ab
+
     @property
     def separations(self):
         """The closest atom, centroid-centroid, and center of mass - center of mass separations of mol_a and mol_b."""
