@@ -243,3 +243,7 @@ cpdef p_invariants_r(coeffs):
     J = np.imag(odd_inv)
     J = np.sign(J) * np.cbrt(J)
     return np.hstack([R, J])
+
+
+cpdef double clebsch_gordan(l1, m1, l2, m2, l, m):
+    return clebsch(2*l1, 2*m1, 2*l2, 2*m2, 2*l, 2*m)

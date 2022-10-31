@@ -405,7 +405,8 @@ class Molecule:
         return {}
 
     def _ext_save_map(self):
-        return {".xyz": self.to_xyz_file}
+        return {".xyz": self.to_xyz_file,
+                ".sdf": self.to_sdf_file}
 
     def _fname_save_map(self):
         return {}
@@ -432,6 +433,53 @@ class Molecule:
         if not extension.startswith("."):
             extension = "." + extension
         return extension_map[extension](filename, **kwargs)
+
+    def to_sdf_string(self) -> str:
+        """
+        Represent this molecule as a string in the format
+        of an MDL .sdf file.
+
+        Returns:
+            contents (str) the contents of the .sdf file
+        """
+        from chmpy.fmt.sdf import to_sdf_string
+
+        bonds_left = []
+        bonds_right = []
+        if self.bonds is not None:
+            self.guess_bonds()
+            for x, y in self.bonds.keys():
+                bonds_left.append(x + 1)
+                bonds_right.append(y + 1)
+
+
+        sdf_dict = {
+            "header": [self.name, "created by chmpy", ""],
+            "atoms": {
+                "x": self.positions[:, 0],
+                "y": self.positions[:, 0],
+                "z": self.positions[:, 0],
+                "symbol": np.array([x.symbol for x in self.elements]),
+            },
+            "bonds": {
+                "left": np.array(bonds_left),
+                "right": np.array(bonds_right),
+            }
+        }
+        return to_sdf_string(sdf_dict)
+
+    def to_sdf_file(self, filename, **kwargs):
+        """
+        Represent this molecule as an
+        of an MDL .sdf file. Keyword arguments are
+        passed to `self.to_sdf_string`.
+
+        Args:
+            filename (str): The path in which store this molecule
+            kwargs: Keyword arguments to be passed to `self.to_sdf_string`
+        """
+        Path(filename).write_text(self.to_sdf_string(**kwargs))
+
 
     def to_xyz_string(self, header=True) -> str:
         """

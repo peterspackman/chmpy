@@ -304,7 +304,6 @@ class SHT:
         else:
             return self._eval_at_points_cplx(coeffs, theta, phi)
 
-
     def complete_coefficients(self, coeffs):
         return expand_coeffs_to_full(self.lmax, coeffs)
 

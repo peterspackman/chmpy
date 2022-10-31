@@ -219,7 +219,7 @@ cdef void expand_coeffs_cython(const int lmax, const double complex[:] cin, doub
             l_offset = l * (l + 1)
             cout[l_offset + m] = cin[plm_idx]
             if m != 0:
-                sign = -1 if l & 1 else 1
+                sign = -1 if m & 1 else 1
                 cout[l_offset - m] = sign * cin[plm_idx].conjugate()
             plm_idx += 1
 

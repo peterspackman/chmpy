@@ -234,7 +234,7 @@ class SHTTestCase(unittest.TestCase):
             0.0, # 4  0
             -np.sqrt(2 * np.pi / 3) + 0.3 * np.sqrt(2 * np.pi / 3) *1j, # 1 1
             0.0, # 2  1
-            0.0, # 3  1
+            -np.sqrt(2 * np.pi / 3) + 0.3 * np.sqrt(2 * np.pi / 3) *1j, # 3 1
             0.0, # 4  1
             0.0, # 2  2
             0.0, # 3  2
@@ -256,9 +256,9 @@ class SHTTestCase(unittest.TestCase):
             0.0, # 2  2
             0.0, # 3 -3
             0.0, # 3 -2
-            0.0, # 3 -1
+            np.sqrt(2 * np.pi / 3) + 0.3 * np.sqrt(2 * np.pi / 3) *1j, # 3 -1
             0.0, # 3  0
-            0.0, # 3  1
+            -np.sqrt(2 * np.pi / 3) + 0.3 * np.sqrt(2 * np.pi / 3) *1j, # 3 1
             0.0, # 3  2
             0.0, # 3  3
             0.0, # 4 -4
