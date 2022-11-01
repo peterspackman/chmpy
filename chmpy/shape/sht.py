@@ -249,7 +249,7 @@ class SHT:
         return values
 
     def _eval_at_points_real(self, coeffs, theta, phi):
-        # verified
+        # very slow pure python implementation, should move to cython
         cos_theta = np.cos(theta)
         result = 0.0
         self.plm.evaluate_batch(cos_theta, result=self.plm_work_array)
@@ -273,6 +273,7 @@ class SHT:
         return result
 
     def _eval_at_points_cplx(self, coeffs, theta, phi):
+        # very slow pure python implementation, should move to cython
         cos_theta = np.cos(theta)
         result = 0.0
         self.plm.evaluate_batch(cos_theta, result=self.plm_work_array)
@@ -284,16 +285,21 @@ class SHT:
             plm_idx += 1
 
         mv = np.exp(1j * np.arange(-self.lmax, self.lmax + 1) * phi)
+        cos_vals = 0.0
+        sin_vals = 0.0
         for m in range(1, self.lmax + 1):
-            tmpp = 0.0
-            tmpn = 0.0
+            tmpr = 0.0
+            tmpc = 0.0
             for l in range(m, self.lmax + 1):
                 l_offset = l * (l + 1)
-                tmpp += self.plm_work_array[plm_idx] * coeffs[l_offset + m]
-                tmpn += self.plm_work_array[plm_idx] * coeffs[l_offset - m]
+                tmpr += self.plm_work_array[plm_idx] * coeffs[l_offset + m]
+                tmpc += self.plm_work_array[plm_idx] * coeffs[l_offset - m]
                 plm_idx += 1
-            result += tmpp * mv[self.lmax + m]
-            result += tmpn * np.conj(mv[self.lmax - m])
+            if m & 1:
+                tmpc = -tmpc
+            cos_vals += np.real(mv[self.lmax + m]) * (tmpr + tmpc)
+            sin_vals += np.imag(mv[self.lmax - m]) * (tmpr - tmpc)
+        result += np.real(cos_vals) - np.imag(sin_vals) + 1j * (np.imag(cos_vals) + np.real(sin_vals))
         return result
 
     def evaluate_at_points(self, coeffs, theta, phi):

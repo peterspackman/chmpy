@@ -32,19 +32,22 @@ def reconstructed_surface_icosphere(coefficients, real=True, subdivisions=3):
         n = len(coefficients)
         l_max = int((-3 + np.sqrt(8 * n + 1)) // 2)
     else:
-        raise NotImplementedError(
-            "Complex reconstructed surface case not yet implemented"
-        )
+        n = len(coefficients)
+        l_max = int(np.sqrt(n)) - 1
     LOG.debug("Reconstructing deduced l_max = %d", l_max)
     sht = SHT(l_max)
 
     from trimesh.creation import icosphere
+    datatype = np.float64 if real else np.complex128
 
     sphere = icosphere(subdivisions=subdivisions)
     theta = np.arccos(sphere.vertices[:, 2])
     phi = np.arctan2(sphere.vertices[:, 1], sphere.vertices[:, 0])
-    r = np.empty_like(phi)
+    r = np.empty_like(phi, datatype)
     for i in range(phi.shape[0]):
         r[i] = sht.evaluate_at_points(coefficients, theta[i], phi[i])
-    sphere.vertices *= r[:, np.newaxis]
+    sphere.vertices *= np.real(r[:, np.newaxis])
+
+    if not real:
+        sphere.vertex_attributes["property"] = np.imag(r)
     return sphere
