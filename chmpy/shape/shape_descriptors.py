@@ -73,9 +73,11 @@ def make_invariants(l_max, coefficients, kinds="NP") -> np.ndarray:
     return np.hstack(invariants)
 
 
-def _compute_property_in_j_channel(sht, r, property_function):
+def _compute_property_in_j_channel(sht, r, property_function, origin=None):
     x, y, z = sht.grid_cartesian
     xyz = np.c_[x.flatten(), y.flatten(), z.flatten()] * r.flatten()[:, np.newaxis]
+    if origin is not None:
+        xyz += origin
     prop_values = property_function(xyz)
     r_cplx = np.empty(r.shape, dtype=np.complex128)
     r_cplx.real = r
@@ -140,7 +142,7 @@ def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
             property_function = Molecule.from_arrays(
                 s.dens_a.elements, s.dens_a.positions
             ).electrostatic_potential
-        r = _compute_property_in_j_channel(sht, r, property_function)
+        r = _compute_property_in_j_channel(sht, r, property_function, origin=o)
         real = False
     l_max = sht.lmax
     coeffs = sht.analysis(r)
