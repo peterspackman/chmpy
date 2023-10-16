@@ -3,7 +3,7 @@ cimport cython
 cimport numpy as cnp
 import numpy as np
 from os.path import join, dirname
-from libc.math cimport fabs, log, sqrt, cos, sin
+from libc.math cimport fabs, log, cos, sin
 from cython.parallel import prange
 
 cnp.import_array()
@@ -44,22 +44,21 @@ cdef class PromoleculeDensity:
         cdef const float[::1] domain_view = self.domain
         cdef int npos = self.positions.shape[0]
         cdef int npts = pts.shape[0]
-        with nogil:
-            for i in range(npos):
-                pos[0] = pos_view[i, 0]
-                pos[1] = pos_view[i, 1]
-                pos[2] = pos_view[i, 2]
-                for j in range(npts):
-                    tmp_view[j] = 0.0
-                    r_view[j] = (
-                        (pts[j, 0] - pos[0]) * (pts[j, 0] - pos[0]) + 
-                        (pts[j, 1] - pos[1]) * (pts[j, 1] - pos[1]) + 
-                        (pts[j, 2] - pos[2]) * (pts[j, 2] - pos[2])
-                    )
-                    r_view[j] = sqrt(r_view[j]) / 0.5291772108 # bohr_per_angstrom
-                log_interp_f(r_view, domain_view, rho_data_view[i], tmp_view)
-                for j in range(pts.shape[0]):
-                    rho_view[j] += tmp_view[j]
+        for i in range(npos):
+            pos[0] = pos_view[i, 0]
+            pos[1] = pos_view[i, 1]
+            pos[2] = pos_view[i, 2]
+            for j in range(npts):
+                tmp_view[j] = 0.0
+                r_view[j] = (
+                    (pts[j, 0] - pos[0]) * (pts[j, 0] - pos[0]) + 
+                    (pts[j, 1] - pos[1]) * (pts[j, 1] - pos[1]) + 
+                    (pts[j, 2] - pos[2]) * (pts[j, 2] - pos[2])
+                )
+                r_view[j] = r_view[j] / (0.5291772108 * 0.5291772108) # bohr_per_angstrom
+            interp_f(r_view, domain_view, rho_data_view[i], tmp_view)
+            for j in range(pts.shape[0]):
+                rho_view[j] += tmp_view[j]
 
     cdef float one_rho(self, const float position[3]) noexcept nogil:
         cdef int i
@@ -76,8 +75,8 @@ cdef class PromoleculeDensity:
             for col in range(3):
                 diff = position[col] - pos_view[i, col]
                 r += diff*diff
-            r = sqrt(r) / 0.5291772108 # bohr_per_angstrom
-            rho += log_interp_f_one(r, xi, rho_data_view[i])
+            r = r / (0.5291772108 * 0.5291772108) # bohr_per_angstrom
+            rho += interp_f_one(r, xi, rho_data_view[i])
         return rho
 
 @cython.final
@@ -103,84 +102,52 @@ cdef class StockholderWeight:
 
 
 @cython.cdivision(True)
-cdef void log_interp_d(const double[::1] x, const double[::1] xi,
-                       const double[::1] yi, double[::1] y) noexcept nogil:
-    cdef double xval, lxval, guess
-    cdef double slope
+cdef void interp_f(const float[::1] x, const float[::1] xi,
+                   const float[::1] yi, float[::1] y) noexcept nogil:
+
     cdef int ni = xi.shape[0]
-    cdef double lbound = log(xi[0]), ubound = log(xi[ni - 1])
-    cdef double lrange = ubound - lbound
-    cdef double lfill = yi[0], rfill = yi[ni - 1]
+    cdef float lbound = xi[0]
+    cdef float ubound = xi[ni - 1]
+    cdef float ufill = yi[ni - 1]
+    cdef float lfill = yi[0]
+    cdef float dx = xi[1] - xi[0]
+    cdef float inv_dx = 1.0 / dx
     cdef int i, j
+    cdef float t
+
     for i in prange(x.shape[0]):
-        xval = x[i]
-        lxval = log(xval)
-        guess = ni * (lxval - lbound) / lrange
-        j = <int>guess
+        j = <int>(inv_dx * (x[i] - lbound))
         if j <= 0:
             y[i] = lfill
-            continue
-        if j >= ni - 1:
-            y[i] = rfill
-            continue
-
-        while xi[j] < xval:
-            j = j + 1
-
-        slope = (yi[j] - yi[j-1]) / (xi[j] - xi[j-1])
-        y[i] += yi[j-1] + (xval - xi[j-1]) * slope
-
-@cython.cdivision(True)
-cdef void log_interp_f(const float[::1] x, const float[::1] xi,
-                       const float[::1] yi, float[::1] y) noexcept nogil:
-    cdef float xval, lxval, guess
-    cdef float slope
-    cdef int ni = xi.shape[0]
-    cdef float lbound = log(xi[0])
-    cdef float ubound = log(xi[ni - 1])
-    cdef float lrange = ubound - lbound
-    cdef float lfill = yi[0], rfill = 0.0
-    cdef int i, j
-    for i in prange(x.shape[0]):
-        xval = x[i]
-        lxval = log(xval)
-        guess = ni * (lxval - lbound) / lrange
-        j = <int>guess
-        if j <= 0:
-            y[i] = lfill
-            continue
         elif j >= ni - 1:
-            y[i] = rfill
-            continue
-
-        while True:
-            j = j + 1
-            if xi[j] >= xval: break
-
-        slope = (yi[j] - yi[j-1]) / (xi[j] - xi[j-1])
-        y[i] = y[i] + yi[j-1] + (xval - xi[j-1]) * slope
+            y[i] = ufill
+        else:
+            t = (x[i] - xi[j]) * inv_dx 
+            y[i] = (1.0 - t) * yi[j] + t * yi[j + 1]
 
 @cython.cdivision(True)
-cdef inline float log_interp_f_one(const float x, const float[::1] xi, const float[::1] yi) noexcept nogil:
-    cdef float xval, lxval, guess
-    cdef float slope
+cdef inline float interp_f_one(const float x, const float[::1] xi,
+                               const float[::1] yi) noexcept nogil:
+
     cdef int ni = xi.shape[0]
-    cdef float lbound = log(xi[0]), ubound = log(xi[ni - 1])
-    cdef float lrange = ubound - lbound
-    cdef float lfill = yi[0], rfill = yi[ni - 1]
+    cdef float lbound = xi[0]
+    cdef float ubound = xi[ni - 1]
+    cdef float ufill = 0.0
+    cdef float lfill = yi[0]
+    cdef float dx = xi[1] - xi[0]
+    cdef float inv_dx = 1.0 / dx
     cdef int j
-    lxval = log(x)
-    guess = ni * (lxval - lbound) / lrange
-    j = <int>guess
+    cdef float t
+
+    j = <int>(inv_dx * (x - lbound))
     if j <= 0:
         return lfill
-    if j >= ni - 1:
-        return rfill
-    while True:
-        j += 1
-        if xi[j] >= x: break
-    slope = (yi[j] - yi[j-1]) / (xi[j] - xi[j-1])
-    return yi[j-1] + (x - xi[j-1]) * slope
+    elif j >= ni - 1:
+        return ufill
+    else:
+        t = (x - xi[j]) * inv_dx 
+        return (1.0 - t) * yi[j] + t * yi[j + 1]
+
 
 cdef inline void fvmul(const float o[3], const float a, const float v[3], float dest[3]) noexcept nogil:
     dest[0] = o[0] + v[0] * a
@@ -360,18 +327,3 @@ cpdef sphere_stockholder_radii(
             d[2] = grid[i, 2]
             rview[i] = brents_stock(s, o, d, l, u, tol, max_iter, isovalue)
     return r
-
-
-def log_interp_double(const double[::1] pts, const double[::1] xi, const double[::1] yi):
-    y = np.zeros(pts.shape[0], dtype=np.float64)
-    cdef double[::1] yview = y
-    with nogil:
-        log_interp_d(pts, xi, yi, yview)
-    return y
-
-def log_interp_float(const float[::1] pts, const float[::1] xi, const float[::1] yi):
-    y = np.zeros(pts.shape[0], dtype=np.float32)
-    cdef float[::1] yview = y
-    with nogil:
-        log_interp_f(pts, xi, yi, yview)
-    return y

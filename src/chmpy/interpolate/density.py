@@ -1,10 +1,7 @@
 import numpy as np
-from scipy.interpolate import interp1d
-from scipy.spatial.distance import cdist
 from scipy.spatial import cKDTree as KDTree
 from os.path import join, dirname
 from chmpy.core.element import vdw_radii
-from .interp import InterpolatorLog1D
 from ._density import PromoleculeDensity as cPromol, StockholderWeight as cStock
 import numpy as np
 

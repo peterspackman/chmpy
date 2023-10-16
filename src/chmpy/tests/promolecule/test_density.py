@@ -20,7 +20,8 @@ class PromoleculeDensityTestCase(unittest.TestCase):
     def test_rho(self):
         pts = np.array(self.pos) + (1.0, 0.0, 0.0)
         rho = self.dens.rho(pts)
-        expected = np.array((0.585542, 0.005646))
+        # this will only be true if the interpolator data remains the same
+        expected = np.array((0.375174, 0.005646))
         np.testing.assert_allclose(rho, expected, atol=1e-5)
 
     def test_bb(self):
