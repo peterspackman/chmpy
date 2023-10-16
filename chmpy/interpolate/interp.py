@@ -1,5 +1,5 @@
 import numpy as np
-from ._linterp import log_interp
+from ._density import log_interp
 
 
 class InterpolatorLog1D:

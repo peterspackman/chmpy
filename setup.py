@@ -2,11 +2,6 @@ from setuptools import Extension, setup
 
 extension_modules = [
     Extension(
-        "chmpy.interpolate._linterp",
-        sources=["chmpy/interpolate/_linterp.c"],
-        language="c",
-    ),
-    Extension(
         "chmpy.interpolate._density",
         sources=["chmpy/interpolate/_density.pyx"],
     ),
