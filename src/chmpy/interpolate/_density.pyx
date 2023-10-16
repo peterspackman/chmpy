@@ -27,16 +27,18 @@ cdef class PromoleculeDensity:
         self.domain = domain
         self.rho_data = rho_data
 
-    cdef rho(self, const float[:, ::1] pts):
+
+    def rho(self, pts):
+        r = np.empty(pts.shape[0], dtype=np.float32)
+        rho = np.zeros(pts.shape[0], dtype=np.float32)
+        tmp = np.empty(pts.shape[0], dtype=np.float32)
+        self.evaluate_rho(pts, rho, tmp, r)
+        return rho
+
+    cdef void evaluate_rho(self, const float[:, ::1] pts, float[::1] rho_view, float[::1] tmp_view, float[::1] r_view) noexcept nogil:
         cdef int i, j, col
         cdef float diff
         cdef float[3] pos
-        cdef cnp.ndarray[cnp.float32_t, ndim=1] r = np.empty(pts.shape[0], dtype=np.float32)
-        cdef cnp.ndarray[cnp.float32_t, ndim=1] rho = np.zeros(pts.shape[0], dtype=np.float32)
-        cdef cnp.ndarray[cnp.float32_t, ndim=1] tmp = np.empty(pts.shape[0], dtype=np.float32)
-        cdef float[::1] rho_view = rho
-        cdef float[::1] tmp_view = tmp
-        cdef float[::1] r_view = r
         cdef const float[:, ::1] pos_view = self.positions
         cdef const float[:, ::1] rho_data_view = self.rho_data
         cdef const float[::1] domain_view = self.domain
@@ -58,7 +60,6 @@ cdef class PromoleculeDensity:
                 log_interp_f(r_view, domain_view, rho_data_view[i], tmp_view)
                 for j in range(pts.shape[0]):
                     rho_view[j] += tmp_view[j]
-        return rho
 
     cdef float one_rho(self, const float position[3]) noexcept nogil:
         cdef int i
@@ -89,10 +90,7 @@ cdef class StockholderWeight:
         self.dens_b = dens_b
         self.background = background
 
-    cdef weights(self, const float[:, ::1] positions):
-        cdef cnp.ndarray[cnp.float32_t, ndim=1] rho = np.empty(
-                positions.shape[0], dtype=np.float32
-        )
+    def weights(self, positions):
         rho_a = self.dens_a.rho(positions)
         rho_b = self.dens_b.rho(positions)
         result = rho_a / (rho_a + rho_b + self.background)
@@ -364,9 +362,16 @@ cpdef sphere_stockholder_radii(
     return r
 
 
-def log_interp(const double[::1] pts, const double[::1] xi, const double[::1] yi):
+def log_interp_double(const double[::1] pts, const double[::1] xi, const double[::1] yi):
     y = np.zeros(pts.shape[0], dtype=np.float64)
     cdef double[::1] yview = y
     with nogil:
         log_interp_d(pts, xi, yi, yview)
+    return y
+
+def log_interp_float(const float[::1] pts, const float[::1] xi, const float[::1] yi):
+    y = np.zeros(pts.shape[0], dtype=np.float32)
+    cdef float[::1] yview = y
+    with nogil:
+        log_interp_f(pts, xi, yi, yview)
     return y

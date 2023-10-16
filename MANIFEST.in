@@ -1,4 +1,3 @@
-include chmpy/**/*.jinja2
-include chmpy/**/*.gt
-inlcude chmpy/**/*.json
-include chmpy/**/*.npz
+graft tests
+global-include *.jinja2 *.gt *.json *.npz *.py
+global-exclude *.py[cod]

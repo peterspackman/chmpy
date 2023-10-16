@@ -1,5 +1,5 @@
 import numpy as np
-from ._density import log_interp
+from ._density import log_interp_double, log_interp_float
 
 
 class InterpolatorLog1D:
@@ -23,7 +23,11 @@ class InterpolatorLog1D:
 
     def __init__(self, xs, ys):
         self.xs = xs
-        self.ys = ys
+        self.dtype = self.xs.dtype
+        if ys.dtype != self.dtype:
+            self.ys = np.array(ys, dtype=self.dtype)
+        else:
+            self.ys = ys
 
     def __call__(self, pts):
         """Evaluate the interpolated function on the given set of
@@ -39,6 +43,9 @@ class InterpolatorLog1D:
         :obj:`np.ndarray`
             values of the interpolated function at the given set of points.
         """
-        q = np.array(pts.ravel(), dtype=np.float32)
-        results = log_interp(q, self.xs, self.ys)
+        q = np.array(pts.ravel(), dtype=self.dtype)
+        if self.dtype == np.float32:
+            results = log_interp_float(q, self.xs, self.ys)
+        else:
+            results = log_interp_double(q, self.xs, self.ys)
         return results.reshape(pts.shape)
