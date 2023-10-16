@@ -12,7 +12,6 @@
 """
 
 import numpy as np
-cimport numpy as np
 import cython
 from os.path import join, dirname
 from libc.math cimport exp
@@ -22,7 +21,7 @@ _FORM_FACTOR_KEYS = _FORM_FACTOR_DATA.f.keys
 _FORM_FACTOR_KEYS_LIST = _FORM_FACTOR_KEYS.tolist()
 _FORM_FACTOR_VALUES = _FORM_FACTOR_DATA.f.values
 
-cdef void fill_unique_plane_factors(const int[:, ::] hkl, const double[:] q, int[:] fac) nogil:
+cdef void fill_unique_plane_factors(const int[:, ::] hkl, const double[:] q, int[:] fac) noexcept nogil:
     cdef int i, j
     cdef int N
     cdef int nh, nk, nl

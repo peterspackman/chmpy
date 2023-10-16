@@ -154,6 +154,5 @@ def to_res_contents(shelx_data):
     }
     sections = []
     for key in SHELX_FORMATTERS:
-        if shelx_data[key] != []:
-            sections.append(SHELX_FORMATTERS[key](shelx_data[key]))
+        sections.append(SHELX_FORMATTERS[key](shelx_data[key]))
     return "\n".join(sections)

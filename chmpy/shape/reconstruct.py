@@ -1,5 +1,6 @@
 import logging
 import numpy as np
+from chmpy.util.num import cartesian_to_spherical_mgrid
 from .sht import SHT
 
 LOG = logging.getLogger(__name__)
@@ -41,8 +42,7 @@ def reconstructed_surface_icosphere(coefficients, real=True, subdivisions=3):
     datatype = np.float64 if real else np.complex128
 
     sphere = icosphere(subdivisions=subdivisions)
-    theta = np.arccos(sphere.vertices[:, 2])
-    phi = np.arctan2(sphere.vertices[:, 1], sphere.vertices[:, 0])
+    r, theta, phi = cartesian_to_spherical_mgrid(sphere.vertices[:, 0], sphere.vertices[:, 1], sphere.vertices[:, 2])
     r = np.empty_like(phi, datatype)
     for i in range(phi.shape[0]):
         r[i] = sht.evaluate_at_points(coefficients, theta[i], phi[i])

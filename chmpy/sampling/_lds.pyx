@@ -1,11 +1,13 @@
 # cython: language_level=3, boundscheck=False, wraparound=False
-cimport numpy as np
+cimport numpy as cnp
 cimport cython
 import numpy as np
 from libc.math cimport pow
 
+cnp.import_array()
+
 @cython.cdivision(True)
-cdef double phi(const unsigned int d) nogil:
+cdef double phi(const unsigned int d) noexcept nogil:
     cdef int iterations = 30
     cdef int i
     cdef double x = 2.0
@@ -14,7 +16,7 @@ cdef double phi(const unsigned int d) nogil:
     return x
 
 @cython.cdivision(True)
-cdef void alpha(double[::1] a) nogil:
+cdef void alpha(double[::1] a) noexcept nogil:
     cdef int dims = a.shape[0]
     cdef double g = phi(dims)
     cdef int i
@@ -38,7 +40,7 @@ cpdef quasirandom_kgf(const unsigned int N, const unsigned int D):
         np.ndarray: an (D) dimensional sampling point
     """
     cdef double offset = 0.5
-    cdef np.ndarray[np.float64_t, ndim=1] a = np.empty(D, dtype=np.float64)
+    cdef cnp.ndarray[cnp.float64_t, ndim=1] a = np.empty(D, dtype=np.float64)
     cdef double[::1] a_view = a
     with nogil:
         alpha(a_view)
@@ -61,9 +63,9 @@ cpdef quasirandom_kgf_batch(const unsigned int L, const unsigned int U, const un
         np.ndarray: an (U - L + 1, D) dimensional array of sampling points
     """
     cdef double offset = 0.5
-    cdef np.ndarray[np.float64_t, ndim=1] a = np.empty(D, dtype=np.float64)
-    cdef np.ndarray[np.float64_t, ndim=2] result = np.empty((U - L + 1, D), dtype=np.float64)
-    cdef np.ndarray[np.int32_t, ndim=1] N = np.arange(L, U + 1, dtype=np.int32)
+    cdef cnp.ndarray[cnp.float64_t, ndim=1] a = np.empty(D, dtype=np.float64)
+    cdef cnp.ndarray[cnp.float64_t, ndim=2] result = np.empty((U - L + 1, D), dtype=np.float64)
+    cdef cnp.ndarray[cnp.int32_t, ndim=1] N = np.arange(L, U + 1, dtype=np.int32)
     cdef double[::1] a_view = a
     with nogil:
         alpha(a_view)

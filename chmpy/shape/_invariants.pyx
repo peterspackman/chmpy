@@ -1,6 +1,5 @@
 # cython: language_level=3, boundscheck=False, wraparound=False
 cimport cython
-cimport numpy as np
 import numpy as np
 from libc.math cimport sqrt
 from libc.stdlib cimport abs
@@ -81,7 +80,7 @@ cdef double * factorial = [
 
 
 @cython.cdivision(True)
-cdef double clebsch(int j1, int m1, int j2, int m2, int j, int m) nogil:
+cdef double clebsch(int j1, int m1, int j2, int m2, int j, int m) noexcept nogil:
    # Calculation using Racah formula taken from "Angular Momentum",
    # D.M.Brink & G.R.Satchler, Oxford, 1968
    cdef double res = 0.0
@@ -144,16 +143,16 @@ cdef double clebsch(int j1, int m1, int j2, int m2, int j, int m) nogil:
 
 
 @cython.cdivision(True)
-cdef int coefficient_c(int l, int m) nogil:
+cdef int coefficient_c(int l, int m) noexcept nogil:
     return ((l+1)*(l+1)) - l + m - 1
 
 
 @cython.cdivision(True)
-cdef int coefficient_r(int l, int m) nogil:
+cdef int coefficient_r(int l, int m) noexcept nogil:
     return (l+1)*(l+2)/2 - l + m - 1
 
 
-cdef double complex invariant_P_c(double complex[::1] coeffs, int l, int l1, int l2) nogil:
+cdef double complex invariant_P_c(double complex[::1] coeffs, int l, int l1, int l2) noexcept nogil:
     cdef double complex res = 0.0
     cdef double complex p, coeff
     cdef double c
@@ -172,7 +171,7 @@ cdef double complex invariant_P_c(double complex[::1] coeffs, int l, int l1, int
         res += p * coeff.conjugate()
     return res
 
-cdef double complex invariant_P_r(double complex[::1] coeffs, int l, int l1, int l2) nogil:
+cdef double complex invariant_P_r(double complex[::1] coeffs, int l, int l1, int l2) noexcept nogil:
     cdef double complex res = 0.0
     cdef double complex p, coeff
     cdef double c

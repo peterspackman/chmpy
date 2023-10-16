@@ -1,0 +1,4 @@
+include chmpy/**/*.jinja2
+include chmpy/**/*.gt
+inlcude chmpy/**/*.json
+include chmpy/**/*.npz

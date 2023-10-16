@@ -53,7 +53,6 @@ inclusion in chmpy by Peter Spackman in 2020.
 
 # Cython specific imports
 import numpy as np
-cimport numpy as np
 import cython
 
 # Enable low level memory management

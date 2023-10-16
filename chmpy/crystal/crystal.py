@@ -1215,7 +1215,7 @@ class Crystal:
             return np.asarray(descriptors)
 
     def atomic_shape_descriptors(
-        self, l_max=5, radius=6.0, return_coefficients=False
+        self, l_max=5, radius=6.0, return_coefficients=False, with_property=None
     ) -> np.ndarray:
         """
         Calculate the shape descriptors[1,2] for all symmetry unique
@@ -1226,6 +1226,7 @@ class Crystal:
                 transform of the molecular shape function.
             radius (float, optional): maximum distance (Angstroms) to include surroundings
                 in the shape description
+            with_property (str, optional): name of the surface property to include in the shape description
             return_coefficients (bool, optional): also return the spherical harmonic coefficients
 
         Returns:
@@ -1259,6 +1260,7 @@ class Crystal:
                 neighbour_pos,
                 bounds=(0.15, ubound),
                 coefficients=return_coefficients,
+                with_property=with_property
             )
             if return_coefficients:
                 descriptors.append(desc[1])

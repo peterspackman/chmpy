@@ -133,7 +133,7 @@ def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
     real = True
     if property_function is not None:
         if property_function == "d_norm":
-            property_function = s.d_norm
+            property_function = lambda x: s.d_norm(x)[3]
         elif property_function == "esp":
             from chmpy import Molecule
 

@@ -1,14 +1,12 @@
 # cython: language_level=3, boundscheck=False, wraparound=False
 cimport cython
-cimport numpy as np
-from scipy.fft import fft, ifft
 import numpy as np
+from scipy.fft import fft, ifft
 from libc.math cimport sqrt, M_PI
 from libc.stdlib cimport abs
 
-
 @cython.cdivision(True)
-cdef double amm(const int m) nogil:
+cdef double amm(const int m) noexcept nogil:
     cdef double a = 1.0
     cdef int k
     for k in range(1, abs(m) + 1):
@@ -18,18 +16,18 @@ cdef double amm(const int m) nogil:
 
 
 @cython.cdivision(True)
-cdef double alm(const int l, const int m) nogil:
+cdef double alm(const int l, const int m) noexcept nogil:
     return sqrt((4 * l * l - 1) / (1.0 * l * l - m * m))
 
 @cython.cdivision(True)
-cdef double blm(const int l, const int m) nogil:
+cdef double blm(const int l, const int m) noexcept nogil:
     return -sqrt(
         (2.0 * l + 1) * ((l - 1)*(l - 1) - m * m) / 
         ((2.0 * l - 3) * (l * l - m * m))
     )
 
 @cython.cdivision(True)
-cdef void compute_ab(const int lmax, double[:, ::1] a, double[:, ::1] b) nogil:
+cdef void compute_ab(const int lmax, double[:, ::1] a, double[:, ::1] b) noexcept nogil:
     cdef int m, l
     for m in range(0, lmax + 1):
         a[m, m] = amm(m)
@@ -54,7 +52,7 @@ cdef class AssocLegendre:
 
 
     @cython.cdivision(True)
-    cdef void evaluate_batch_cython(self, double x, double[:] result) nogil:
+    cdef void evaluate_batch_cython(self, double x, double[:] result) noexcept nogil:
         cdef int idx = 0
         cdef int l, m
         for m in range(0, self.lmax + 1):
@@ -84,7 +82,7 @@ cdef void analysis_cython_cplx(const int lmax, const int nphi,
                           const double complex[:] fft,
                           const double[:] plm_work_array,
                           const double w,
-                          double complex[:] coeffs) nogil:
+                          double complex[:] coeffs) noexcept nogil:
         cdef int plm_idx, l_offset, l, m, m_idx_neg, m_idx_pos, sign
         cdef double p
         cdef double complex pw, tmp, ii, rr
@@ -120,7 +118,7 @@ cdef void analysis_cython_cplx(const int lmax, const int nphi,
 cdef void synthesis_cython_cplx(const int lmax, const int nphi,
                                 const double complex[:] coeffs,
                                 const double[:] plm_work_array,
-                                double complex[:] fft) nogil:
+                                double complex[:] fft) noexcept nogil:
     cdef int plm_idx, l_offset, l, m, m_idx_neg, m_idx_pos, sign
     cdef double p
     cdef double complex ii, rr
@@ -159,7 +157,7 @@ cdef void synthesis_cython_cplx(const int lmax, const int nphi,
 cdef void synthesis_cython_real(const int lmax, const int nphi,
                                 const double complex[:] coeffs,
                                 const double[:] plm_work_array,
-                                double complex[:] fft) nogil:
+                                double complex[:] fft) noexcept nogil:
     cdef int plm_idx, l_offset, l, m, m_idx_neg, m_idx_pos, sign
 
     cdef double p
@@ -185,7 +183,7 @@ cdef void analysis_cython_real(const int lmax, const int nphi,
                           const double complex[:] fft,
                           const double[:] plm_work_array,
                           const double w,
-                          double complex[:] coeffs) nogil:
+                          double complex[:] coeffs) noexcept nogil:
         cdef int plm_idx, l_offset, l, m, m_idx_neg, m_idx_pos
         cdef double complex pw, tmp
         cdef int sign
@@ -210,7 +208,7 @@ cdef void analysis_cython_real(const int lmax, const int nphi,
 
 
 @cython.cdivision(True)
-cdef void expand_coeffs_cython(const int lmax, const double complex[:] cin, double complex[:] cout) nogil:
+cdef void expand_coeffs_cython(const int lmax, const double complex[:] cin, double complex[:] cout) noexcept nogil:
     cdef int l, m, plm_idx, l_offset
     cdef int sign
     plm_idx = 0
