@@ -52,8 +52,7 @@ jobs:
 
     - name: Build the project
       run: |
-        python -m build
-        pip install dist/chmpy*.whl
+        python -m pip install .
 
     - name: Lint (flake8)
       run: |
