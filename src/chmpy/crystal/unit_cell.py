@@ -566,6 +566,35 @@ class UnitCell:
         T = np.array(T)
         return UnitCell(np.dot(T, self.direct))
 
+    def to_mesh(self):
+        from trimesh import Trimesh
+        verts = np.array([
+            np.zeros(3),
+            self.v_c,
+            self.v_b,
+            self.v_b + self.v_c,
+            self.v_a,
+            self.v_a + self.v_c,
+            self.v_a + self.v_b,
+            self.v_a + self.v_b + self.v_c,
+        ])
+
+        faces = np.array([
+            [1, 3, 0],
+            [4, 1, 0],
+            [0, 3, 2],
+            [2, 4, 0],
+            [1, 7, 3],
+            [5, 1, 4],
+            [5, 7, 1],
+            [3, 7, 2],
+            [6, 4, 2],
+            [2, 7, 6],
+            [6, 5, 4],
+            [7, 5, 6]
+        ])
+        return Trimesh(vertices=verts, faces=faces)
+
     def __repr__(self):
         cell = self.cell_type
         unique = self.unique_parameters
