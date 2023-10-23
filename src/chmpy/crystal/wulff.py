@@ -125,6 +125,22 @@ class WulffSHT:
         )
         return invariants
 
+    def invariants_kazhdan(self, sht_object=None, **kwargs):
+        from chmpy.shape.sht import SHT
+        if sht_object is None:
+            sht = SHT(self.l_max)
+        else:
+            sht = sht_object
+        return sht.invariants_pure_python(self.coeffs)
+
+    def power_spectrum(self, sht_object=None, **kwargs):
+        from chmpy.shape.sht import SHT
+        if sht_object is None:
+            sht = SHT(self.l_max)
+        else:
+            sht = sht_object
+        return sht.power_spectrum(self.coeffs)
+
     @classmethod
     def from_gmf_and_crystal(cls, gmf, crystal, **kwargs):
         hkl, energies = expand_symmetry_related_planes(gmf.hkl, gmf.energies, crystal.space_group)

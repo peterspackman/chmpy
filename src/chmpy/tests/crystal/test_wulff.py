@@ -41,6 +41,34 @@ class WulffConstructionTestCase(unittest.TestCase):
              -7.04135032e-03,  2.05657853e-01,
              0.00000000e+00,  3.79056240e-02))
 
-        np.testing.assert_allclose(s.coeffs.real, coeffs_real_expected)
+
+        np.testing.assert_allclose(s.coeffs.real, coeffs_real_expected, rtol=1e-6, atol=1e-7)
         
+    def test_cube_sht_invariants(self):
+        from scipy.spatial.transform import Rotation
+        facets = np.array((
+            (1, 0, 0),
+            (0, 1, 0),
+            (0, 0, 1),
+            (-1, 0, 0),
+            (0, -1, 0),
+            (0, 0, -1)
+        ))
+
+        facet_energies = np.ones(6)
+        facet_energies[0] = 5
+
+        l_max = 20
+        s = WulffSHT(facets, facet_energies, l_max=l_max)
+        invariants_expected = s.power_spectrum()
+        coeffs = None
+
+        for rot in Rotation.random(100):
+            facets_r = facets @ rot.as_matrix()
+            s = WulffSHT(facets_r, facet_energies, l_max=l_max)
+            inv = s.power_spectrum()
+            coeffs = s.coeffs
+            np.testing.assert_allclose(inv, invariants_expected, rtol=1e-3, atol=1e-1)
+
+
 

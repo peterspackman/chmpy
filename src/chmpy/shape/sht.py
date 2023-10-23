@@ -45,6 +45,23 @@ def _closest_int_with_only_prime_factors_up_to_fmax(n, fmax=7):
 
 
 class SHT:
+    r"""
+    A class to encapsulate the re-usable data for a Spherical Harmonic Transform (SHT).
+
+    Attributes:
+        lmax: the maximum angular momentum of the SHT, affects grid size etc.
+        plm: class to evaluate associated Legendre polynomials
+        nphi: the number of phi angular grid points
+        ntheta: the number of theta angular grid points
+        phi: the phi angular grid points (equispaced) between [i, 2 \pi]
+        cos_theta: cos values of the theta grid (evaluated as Gauss-Legendre quadrature points)
+        weights: the Gauss-Legendre grid weights
+        theta: the theta angular grid points (derived from cos_theta)
+        fft_work_array: an internal work array for the various FFTs done in the transform
+        plm_work_array: an internal work array for the evaluate of plm values
+
+    """
+
     def __init__(self, lm, nphi=None, ntheta=None):
         self.lmax = lm
         self.plm = AssocLegendre(lm)
@@ -77,17 +94,33 @@ class SHT:
         return l * (l + 1) + m
 
     def nlm(self):
+        "the number of complex SHT coefficients"
         return (self.lmax + 1) * (self.lmax + 1)
 
     def nplm(self):
+        "the number of real SHT coefficients (i.e. legendre polynomial terms)"
         return (self.lmax + 1) * (self.lmax + 2) // 2
 
     def compute_on_grid(self, func):
+        "compute the values of `func` on the SHT grid"
         values = func(*self.grid)
         return values
 
     def analysis_pure_python(self, values):
-        """much slower"""
+        """
+        Perform the forward SHT i.e. evaluate the given SHT coefficients
+        given the values of the (real-valued) function at the grid points
+        used in the transform.
+
+        *NOTE*: this is implemented in pure python so will be much slower than
+        just calling analysis, but it is provided here as a reference implementation
+
+        Arguments:
+            values (np.ndarray): the evaluated function at the SHT grid points
+
+        Returns:
+            np.ndarray the set of spherical harmonic coefficients
+        """
         coeffs = np.zeros(self.nplm(), dtype=np.complex128)
         for itheta, (ct, w) in enumerate(zip(self.cos_theta, self.weights)):
             self.fft_work_array[:] = values[itheta, :]
@@ -113,7 +146,21 @@ class SHT:
         return coeffs
 
     def analysis_pure_python_cplx(self, values):
-        """much slower"""
+        """
+        Perform the forward SHT i.e. evaluate the given SHT coefficients
+        given the values of the (complex-valued) function at the grid points
+        used in the transform.
+
+        *NOTE*: this is implemented in pure python so will be much slower than
+        just calling analysis, but it is provided here as a reference implementation
+
+        Arguments:
+            values (np.ndarray): the evaluated function at the SHT grid points
+
+        Returns:
+            np.ndarray the set of spherical harmonic coefficients
+        """
+
         coeffs = np.zeros(self.nlm(), dtype=np.complex128)
         rlm = np.zeros(self.nlm(), dtype=np.complex128)
         ilm = np.zeros(self.nlm(), dtype=np.complex128)
@@ -152,6 +199,21 @@ class SHT:
 
 
     def synthesis_pure_python_cplx(self, coeffs):
+        """
+        Perform the inverse SHT i.e. evaluate the given (complex-valued) function at the
+        grid points used in the transform.
+
+
+        *NOTE*: this is implemented in pure python so will be much slower than
+        just calling analysis, but it is provided here as a reference implementation
+
+        Arguments:
+            coeffs (np.ndarray): the set of spherical harmonic coefficients
+
+        Returns:
+            np.ndarray the evaluated function at the SHT grid points
+        """
+
         values = np.zeros((self.ntheta, self.nphi), dtype=np.complex128)
         for itheta, ct in enumerate(self.cos_theta):
             self.fft_work_array[:] = 0
@@ -186,6 +248,19 @@ class SHT:
         return values
 
     def synthesis_pure_python(self, coeffs):
+        """
+        Perform the inverse SHT i.e. evaluate the given (real-valued) function at the
+        grid points used in the transform.
+
+        *NOTE*
+
+        Arguments:
+            coeffs (np.ndarray): the set of spherical harmonic coefficients
+
+        Returns:
+            np.ndarray the evaluated function at the SHT grid points
+        """
+
         values = np.zeros((self.ntheta, self.nphi))
         for itheta, ct in enumerate(self.cos_theta):
             self.fft_work_array[:] = 0
@@ -210,8 +285,18 @@ class SHT:
             values[itheta, :] = self.fft_work_array[:].real
         return values
 
-
     def analysis(self, values):
+        """
+        Perform the forward SHT i.e. evaluate the given SHT coefficients
+        given the values of the function at the grid points used in the transform.
+
+        Arguments:
+            values (np.ndarray): the evaluated function at the SHT grid points
+
+        Returns:
+            np.ndarray the set of spherical harmonic coefficients
+        """
+
         real = not np.iscomplexobj(values)
         if real:
             kernel = analysis_kernel_real
@@ -228,6 +313,16 @@ class SHT:
         return coeffs
 
     def synthesis(self, coeffs):
+        """
+        Perform the inverse SHT i.e. evaluate the given function at the
+        grid points used in the transform.
+
+        Arguments:
+            coeffs (np.ndarray): the set of spherical harmonic coefficients
+
+        Returns:
+            np.ndarray the evaluated function at the SHT grid points
+        """
         real = (coeffs.size == self.nplm())
         if real:
             kernel = synthesis_kernel_real
@@ -303,6 +398,23 @@ class SHT:
         return result
 
     def evaluate_at_points(self, coeffs, theta, phi):
+        r"""
+        Evaluate the value of the function described in terms of the provided SH
+        coefficients at the provided (angular) points. 
+        Will attempt to detect if the provided coefficients are from a real
+        or a complex transform.
+
+        Note that this can be quite slow, especially in comparison with just 
+        synthesis step.
+
+        Arguments:
+            coeffs (np.ndarray): the set of spherical harmonic coefficients
+            theta (np.ndarray): the angular coordinates \theta
+            phi (np.ndarray): the angular coordinates \phi
+
+        Returns:
+            np.ndarray the evaluated function values
+        """
         real = (coeffs.size == self.nplm())
         if real:
             return self._eval_at_points_real(coeffs, theta, phi)
@@ -311,10 +423,22 @@ class SHT:
             return self._eval_at_points_cplx(coeffs, theta, phi)
 
     def complete_coefficients(self, coeffs):
+        """
+        Construct the complete set of SHT coefficients
+        for a given real analysis. Should be equivalent to performing
+        a complex valued SHT with the imaginary values being zero.
+
+        Arguments:
+            coefficients (np.ndarray): the set of spherical harmonic coefficients
+
+        Returns:
+            np.ndarray the full set of spherical harmonic coefficients for a complext transform
+        """
         return expand_coeffs_to_full(self.lmax, coeffs)
 
     @property
     def grid(self):
+        "The set of grid points [\theta, \phi] for this SHT"
         return np.meshgrid(
             self.theta,
             self.phi, indexing="ij"
@@ -326,6 +450,95 @@ class SHT:
         theta, phi = self.grid
         r = np.ones_like(theta)
         return spherical_to_cartesian_mgrid(r, theta, phi)
+
+
+    def power_spectrum(self, coeffs) -> np.ndarray:
+        r"""
+        Evaluate the power spectrum of the function described in terms of the provided SH
+        coefficients.
+
+        Arguments:
+            coeffs (np.ndarray): the set of spherical harmonic coefficients
+
+        Returns:
+            np.ndarray the evaluated power spectrum
+        """
+
+        real = (coeffs.size == self.nplm())
+        if real:
+            n = len(coeffs)
+            l_max = int((-3 + np.sqrt(8 * n + 1)) // 2)
+            spectrum = np.zeros(l_max + 1)
+            
+            pattern = np.concatenate([np.arange(m, l_max + 1) for m in range(l_max + 1)])
+            boundary = l_max + 1
+            np.add.at(spectrum, pattern[:boundary], np.abs(coeffs[:boundary])**2)
+            np.add.at(spectrum, pattern[boundary:], 2 * np.abs(coeffs[boundary:])**2)
+            spectrum /= (2 * pattern[:boundary] + 1)
+            
+            return spectrum
+        else:
+            l_max = int(np.sqrt(len(coeffs))) - 1
+            spectrum = np.empty(l_max + 1)
+            coeffs2 = np.abs(coeffs) **2
+            idx = 0
+            for l in range(l_max + 1):
+                count = 2 * l + 1
+                spectrum[l] = np.sum(coeffs2[idx:idx + count]) / count
+                idx += count
+            return spectrum
+
+    def invariants_kazhdan(self, coeffs):
+        r"""
+        Evaluate the rotation invariants as detailed in Kazhdan et al.[1] for the
+        provided set of SHT coefficients
+
+        *NOTE* this is not a well-tested implementation, and is not complete
+        for the set of invariants described in the work.
+
+        Arguments:
+            coeffs(np.ndarray): the set of spherical harmonic coefficients
+
+        Returns:
+            np.ndarray the evaluated rotation invariants
+
+        References:
+        ```
+        [1] Kazhdan et al. Proc. 2003 Eurographics/ACM SIGGRAPH SGP, (2003)
+            https://dl.acm.org/doi/10.5555/882370.882392
+        ```
+
+        """
+
+        invariants = np.empty(self.lmax + 1)
+        for lvalue in range(0, self.lmax + 1):
+            values = np.zeros((self.ntheta, self.nphi))
+            for itheta, ct in enumerate(self.cos_theta):
+                self.fft_work_array[:] = 0
+                self.plm.evaluate_batch(ct, result=self.plm_work_array)
+
+                plm_idx = 0
+                # m = 0 case
+                for l in range(self.lmax + 1):
+                    if l == lvalue:
+                        p = self.plm_work_array[plm_idx]
+                        self.fft_work_array[0] += coeffs[plm_idx] * p
+                    plm_idx += 1
+
+                for m in range(1, self.lmax + 1):
+                    sign = -1 if m & 1 else 1
+                    for l in range(m, self.lmax + 1):
+                        if l == lvalue:
+                            p = self.plm_work_array[plm_idx]
+                            rr = 2 * sign * coeffs[plm_idx] * p
+                            self.fft_work_array[m] += rr
+                        plm_idx += 1
+
+                ifft(self.fft_work_array, norm="forward", overwrite_x=True) 
+                values[itheta, :] = self.fft_work_array[:].real
+            invariants[lvalue] = np.sum(values ** 2) / values.size / (2 * lvalue + 1)
+        return invariants
+
 
 def test_func(theta, phi):
     return (1.0 + 0.01 * np.cos(theta) +
