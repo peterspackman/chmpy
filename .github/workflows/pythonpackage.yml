@@ -52,7 +52,7 @@ jobs:
 
     - name: Build the project
       run: |
-        python -m pip install .
+        python -m pip install . -vv
 
     - name: Lint (flake8)
       run: |
