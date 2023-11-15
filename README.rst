@@ -85,7 +85,7 @@ class:
     
 The resulting surface should look something like this when visualized:
 
-.. image:: tests/acetic_acid.png
+.. image:: src/chmpy/tests/acetic_acid.png
   :height: 200px
 
 
