@@ -1,4 +1,4 @@
-name: CI
+name: Test
 
 on: [push]
 
@@ -64,8 +64,3 @@ jobs:
     - name: Run tests
       run: |
         python -m pytest
-
-    - name: Publish package to PyPI
-      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
-      run: | 
-        python -m publish -u __token__ -p ${{ secrets.PYPI_TOKEN }}

@@ -26,7 +26,7 @@ repository = "https://github.com/peterspackman/chmpy"
 documentation = "https://peterspackman.github.io/chmpy/"
 
 [build-system]
-requires = ["setuptools>=68.0", "cython>=3.0", "oldest-supported-numpy"]
+requires = ["setuptools>=68.0", "cython>=3.0", "numpy>=1.25"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
