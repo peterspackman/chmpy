@@ -224,7 +224,9 @@ class Crystal:
         )
         return getattr(self, "_unit_cell_atom_dict")
 
-    def unit_cell_connectivity(self, tolerance=0.4, neighbouring_cells=1, **kwargs) -> Tuple:
+    def unit_cell_connectivity(
+        self, tolerance=0.4, neighbouring_cells=1, **kwargs
+    ) -> Tuple:
         """
         Periodic connectiviy for the unit cell, populates _uc_graph
         with a networkx.Graph object, where nodes are indices into the
@@ -260,7 +262,9 @@ class Crystal:
         uc_nums = slab["element"][:n_uc]
         neighbour_pos = slab["frac_pos"][n_uc:]
         cart_uc_pos = self.to_cartesian(uc_pos)
-        covalent_radii_dict = {x: Element.from_atomic_number(x).cov for x in np.unique(uc_nums)}
+        covalent_radii_dict = {
+            x: Element.from_atomic_number(x).cov for x in np.unique(uc_nums)
+        }
         covalent_radii_dict.update(kwargs.get("covalent_radii", {}))
         # first establish all connections in the unit cell
         covalent_radii = np.array([covalent_radii_dict[x] for x in uc_nums])
@@ -319,7 +323,9 @@ class Crystal:
 
         if hasattr(self, "_unit_cell_molecules"):
             return getattr(self, "_unit_cell_molecules")
-        uc_graph, edge_cells = self.unit_cell_connectivity(tolerance=bond_tolerance, **kwargs)
+        uc_graph, edge_cells = self.unit_cell_connectivity(
+            tolerance=bond_tolerance, **kwargs
+        )
         n_uc_mols, uc_mols = csgraph.connected_components(
             csgraph=uc_graph, directed=False, return_labels=True
         )
@@ -600,7 +606,8 @@ class Crystal:
             asym = slab["asym_atom"][idxs]
             d = np.linalg.norm(positions - pos, axis=1)
             keep = np.where(d > 1e-3)[0]
-            results.append({
+            results.append(
+                {
                     "centre": {
                         "element": n.atomic_number,
                         "cart_pos": pos,
@@ -611,8 +618,9 @@ class Crystal:
                         "cart_pos": positions[keep],
                         "distance": d[keep],
                         "asym_atom": asym[keep],
-                    }
-                })
+                    },
+                }
+            )
         return results
 
     def atom_group_surroundings(self, atoms, radius=6.0) -> Tuple:
@@ -1260,7 +1268,7 @@ class Crystal:
                 neighbour_pos,
                 bounds=(0.15, ubound),
                 coefficients=return_coefficients,
-                with_property=with_property
+                with_property=with_property,
             )
             if return_coefficients:
                 descriptors.append(desc[1])
@@ -1352,6 +1360,7 @@ class Crystal:
             ".res": cls.from_shelx_file,
             ".vasp": cls.from_vasp_file,
             ".pdb": cls.from_pdb_file,
+            ".gen": cls.from_gen_file,
         }
 
     def _ext_save_map(self):
@@ -1489,11 +1498,13 @@ class Crystal:
     @classmethod
     def from_pdb_file(cls, filename):
         from chmpy.fmt.pdb import Pdb
+
         pdb = Pdb.from_file(filename)
         uc = UnitCell.from_lengths_and_angles(
-                [pdb.unit_cell["a"], pdb.unit_cell["b"], pdb.unit_cell["c"]],
-                [pdb.unit_cell["alpha"], pdb.unit_cell["beta"], pdb.unit_cell["gamma"]],
-                unit="degrees")
+            [pdb.unit_cell["a"], pdb.unit_cell["b"], pdb.unit_cell["c"]],
+            [pdb.unit_cell["alpha"], pdb.unit_cell["beta"], pdb.unit_cell["gamma"]],
+            unit="degrees",
+        )
         pos_cart = np.c_[pdb.atoms["x"], pdb.atoms["y"], pdb.atoms["z"]]
         pos_frac = uc.to_fractional(pos_cart)
         elements = [Element.from_string(x) for x in pdb.atoms["element"]]
@@ -1560,11 +1571,34 @@ class Crystal:
         unit_cell = UnitCell.cubic(1000)
 
         asym = AsymmetricUnit(
-            elements=molecule.elements, positions=unit_cell.to_fractional(molecule.positions),
-            labels=molecule.labels
+            elements=molecule.elements,
+            positions=unit_cell.to_fractional(molecule.positions),
+            labels=molecule.labels,
         )
         space_group = SpaceGroup(1)
         return cls(unit_cell, space_group, asym)
+
+    @classmethod
+    def from_gen_string(cls, contents, **kwargs):
+        from chmpy.fmt.gen import parse_gen_string
+
+        elements, positions, cell, fractional = parse_gen_string(contents)
+        unit_cell = UnitCell(cell[1:4, :])
+
+        asym = AsymmetricUnit(
+            elements=elements,
+            positions=positions,
+        )
+        space_group = SpaceGroup(1)
+        return cls(unit_cell, space_group, asym, **kwargs)
+
+    @classmethod
+    def from_gen_file(cls, filename, **kwargs):
+        from chmpy.fmt.gen import parse_gen_file
+
+        p = Path(filename)
+        titl = p.stem
+        return cls.from_gen_string(p.read_text(), titl=titl, **kwargs)
 
     @property
     def name(self) -> str:
