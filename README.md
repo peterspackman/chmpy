@@ -1,6 +1,9 @@
 # chmpy
 
 ![CI](https://github.com/peterspackman/chmpy/workflows/CI/badge.svg)
+[![DOI](https://zenodo.org/badge/211644812.svg)](https://zenodo.org/doi/10.5281/zenodo.10697512)
+
+
 
 A library for computational chemistry in python. Featuring support for
 molecules, crystals, Hirshfeld & promolecule density isosurfaces,
