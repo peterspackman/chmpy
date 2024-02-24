@@ -1,7 +1,7 @@
 [project]
 name = "chmpy"
 readme = "README.md"
-version = "1.1.1"
+version = "1.1.2"
 requires-python = ">=3.9"
 description = "Molecules, crystals, promolecule and Hirshfeld surfaces using python."
 authors = [
@@ -19,7 +19,7 @@ dependencies = [
 
 [project.optional-dependencies]
 graph = ["graph_tool"]
-docs = ["sphinx", "furo", "myst-parser"]
+docs = ["mkdocs", "mkdocs-material", "mkdocstrings", "mkdocstrings-python", "mkdocs-gen-files", "mkdocs-literate-nav"]
 
 [project.urls]
 homepage = "https://github.com/peterspackman/chmpy"
