@@ -5,9 +5,16 @@ repo_name: peterspackman/chmpy
 
 theme:
     name: material
+    logo: assets/chmpy_logo_small_no_text_dark.png
+    features:
+        - content.code.copy
     palette:
-        primary: light blue
+        primary: blue grey
         scheme: preference
+    font:
+        text: Helvetica
+        code: Noto Sans Mono
+
 extra:
     social:
         - icon: fontawesome/brands/github
@@ -24,7 +31,13 @@ plugins:
 
 
 markdown_extensions:
-    - codehilite
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
 
 nav:
     - Home: index.md

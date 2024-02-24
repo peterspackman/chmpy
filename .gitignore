@@ -9,3 +9,4 @@ __pycache__/
 .coverage
 junk/
 .*.swp
+.DS_Store

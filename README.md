@@ -1,19 +1,35 @@
-# chmpy
-
 ![CI](https://github.com/peterspackman/chmpy/workflows/CI/badge.svg)
 [![DOI](https://zenodo.org/badge/211644812.svg)](https://zenodo.org/doi/10.5281/zenodo.10697512)
 
 
+<!-- PROJECT LOGO -->
+<br />
+<div align="center">
+  <a href="https://github.com/peterspackman/chmpy">
+    <img src="docs/assets/chmpy_logo.png" alt="Logo" height="80" width="80">
+  </a>
 
-A library for computational chemistry in python. Featuring support for
-molecules, crystals, Hirshfeld & promolecule density isosurfaces,
-spherical harmonic shape descriptors and much more...
+  <h3 align="center">chmpy</h3>
+
+  <p align="center">
+    A library for computational chemistry in python.
+    <br />
+    <a href="https://peterspackman.github.io/chmpy"><strong>Documentation»</strong></a>
+    <br />
+    <a href="https://github.com/peterspackman/chmpy/issues">Report a bug</a>
+    ·
+    <a href="https://github.com/peterspackman/chmpy/issues">Request a new feature</a>
+  </p>
+</div>
+
+chmpy supports handling molecules, crystals, Hirshfeld & promolecule 
+density isosurfaces, spherical harmonic shape descriptors and much more...
 
 ## Installation
 
 Basic installation can be done through the python package manager `pip`:
 
-```bash
+``` bash
 pip install chmpy
 # or to install directly from GitHub:
 pip install git+https://github.com/peterspackman/chmpy.git
@@ -21,7 +37,7 @@ pip install git+https://github.com/peterspackman/chmpy.git
 
 For development or modifications, install locally using pip:
 
-```bash
+``` bash
 pip install -e .
 ```
 
@@ -49,7 +65,7 @@ python.
 Loading a crystal structure from a CIF (`.cif`) or SHELX (`.res`)
 file, or a molecule from an XMOL (`.xyz`) file is straightforward:
 
-```python
+``` python
 from chmpy import Crystal, Molecule
 c = Crystal.load("tests/acetic_acid.cif")
 print(c)
@@ -70,7 +86,7 @@ Generation of surfaces with the default settings can be done with
 minimal hassle, simply by using the corresponding members of the Crystal
 class:
 
-```python
+``` python
 c = Crystal.load("tests/test_files/acetic_acid.cif")
 # This will generate a high resolution surface
 # for each symmetry unique molecule in the crystal
@@ -88,6 +104,11 @@ save_mesh(surfaces[0], "acetic_acid.ply")
     
 The resulting surface should look something like this when visualized:
 
-![acetic_acid.png](src/chmpy/tests/acetic_acid.png)
+<br />
+<div align="center">
+    <img src="src/chmpy/tests/acetic_acid.png" alt="Acetic acid" height=200>
+</div>
+
+
 
 
