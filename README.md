@@ -6,7 +6,7 @@
 <br />
 <div align="center">
   <a href="https://github.com/peterspackman/chmpy">
-    <img src="docs/assets/chmpy_logo.png" alt="Logo" height="80" width="80">
+    <img src="docs/assets/chmpy_logo.png" alt="chmpy logo" height="128" width="128">
   </a>
 
   <h3 align="center">chmpy</h3>
@@ -25,7 +25,7 @@
 chmpy supports handling molecules, crystals, Hirshfeld & promolecule 
 density isosurfaces, spherical harmonic shape descriptors and much more...
 
-## Installation
+# Installation
 
 Basic installation can be done through the python package manager `pip`:
 
@@ -41,7 +41,7 @@ For development or modifications, install locally using pip:
 pip install -e .
 ```
 
-## Features
+# Features
 While the library is intended to be flexible and make it easy to build
 complex pipelines or properties, the following is a brief summary of
 intended features:
@@ -58,9 +58,9 @@ how to represent crystal structures, molecules etc. and evaluate
 scientifically relevant information quickly and efficiently using
 python.
 
-## Examples
+# Examples
 
-### Crystal structures and molecules
+## Crystal structures and molecules
 
 Loading a crystal structure from a CIF (`.cif`) or SHELX (`.res`)
 file, or a molecule from an XMOL (`.xyz`) file is straightforward:
@@ -78,7 +78,7 @@ print(m)
 # <Molecule: H2O(-0.67,-0.00,0.01)>
 ```
 
-### Hirshfeld and promolecule density isosurfaces
+## Hirshfeld and promolecule density isosurfaces
 
 Hirshfeld and promolecule density isosurfaces
 
