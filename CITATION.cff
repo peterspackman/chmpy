@@ -2,8 +2,8 @@ cff-version: 1.1.0
 message: "If you use this software, please cite it as below."
 authors:
 - family-names: Spackman
-  given-names: Peter R.
-  orcid: https://orcid.org/0000-0002-6532-8571
+  given-names: "Peter R."
+  orcid: "https://orcid.org/0000-0002-6532-8571"
 title: "Chmpy: A python library for computational chemistry"
-version: v1.1.4
+version: v1.1.5
 date-released: 2024-02-24
