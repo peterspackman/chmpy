@@ -33,6 +33,16 @@ def _nearest_molecule_idx(vertices, el, pos):
     u, idxs = np.unique(l, return_inverse=True)
     return np.arange(len(u), dtype=np.uint8)[idxs]
 
+def _nearest_atom_idx(vertices, el, pos):
+    from scipy.sparse.csgraph import connected_components
+    import pandas as pd
+    from time import time
+
+    t1 = time()
+    tree = KDTree(pos)
+    d, idxs = tree.query(vertices, k=1)
+    t2 = time()
+    return idxs
 
 class Crystal:
     """
@@ -1016,6 +1026,9 @@ class Crystal:
         meshes = []
         extra_props = {}
         isos = []
+        def nearest_atomic_number(pos, n_e, n_p):
+            return np.array(n_e[_nearest_atom_idx(pos, n_e, n_p)], dtype=np.uint8)
+
         if kind == "atom":
             for surrounds in self.atomic_surroundings(radius=radius):
                 n = surrounds["centre"]["element"]
@@ -1037,6 +1050,8 @@ class Crystal:
                     extra_props["fragment_patch"] = lambda x: _nearest_molecule_idx(
                         x, n_e, n_p
                     )
+                extra_props["nearest_atom_external"] = lambda x: nearest_atomic_number(x, n_e, n_p)
+                extra_props["nearest_atom_internal"] = lambda x: nearest_atomic_number(x, mol.atomic_numbers, mol.positions)
                 s = StockholderWeight.from_arrays(
                     mol.atomic_numbers, mol.positions, n_e, n_p
                 )
