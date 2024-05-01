@@ -44,11 +44,19 @@ def project_to_plane(points, plane_normal):
 
 def winding_order_ccw(points):
     "return the indices to reorder the provided 2D points into CCW order"
-    centroid = np.mean(points, axis=0)
-    directions = points - centroid
+    centroid = points[0]
+    directions = points[1:] - centroid
     directions /= np.linalg.norm(directions, axis=1)[:, np.newaxis]
-    idxs = list(range(points.shape[0]))
-    return sorted(idxs, key=lambda x: np.arctan2(directions[x, 1], directions[x, 0]))
+    idxs = list(range(1, points.shape[0]))
+    return [0] + sorted(idxs, key=lambda x: np.arctan2(directions[x - 1, 1], directions[x - 1, 0]))
+
+
+def prune_degenerate_points(points, threshold=1e-5):
+    dist_sq = np.sum((points[:, np.newaxis] - points)**2, axis=2)
+    dist_sq[np.tril_indices_from(dist_sq)] = 1
+    keep_mask = np.all(dist_sq >= threshold**2, axis=1)
+    idxs = np.nonzero(keep_mask)[0]
+    return points[keep_mask], idxs
 
 def ordered_facets(points, facets, facet_normals):
     result = []
@@ -56,10 +64,10 @@ def ordered_facets(points, facets, facet_normals):
         if len(facet) == 0:
             result.append([])
             continue
-
-        points_2d = project_to_plane(points[facet], facet_normals[i])
+        pts, idxs = prune_degenerate_points(points[facet])
+        points_2d = project_to_plane(pts, facet_normals[i])
         ccw_order = winding_order_ccw(points_2d)
-        result.append([facet[x] for x in ccw_order])
+        result.append([facet[idxs[x]] for x in ccw_order])
     return result
 
 def order_and_triangulate_polygons(points, facets, facet_normals):
