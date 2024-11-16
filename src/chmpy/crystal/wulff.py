@@ -2,15 +2,34 @@ from scipy.spatial import ConvexHull
 import numpy as np
 from chmpy.crystal import Crystal
 
-def expand_symmetry_related_planes(hkl, energies, spacegroup):
+def expand_symmetry_related_planes(hkl, energies, crystal):
     nfacets = hkl.shape[0]
-    nsymop = len(spacegroup)
-    expanded_facets = np.empty((nfacets * nsymop, 3), dtype=int)
-    tiled_energies = np.tile(energies, nsymop)
+    sg = crystal.sg
+    nsymop = len(sg)
+    expanded_facets = []
 
-    for i, s in enumerate(spacegroup.symmetry_operations):
-        expanded_facets[i * nfacets: (i + 1) * nfacets] =\
-                (hkl @ s.rotation.T).astype(int)
+
+    R = crystal.uc.reciprocal_lattice
+    RI = crystal.uc.direct.T
+    frac = crystal.to_fractional(hkl @ R)
+    print(frac)
+    print(np.round(crystal.to_cartesian(frac) @ RI, 2).astype(int))
+
+    for i, s in enumerate(sg.symmetry_operations):
+        if (len(np.nonzero(s.translation)[0]) > 0):
+            continue
+        print("Symop", s)
+        rot = s.rotation.T
+        print(rot)
+        transformed = crystal.to_cartesian(frac @ rot) @ RI
+        print(transformed)
+        transformed = np.round(transformed, 2).astype(int)
+        print(transformed)
+        expanded_facets.append(transformed)
+
+    expanded_facets = np.vstack(expanded_facets)
+    tiled_energies = np.tile(energies, expanded_facets.shape[0] // hkl.shape[0])
+
 
     # identify the unique directions
     # we may not need to include the inversion as it should probably
@@ -20,9 +39,6 @@ def expand_symmetry_related_planes(hkl, energies, spacegroup):
         reduced = tuple(x / np.gcd.reduce(x).max())
         if reduced not in unique or tiled_energies[unique[reduced]] > tiled_energies[i]:
             unique[reduced] = i
-        reduced_neg = tuple(-v for v in reduced)
-        if reduced_neg not in unique or tiled_energies[unique[reduced_neg]] > tiled_energies[i]:
-            unique[reduced_neg] = i
 
     unique_facets = []
     unique_energies = []

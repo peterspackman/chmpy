@@ -26,9 +26,9 @@ def property_to_color(prop, cmap="viridis", **kwargs):
     Returns:
         array_like: the array of color values for the given property
     """
-    from matplotlib.cm import get_cmap
+    from matplotlib import colormaps
+    colormap = colormaps[kwargs.get("colormap", DEFAULT_COLORMAPS.get(cmap, cmap))]
 
-    colormap = get_cmap(kwargs.get("colormap", DEFAULT_COLORMAPS.get(cmap, cmap)))
     norm = None
     vmin = kwargs.get("vmin", prop.min())
     vmax = kwargs.get("vmax", prop.max())

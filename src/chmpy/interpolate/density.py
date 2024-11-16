@@ -49,7 +49,7 @@ class PromoleculeDensity:
 
     def __repr__(self):
         return "<PromoleculeDensity: {} atoms, centre={}>".format(
-            self.natoms, tuple(self.centroid)
+            self.natoms, self.centroid
         )
 
     def d_norm(self, positions):

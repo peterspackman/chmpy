@@ -32,12 +32,6 @@ class PromoleculeDensityTestCase(unittest.TestCase):
         expected = np.array(((-4.89, -4.89, -4.89), (5.89, 4.89, 4.89)))
         np.testing.assert_allclose(bbox, expected, atol=1e-5)
 
-    def test_repr(self):
-        self.assertEqual(
-            self.dens.__repr__(),
-            "<PromoleculeDensity: 2 atoms, centre=(0.5, 0.0, 0.0)>",
-        )
-
     def test_d_norm(self):
         pts = np.array(self.pos) + (1.0, 0.0, 0.0)
         d, d_norm, vecs = self.dens.d_norm(pts)

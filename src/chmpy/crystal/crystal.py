@@ -490,6 +490,8 @@ class Crystal:
                 continue
             else:
                 for asym_mol in molecules:
+                    if len(mol) != len(asym_mol):
+                        continue
                     if np.all(mol.properties[ak] == asym_mol.properties[ak]):
                         mol.properties["asym_mol_idx"] = asym_mol.properties[
                             "asym_mol_idx"

@@ -539,6 +539,30 @@ class SHT:
             invariants[lvalue] = np.sum(values ** 2) / values.size / (2 * lvalue + 1)
         return invariants
 
+    def faces(self):
+        """
+        Generate the triangular faces for the grid vertices.
+        Returns:
+            list: A list of lists representing the faces, where each inner list contains the indices of the vertices that form a triangular face.
+        """
+        faces = []
+        for i in range(self.ntheta - 1):
+            for j in range(self.nphi):
+                # Create two triangles for each quad
+                triangle1 = [
+                    i * self.nphi + j,
+                    i * self.nphi + (j + 1) % self.nphi,
+                    (i + 1) * self.nphi + j
+                ]
+                triangle2 = [
+                    (i + 1) * self.nphi + j,
+                    i * self.nphi + (j + 1) % self.nphi,
+                    (i + 1) * self.nphi + (j + 1) % self.nphi
+                ]
+                faces.append(triangle1)
+                faces.append(triangle2)
+        return faces
+
 
 def test_func(theta, phi):
     return (1.0 + 0.01 * np.cos(theta) +

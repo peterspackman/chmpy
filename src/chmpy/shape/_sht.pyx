@@ -2,7 +2,7 @@
 cimport cython
 import numpy as np
 from scipy.fft import fft, ifft
-from libc.math cimport sqrt, M_PI
+from libc.math cimport sqrt, M_PI, pow
 from libc.stdlib cimport abs
 
 @cython.cdivision(True)
@@ -45,9 +45,9 @@ cdef class AssocLegendre:
     def __init__(self, lm):
         self.lmax = lm
         shape = (lm + 1, lm + 1)
-        self.a = np.zeros(shape)
-        self.b = np.zeros(shape)
-        self.cache = np.zeros(shape)
+        self.a = np.zeros(shape, dtype=np.float64)
+        self.b = np.zeros(shape, dtype=np.float64)
+        self.cache = np.zeros(shape, dtype=np.float64)
         compute_ab(self.lmax, self.a, self.b)
 
 
@@ -58,7 +58,7 @@ cdef class AssocLegendre:
         for m in range(0, self.lmax + 1):
             for l in range(m, self.lmax + 1):
                 if(l == m):
-                    result[idx] = self.a[l, m] * (1 - x * x) ** (0.5 * m)
+                    result[idx] = self.a[l, m] * pow(1.0 - x * x, 0.5 * m)
                 elif (l == (m + 1)):
                     result[idx] = self.a[l, m] * x * self.cache[l - 1, m]
                 else:
