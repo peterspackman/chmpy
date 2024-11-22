@@ -69,7 +69,7 @@ class ReturnCodeError(Exception):
 
 
 class AbstractExecutable(ABC):
-    """ Abstract base class of an Executable"""
+    """Abstract base class of an Executable"""
 
     _name = "job"
     _has_dependencies = False
@@ -97,7 +97,7 @@ class AbstractExecutable(ABC):
 
     @working_directory.setter
     def working_directory(self, dirname):
-        """"Set the working directory for this job"""
+        """ "Set the working directory for this job"""
         assert dir_exists_or_is_creatable(
             dirname
         ), f"{dirname} either cannot be found or is not createable"
@@ -127,17 +127,17 @@ class AbstractExecutable(ABC):
 
     @abc.abstractmethod
     def post_process(self):
-        """ Do whatever needs to be done after the job."""
+        """Do whatever needs to be done after the job."""
         raise NotImplementedError
 
     @property
     def name(self):
-        """ The name of the job as a string."""
+        """The name of the job as a string."""
         return self._name
 
     @name.setter
     def name(self, name):
-        """ Change the name of the job. """
+        """Change the name of the job."""
         self._name = name
 
     @property

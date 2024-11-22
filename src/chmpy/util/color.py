@@ -27,12 +27,16 @@ def property_to_color(prop, cmap="viridis", **kwargs):
         array_like: the array of color values for the given property
     """
     from matplotlib import colormaps
+
     colormap = colormaps[kwargs.get("colormap", DEFAULT_COLORMAPS.get(cmap, cmap))]
 
     norm = None
     vmin = kwargs.get("vmin", prop.min())
     vmax = kwargs.get("vmax", prop.max())
-    midpoint = kwargs.get("midpoint", max(min(0.0, vmax - 0.01), vmin + 0.01) if cmap in ("d_norm", "esp") else None)
+    midpoint = kwargs.get(
+        "midpoint",
+        max(min(0.0, vmax - 0.01), vmin + 0.01) if cmap in ("d_norm", "esp") else None,
+    )
     if midpoint is not None:
         try:
             from matplotlib.colors import TwoSlopeNorm

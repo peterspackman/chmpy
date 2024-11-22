@@ -3,23 +3,84 @@ from dataclasses import dataclass
 from chmpy.crystal.symmetry_operation import SymmetryOperation
 import numpy as np
 
-_PG_ROTATION_AXES = np.array([
-    [1, 0, 0], [0, 1, 0], [0, 0, 1], [0, 1, 1], [1, 0, 1],
-    [1, 1, 0], [0, 1, -1], [-1, 0, 1], [1, -1, 0], [1, 1, 1],
-    [-1, 1, 1], [1, -1, 1], [1, 1, -1], [0, 1, 2], [2, 0, 1],
-    [1, 2, 0], [0, 2, 1], [1, 0, 2], [2, 1, 0], [0, -1, 2],
-    [2, 0, -1], [-1, 2, 0], [0, -2, 1], [1, 0, -2], [-2, 1, 0],
-    [2, 1, 1], [1, 2, 1], [1, 1, 2], [2, -1, -1], [-1, 2, -1],
-    [-1, -1, 2], [2, 1, -1], [-1, 2, 1], [1, -1, 2], [2, -1, 1],
-    [1, 2, -1], [-1, 1, 2], [3, 1, 2], [2, 3, 1], [1, 2, 3],
-    [3, 2, 1], [1, 3, 2], [2, 1, 3], [3, -1, 2], [2, 3, -1],
-    [-1, 2, 3], [3, -2, 1], [1, 3, -2], [-2, 1, 3], [3, -1, -2],
-    [-2, 3, -1], [-1, -2, 3], [3, -2, -1], [-1, 3, -2], [-2, -1, 3],
-    [3, 1, -2], [-2, 3, 1], [1, -2, 3], [3, 2, -1], [-1, 3, 2],
-    [2, -1, 3], [1, 1, 3], [-1, 1, 3], [1, -1, 3], [-1, -1, 3],
-    [1, 3, 1], [-1, 3, 1], [1, 3, -1], [-1, 3, -1], [3, 1, 1],
-    [3, 1, -1], [3, -1, 1], [3, -1, -1]
-])
+_PG_ROTATION_AXES = np.array(
+    [
+        [1, 0, 0],
+        [0, 1, 0],
+        [0, 0, 1],
+        [0, 1, 1],
+        [1, 0, 1],
+        [1, 1, 0],
+        [0, 1, -1],
+        [-1, 0, 1],
+        [1, -1, 0],
+        [1, 1, 1],
+        [-1, 1, 1],
+        [1, -1, 1],
+        [1, 1, -1],
+        [0, 1, 2],
+        [2, 0, 1],
+        [1, 2, 0],
+        [0, 2, 1],
+        [1, 0, 2],
+        [2, 1, 0],
+        [0, -1, 2],
+        [2, 0, -1],
+        [-1, 2, 0],
+        [0, -2, 1],
+        [1, 0, -2],
+        [-2, 1, 0],
+        [2, 1, 1],
+        [1, 2, 1],
+        [1, 1, 2],
+        [2, -1, -1],
+        [-1, 2, -1],
+        [-1, -1, 2],
+        [2, 1, -1],
+        [-1, 2, 1],
+        [1, -1, 2],
+        [2, -1, 1],
+        [1, 2, -1],
+        [-1, 1, 2],
+        [3, 1, 2],
+        [2, 3, 1],
+        [1, 2, 3],
+        [3, 2, 1],
+        [1, 3, 2],
+        [2, 1, 3],
+        [3, -1, 2],
+        [2, 3, -1],
+        [-1, 2, 3],
+        [3, -2, 1],
+        [1, 3, -2],
+        [-2, 1, 3],
+        [3, -1, -2],
+        [-2, 3, -1],
+        [-1, -2, 3],
+        [3, -2, -1],
+        [-1, 3, -2],
+        [-2, -1, 3],
+        [3, 1, -2],
+        [-2, 3, 1],
+        [1, -2, 3],
+        [3, 2, -1],
+        [-1, 3, 2],
+        [2, -1, 3],
+        [1, 1, 3],
+        [-1, 1, 3],
+        [1, -1, 3],
+        [-1, -1, 3],
+        [1, 3, 1],
+        [-1, 3, 1],
+        [1, 3, -1],
+        [-1, 3, -1],
+        [3, 1, 1],
+        [3, 1, -1],
+        [3, -1, 1],
+        [3, -1, -1],
+    ]
+)
+
 
 def _get_pg_rotation_matrix(axis, angle):
     """Generate a rotation matrix for a given axis and angle."""
@@ -27,11 +88,14 @@ def _get_pg_rotation_matrix(axis, angle):
     axis = axis / np.linalg.norm(axis)
     a = np.cos(angle / 2)
     b, c, d = -axis * np.sin(angle / 2)
-    return np.array([
-        [a*a+b*b-c*c-d*d, 2*(b*c-a*d), 2*(b*d+a*c)],
-        [2*(b*c+a*d), a*a+c*c-b*b-d*d, 2*(c*d-a*b)],
-        [2*(b*d-a*c), 2*(c*d+a*b), a*a+d*d-b*b-c*c]
-    ])
+    return np.array(
+        [
+            [a * a + b * b - c * c - d * d, 2 * (b * c - a * d), 2 * (b * d + a * c)],
+            [2 * (b * c + a * d), a * a + c * c - b * b - d * d, 2 * (c * d - a * b)],
+            [2 * (b * d - a * c), 2 * (c * d + a * b), a * a + d * d - b * b - c * c],
+        ]
+    )
+
 
 def _generate_pg_operations(number, symbol):
     """Generate symmetry ops for a given point group."""
@@ -61,13 +125,21 @@ def _generate_pg_operations(number, symbol):
                 ops.append(reflection)
         return ops
 
-    if symbol in ["4", "-4", "4/m", "422", "4mm", "-42m", "4/mmm"]:  # C4, S4, C4h, D4, C4v, D2d, D4h
+    if symbol in [
+        "4",
+        "-4",
+        "4/m",
+        "422",
+        "4mm",
+        "-42m",
+        "4/mmm",
+    ]:  # C4, S4, C4h, D4, C4v, D2d, D4h
         axis = _PG_ROTATION_AXES[2]  # z-axis
-        ops.append(_get_pg_rotation_matrix(axis, np.pi/2))
+        ops.append(_get_pg_rotation_matrix(axis, np.pi / 2))
         ops.append(_get_pg_rotation_matrix(axis, np.pi))
-        ops.append(_get_pg_rotation_matrix(axis, 3*np.pi/2))
+        ops.append(_get_pg_rotation_matrix(axis, 3 * np.pi / 2))
         if "-4" in symbol or "4/m" in symbol:
-            ops.append(-_get_pg_rotation_matrix(axis, np.pi/2))
+            ops.append(-_get_pg_rotation_matrix(axis, np.pi / 2))
         if "422" in symbol or "4mm" in symbol or "-42m" in symbol or "4/mmm" in symbol:
             for axis in _PG_ROTATION_AXES[:2]:
                 ops.append(_get_pg_rotation_matrix(axis, np.pi))
@@ -80,8 +152,8 @@ def _generate_pg_operations(number, symbol):
 
     if symbol in ["3", "-3", "32", "3m", "-3m"]:  # C3, C3i, D3, C3v, D3d
         axis = _PG_ROTATION_AXES[9]  # [1, 1, 1] axis
-        ops.append(_get_pg_rotation_matrix(axis, 2*np.pi/3))
-        ops.append(_get_pg_rotation_matrix(axis, 4*np.pi/3))
+        ops.append(_get_pg_rotation_matrix(axis, 2 * np.pi / 3))
+        ops.append(_get_pg_rotation_matrix(axis, 4 * np.pi / 3))
         if "-3" in symbol:
             ops.append(-np.eye(3))  # Inversion
         if "32" in symbol or "-3m" in symbol:
@@ -92,17 +164,29 @@ def _generate_pg_operations(number, symbol):
             ops.append(np.array([[0, 1, 0], [1, 0, 0], [0, 0, -1]]))  # Reflection
         return ops
 
-    if symbol in ["6", "-6", "6/m", "622", "6mm", "-6m2", "6/mmm"]:  # C6, C3h, C6h, D6, C6v, D3h, D6h
+    if symbol in [
+        "6",
+        "-6",
+        "6/m",
+        "622",
+        "6mm",
+        "-6m2",
+        "6/mmm",
+    ]:  # C6, C3h, C6h, D6, C6v, D3h, D6h
         axis = _PG_ROTATION_AXES[2]  # z-axis
-        ops.append(_get_pg_rotation_matrix(axis, np.pi/3))
-        ops.append(_get_pg_rotation_matrix(axis, 2*np.pi/3))
+        ops.append(_get_pg_rotation_matrix(axis, np.pi / 3))
+        ops.append(_get_pg_rotation_matrix(axis, 2 * np.pi / 3))
         ops.append(_get_pg_rotation_matrix(axis, np.pi))
-        ops.append(_get_pg_rotation_matrix(axis, 4*np.pi/3))
-        ops.append(_get_pg_rotation_matrix(axis, 5*np.pi/3))
+        ops.append(_get_pg_rotation_matrix(axis, 4 * np.pi / 3))
+        ops.append(_get_pg_rotation_matrix(axis, 5 * np.pi / 3))
         if "-6" in symbol or "6/m" in symbol:
-            ops.append(-_get_pg_rotation_matrix(axis, np.pi/3))
+            ops.append(-_get_pg_rotation_matrix(axis, np.pi / 3))
         if "622" in symbol or "6mm" in symbol or "-6m2" in symbol or "6/mmm" in symbol:
-            for axis in [_PG_ROTATION_AXES[0], _PG_ROTATION_AXES[5], _PG_ROTATION_AXES[1]]:
+            for axis in [
+                _PG_ROTATION_AXES[0],
+                _PG_ROTATION_AXES[5],
+                _PG_ROTATION_AXES[1],
+            ]:
                 ops.append(_get_pg_rotation_matrix(axis, np.pi))
         if "m" in symbol:
             ops.append(np.diag([1, 1, -1]))  # Reflection in xy-plane
@@ -114,13 +198,18 @@ def _generate_pg_operations(number, symbol):
     if symbol in ["23", "m-3", "432", "-43m", "m-3m"]:  # T, Th, O, Td, Oh
         # Rotations around [1, 0, 0], [0, 1, 0], [0, 0, 1]
         for axis in _PG_ROTATION_AXES[:3]:
-            ops.append(_get_pg_rotation_matrix(axis, np.pi/2))
+            ops.append(_get_pg_rotation_matrix(axis, np.pi / 2))
             ops.append(_get_pg_rotation_matrix(axis, np.pi))
-            ops.append(_get_pg_rotation_matrix(axis, 3*np.pi/2))
+            ops.append(_get_pg_rotation_matrix(axis, 3 * np.pi / 2))
         # Rotations around [1, 1, 1] and equivalent directions
-        for axis in [_PG_ROTATION_AXES[9], _PG_ROTATION_AXES[10], _PG_ROTATION_AXES[11], _PG_ROTATION_AXES[12]]:
-            ops.append(_get_pg_rotation_matrix(axis, 2*np.pi/3))
-            ops.append(_get_pg_rotation_matrix(axis, 4*np.pi/3))
+        for axis in [
+            _PG_ROTATION_AXES[9],
+            _PG_ROTATION_AXES[10],
+            _PG_ROTATION_AXES[11],
+            _PG_ROTATION_AXES[12],
+        ]:
+            ops.append(_get_pg_rotation_matrix(axis, 2 * np.pi / 3))
+            ops.append(_get_pg_rotation_matrix(axis, 4 * np.pi / 3))
         if "m" in symbol:
             ops.append(-np.eye(3))  # Inversion
             for i in range(3):
@@ -129,13 +218,12 @@ def _generate_pg_operations(number, symbol):
                 ops.append(reflection)
         if "-43m" in symbol or "m-3m" in symbol:
             # Add improper rotations
-            ops.append(-_get_pg_rotation_matrix(_PG_ROTATION_AXES[0], np.pi/2))
-            ops.append(-_get_pg_rotation_matrix(_PG_ROTATION_AXES[1], np.pi/2))
-            ops.append(-_get_pg_rotation_matrix(_PG_ROTATION_AXES[2], np.pi/2))
+            ops.append(-_get_pg_rotation_matrix(_PG_ROTATION_AXES[0], np.pi / 2))
+            ops.append(-_get_pg_rotation_matrix(_PG_ROTATION_AXES[1], np.pi / 2))
+            ops.append(-_get_pg_rotation_matrix(_PG_ROTATION_AXES[2], np.pi / 2))
         return ops
 
     raise ValueError(f"Unsupported point group: {symbol}")
-
 
 
 @dataclass
@@ -153,8 +241,8 @@ class PointGroup:
     @property
     def symmetry_operations(self):
         return [
-            SymmetryOperation(x, np.zeros(3)) for x in 
-            _generate_pg_operations(self.number, self.symbol)
+            SymmetryOperation(x, np.zeros(3))
+            for x in _generate_pg_operations(self.number, self.symbol)
         ]
 
     @classmethod
@@ -196,9 +284,7 @@ POINT_GROUP_DATA = (
     PointGroup(13, "4mm", "C4v", "tetragonal", "4/mmm", ""),
     PointGroup(14, "-42m", "D2d", "tetragonal", "4/mmm", "-42m"),
     PointGroup(14, "-4m2", "D2d", "tetragonal", "4/mmm", "-4m2"),
-    PointGroup(
-        15, "4/mmm", "D4h", "tetragonal", "4/mmm", ""
-    ),
+    PointGroup(15, "4/mmm", "D4h", "tetragonal", "4/mmm", ""),
     PointGroup(16, "3", "C3", "trigonal", "-3", "H"),
     PointGroup(16, "3r", "C3", "trigonal", "-3", "R"),
     PointGroup(17, "-3", "C3i", "trigonal", "-3", "H"),
@@ -222,9 +308,7 @@ POINT_GROUP_DATA = (
     PointGroup(25, "6mm", "C6v", "hexagonal", "6/mmm", ""),
     PointGroup(26, "-6m2", "D3h", "hexagonal", "6/mmm", "-6m2"),
     PointGroup(26, "-62m", "D3h", "hexagonal", "6/mmm", "-62m"),
-    PointGroup(
-        27, "6/mmm", "D6h", "hexagonal", "6/mmm", ""
-    ),
+    PointGroup(27, "6/mmm", "D6h", "hexagonal", "6/mmm", ""),
     PointGroup(28, "23", "T", "cubic", "m3", ""),
     PointGroup(29, "m-3", "Th", "cubic", "m3", ""),
     PointGroup(30, "432", "O", "cubic", "m3m", ""),

@@ -169,7 +169,6 @@ def calc_radial_function(
     only_intermolecular=False,
     separate_radial=True,
 ):
-
     """
     Radial function (eq (3) of Smith et al. (2017))
     For a given atom returns a list of radial functions of length r_s

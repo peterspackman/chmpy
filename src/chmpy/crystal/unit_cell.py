@@ -93,20 +93,24 @@ class UnitCell:
         ca, cb, cg = np.cos(self.angles)
         sg = np.sin(self.angles[2])
         v = self.volume()
-        self.direct = np.array((
-            (a, 0, 0),
-            (b * cg, b * sg, 0),
-            (c * cb, c * (ca - cb * cg) / sg, v / (a * b * sg))
-        ))
-        self.inverse = np.array((
-            (1.0 / a, 0.0, 0.0),
-            (-cg / (a * sg), 1 / (b * sg), 0),
+        self.direct = np.array(
             (
-                b * c * (ca * cg - cb) / v / sg,
-                a * c * (cb * cg - ca) / v / sg,
-                a * b * sg / v,
+                (a, 0, 0),
+                (b * cg, b * sg, 0),
+                (c * cb, c * (ca - cb * cg) / sg, v / (a * b * sg)),
             )
-        ))
+        )
+        self.inverse = np.array(
+            (
+                (1.0 / a, 0.0, 0.0),
+                (-cg / (a * sg), 1 / (b * sg), 0),
+                (
+                    b * c * (ca * cg - cb) / v / sg,
+                    a * c * (cb * cg - ca) / v / sg,
+                    a * b * sg / v,
+                ),
+            )
+        )
         self._set_cell_type()
 
     def set_vectors(self, vectors):
@@ -568,31 +572,36 @@ class UnitCell:
 
     def to_mesh(self):
         from trimesh import Trimesh
-        verts = np.array([
-            np.zeros(3),
-            self.v_c,
-            self.v_b,
-            self.v_b + self.v_c,
-            self.v_a,
-            self.v_a + self.v_c,
-            self.v_a + self.v_b,
-            self.v_a + self.v_b + self.v_c,
-        ])
 
-        faces = np.array([
-            [1, 3, 0],
-            [4, 1, 0],
-            [0, 3, 2],
-            [2, 4, 0],
-            [1, 7, 3],
-            [5, 1, 4],
-            [5, 7, 1],
-            [3, 7, 2],
-            [6, 4, 2],
-            [2, 7, 6],
-            [6, 5, 4],
-            [7, 5, 6]
-        ])
+        verts = np.array(
+            [
+                np.zeros(3),
+                self.v_c,
+                self.v_b,
+                self.v_b + self.v_c,
+                self.v_a,
+                self.v_a + self.v_c,
+                self.v_a + self.v_b,
+                self.v_a + self.v_b + self.v_c,
+            ]
+        )
+
+        faces = np.array(
+            [
+                [1, 3, 0],
+                [4, 1, 0],
+                [0, 3, 2],
+                [2, 4, 0],
+                [1, 7, 3],
+                [5, 1, 4],
+                [5, 7, 1],
+                [3, 7, 2],
+                [6, 4, 2],
+                [2, 7, 6],
+                [6, 5, 4],
+                [7, 5, 6],
+            ]
+        )
         return Trimesh(vertices=verts, faces=faces)
 
     def __repr__(self):

@@ -26,10 +26,9 @@ def make_N_invariants(coefficients) -> np.ndarray:
     size = int(np.sqrt(len(coefficients)))
     invariants = np.empty(shape=(size), dtype=np.float64)
     for i in range(0, size):
-        lower, upper = i ** 2, (i + 1) ** 2
+        lower, upper = i**2, (i + 1) ** 2
         invariants[i] = np.sum(
-            coefficients[lower : upper + 1]
-            * np.conj(coefficients[lower : upper + 1])
+            coefficients[lower : upper + 1] * np.conj(coefficients[lower : upper + 1])
         ).real
     return np.sqrt(invariants)
 
@@ -84,6 +83,7 @@ def _compute_property_in_j_channel(sht, r, property_function, origin=None):
     r_cplx.imag = prop_values.reshape(r.shape)
     return r_cplx
 
+
 def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
     """
     Calculate the 'stockholder weight' shape descriptors based on the
@@ -125,7 +125,9 @@ def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
     g[:, 1] = y.flatten()
     g[:, 2] = z.flatten()
 
-    r = sphere_stockholder_radii(s.s, o, g, r_min, r_max, 1e-7, 30, isovalue).reshape(sht.grid[0].shape)
+    r = sphere_stockholder_radii(s.s, o, g, r_min, r_max, 1e-7, 30, isovalue).reshape(
+        sht.grid[0].shape
+    )
     if np.any(r < 0):
         raise ValueError(
             f"Unable to find isovalue {isovalue:.2f} in all directions for bounds ({r_min:.2f}, {r_max:.2f})"
@@ -148,9 +150,7 @@ def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
     coeffs = sht.analysis(r)
 
     coeff4inv = expand_coeffs_to_full(l_max, coeffs) if real else coeffs
-    invariants = make_invariants(
-        l_max, coeff4inv, kinds=kwargs.get("kinds", "NP")
-    )
+    invariants = make_invariants(l_max, coeff4inv, kinds=kwargs.get("kinds", "NP"))
 
     if kwargs.get("coefficients", False):
         return coeffs, invariants
@@ -191,7 +191,9 @@ def promolecule_density_descriptor(sht, n_i, p_i, **kwargs):
     g[:, 2] = z.flatten()
 
     o = kwargs.get("origin", np.mean(p_i, axis=0, dtype=np.float32))
-    r = sphere_promolecule_radii(pro.dens, o, g, r_min, r_max, 1e-12, 30, isovalue).reshape(sht.grid[0].shape)
+    r = sphere_promolecule_radii(
+        pro.dens, o, g, r_min, r_max, 1e-12, 30, isovalue
+    ).reshape(sht.grid[0].shape)
     if np.any(r < 0):
         raise ValueError(
             f"Unable to find isovalue {isovalue:.2f} in all directions for bounds ({r_min:.2f}, {r_max:.2f})"
@@ -211,9 +213,7 @@ def promolecule_density_descriptor(sht, n_i, p_i, **kwargs):
     l_max = sht.lmax
     coeffs = sht.analysis(r)
     coeff4inv = expand_coeffs_to_full(l_max, coeffs) if real else coeffs
-    invariants = make_invariants(
-        l_max, coeff4inv, kinds=kwargs.get("kinds", "NP")
-    )
+    invariants = make_invariants(l_max, coeff4inv, kinds=kwargs.get("kinds", "NP"))
 
     if kwargs.get("coefficients", False):
         return coeffs, invariants

@@ -10,7 +10,6 @@ FORMCHK_EXEC = which("formchk")
 
 
 class Gaussian(AbstractExecutable):
-
     _executable_location = GAUSSIAN_EXEC
     _JOB_FILE_FMT = "{}.gjf"
     _LOG_FILE_FMT = "{}.log"

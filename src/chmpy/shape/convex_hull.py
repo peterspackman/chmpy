@@ -11,11 +11,12 @@ def _ray_hull_intersection(direction, hull):
     d = np.min(alpha[alpha > 0])
     return np.linalg.norm(d * direction)
 
+
 def _ray_hull_intersections_batch(directions, hull):
     eq = hull.equations
     X, y = eq[:, :-1], eq[:, -1]
-    d_dot_X= directions @ X.T
-    d_dot_X[d_dot_X<= 0] = 1e-6
+    d_dot_X = directions @ X.T
+    d_dot_X[d_dot_X <= 0] = 1e-6
     alpha = -y / d_dot_X
     d = np.min(alpha, axis=1)
     return np.linalg.norm(d[:, np.newaxis] * directions, axis=1)
@@ -23,7 +24,7 @@ def _ray_hull_intersections_batch(directions, hull):
 
 def ray_hull_intersections(directions, hull, method="fast"):
     """
-    Find the distance from the origin to the intersection with the 
+    Find the distance from the origin to the intersection with the
     given ConvexHull for a list of directions. Assumes `directions`
     is a (N, 3) array of unit vectors representing directions, and
     `hull` is a `ConvexHull` object centered about the origin.
@@ -32,7 +33,7 @@ def ray_hull_intersections(directions, hull, method="fast"):
     Args:
         directions (np.ndarray): (N, 3) array of unit vectors
         hull (ConvexHull): A ConvexHull for which to find intersections
-        
+
 
     Returns:
         np.ndarray: (N,) array of the distances for each intersection

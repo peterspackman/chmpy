@@ -9,7 +9,6 @@ TONTO_EXEC = which("tonto")
 
 
 class Tonto(AbstractExecutable):
-
     _executable_location = TONTO_EXEC
     _STDIN = "stdin"
     _STDOUT = "stdout"
@@ -102,6 +101,8 @@ class Tonto(AbstractExecutable):
 
         env = deepcopy(environ)
         env.update(
-            {"TONTO_BASIS_SET_DIRECTORY": str(self.basis_set_directory),}
+            {
+                "TONTO_BASIS_SET_DIRECTORY": str(self.basis_set_directory),
+            }
         )
         self._run_raw()

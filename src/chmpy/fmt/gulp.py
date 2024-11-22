@@ -8,9 +8,12 @@ from collections import namedtuple
 
 LOG = logging.getLogger(__name__)
 GULP_TEMPLATE = load_template("gulp")
-NUMBER_REGEX = re.compile(r"([-+]?(?:(?:\d*\.\d+)|(?:\d+\.?))(?:[Ee][+-]?\d+)?)\s*([\w/\^\s]+)?")
+NUMBER_REGEX = re.compile(
+    r"([-+]?(?:(?:\d*\.\d+)|(?:\d+\.?))(?:[Ee][+-]?\d+)?)\s*([\w/\^\s]+)?"
+)
 
 Cell = namedtuple("Cell", "a b c alpha beta gamma")
+
 
 def parse_value(string, with_units=False):
     """parse a value from a GULP output file to its appropriate type
@@ -86,6 +89,7 @@ def parse_single_line(line):
     if toks is not None and len(toks) == 2:
         return toks[0].strip(), toks[1].strip()
     return None
+
 
 def parse_gulp_output(contents):
     lines = contents.splitlines()

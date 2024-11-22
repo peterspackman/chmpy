@@ -55,7 +55,7 @@ def parse_atom_lines(lines):
     atom_data = defaultdict(list)
     for line in lines:
         n = 0
-        for (name, parser, length) in _ATOM_FIELDS:
+        for name, parser, length in _ATOM_FIELDS:
             if parser is not None:
                 atom_data[name].append(parser(line[n : n + length]))
             n += length
@@ -66,7 +66,7 @@ def parse_bond_lines(lines):
     bond_data = defaultdict(list)
     for line in lines:
         n = 0
-        for (name, parser, length) in _BOND_FIELDS:
+        for name, parser, length in _BOND_FIELDS:
             if parser is not None:
                 bond_data[name].append(parser(line[n : n + length]))
             n += length
@@ -76,7 +76,7 @@ def parse_bond_lines(lines):
 def parse_counts_line(line):
     n = 0
     result = {}
-    for (name, parser, length) in _COUNTS_FIELDS:
+    for name, parser, length in _COUNTS_FIELDS:
         if length is None:
             result[name] = parser(line[n:].strip())
         else:
@@ -177,46 +177,68 @@ def parse_sdf_contents(contents, limit=None, progress=False, keep_sdf_text=False
 
 def parse_sdf_file(filename, limit=None, progress=False, keep_sdf_text=False):
     contents = Path(filename).read_text()
-    return parse_sdf_contents(contents, limit=limit, progress=progress, keep_sdf_text=keep_sdf_text)
+    return parse_sdf_contents(
+        contents, limit=limit, progress=progress, keep_sdf_text=keep_sdf_text
+    )
 
 
-def to_atom_line(x=0.0,
-                y=0.0,
-                z=0.0,
-                space=None,
-                symbol="",
-                mass_difference=0,
-                charge=0,
-                stereo=0,
-                hydrogen_count=0,
-                stereo_care_box=0,
-                valence=0,
-                h0_designator=0,
-                not_used1=0,
-                not_used2=0,
-                mapping=0,
-                inversion=0,
-                exact_exchange=0):
-
-    return (f"{x:10.4f} {y:10.4f} {z:10.4f} {symbol:3s}"
-            f"{mass_difference:2d}{charge: 3d}{stereo: 3d}"
-            f"{hydrogen_count: 3d}{stereo_care_box: 3d}"
-            f"{valence: 3d}{h0_designator: 3d}{not_used1: 3d}"
-            f"{not_used2: 3d}{mapping: 3d}{inversion: 3d}{exact_exchange: 3d}")
-
-
-def to_bond_line(left=0, right=0, type=0, stereo=0, not_used=0, topology=0, center_status=0):
-    return (f"{left: 3d}{right: 3d}{type: 3d}"
-            f"{stereo: 3d}{not_used: 3d}"
-            f"{topology: 3d}{center_status: 3d}")
+def to_atom_line(
+    x=0.0,
+    y=0.0,
+    z=0.0,
+    space=None,
+    symbol="",
+    mass_difference=0,
+    charge=0,
+    stereo=0,
+    hydrogen_count=0,
+    stereo_care_box=0,
+    valence=0,
+    h0_designator=0,
+    not_used1=0,
+    not_used2=0,
+    mapping=0,
+    inversion=0,
+    exact_exchange=0,
+):
+    return (
+        f"{x:10.4f} {y:10.4f} {z:10.4f} {symbol:3s}"
+        f"{mass_difference:2d}{charge: 3d}{stereo: 3d}"
+        f"{hydrogen_count: 3d}{stereo_care_box: 3d}"
+        f"{valence: 3d}{h0_designator: 3d}{not_used1: 3d}"
+        f"{not_used2: 3d}{mapping: 3d}{inversion: 3d}{exact_exchange: 3d}"
+    )
 
 
-def to_counts_line(atoms=0, bonds=0, atom_list=0, obselete=None,
-                   chiral=0, stext=0, obselete1=0, obselete2=0,
-                   obselete3=0, obselete4=0, additional=0, version="V2000"):
-    return (f"{atoms: 3d}{bonds: 3d}{atom_list: 3d}   {chiral: 3d}{stext: 3d}"
-            f"{obselete1: 3d}{obselete2: 3d}{obselete3: 3d}{obselete4: 3d}"
-            f"{additional: 3d} {version:s}")
+def to_bond_line(
+    left=0, right=0, type=0, stereo=0, not_used=0, topology=0, center_status=0
+):
+    return (
+        f"{left: 3d}{right: 3d}{type: 3d}"
+        f"{stereo: 3d}{not_used: 3d}"
+        f"{topology: 3d}{center_status: 3d}"
+    )
+
+
+def to_counts_line(
+    atoms=0,
+    bonds=0,
+    atom_list=0,
+    obselete=None,
+    chiral=0,
+    stext=0,
+    obselete1=0,
+    obselete2=0,
+    obselete3=0,
+    obselete4=0,
+    additional=0,
+    version="V2000",
+):
+    return (
+        f"{atoms: 3d}{bonds: 3d}{atom_list: 3d}   {chiral: 3d}{stext: 3d}"
+        f"{obselete1: 3d}{obselete2: 3d}{obselete3: 3d}{obselete4: 3d}"
+        f"{additional: 3d} {version:s}"
+    )
 
 
 def to_sdf_string(sdf_dict):
@@ -224,14 +246,13 @@ def to_sdf_string(sdf_dict):
     atoms = sdf_dict.get("atoms", [])
     bonds = sdf_dict.get("bonds", [])
     num_atoms = len(atoms.get("symbol", []))
-    num_bonds= len(bonds.get("left", []))
+    num_bonds = len(bonds.get("left", []))
     counts_line = to_counts_line(atoms=num_atoms, bonds=num_bonds)
     atom_lines = []
     fill_value = 0
 
     atoms_filled = {
-        k: atoms.get(k, [fill_value] * num_atoms)
-        for k, _, _ in _ATOM_FIELDS
+        k: atoms.get(k, [fill_value] * num_atoms) for k, _, _ in _ATOM_FIELDS
     }
     for i in range(num_atoms):
         fields = {k: atoms_filled[k][i] for k, _, _ in _ATOM_FIELDS}
@@ -239,13 +260,11 @@ def to_sdf_string(sdf_dict):
 
     bond_lines = []
     bonds_filled = {
-        k: bonds.get(k, [fill_value] * num_bonds)
-        for k, _, _ in _BOND_FIELDS
+        k: bonds.get(k, [fill_value] * num_bonds) for k, _, _ in _BOND_FIELDS
     }
     for i in range(num_bonds):
         fields = {k: bonds_filled[k][i] for k, _, _ in _BOND_FIELDS}
         bond_lines.append(to_bond_line(**fields))
-   
 
     header = "\n".join(header_lines)
     atom_str = "\n".join(atom_lines)
@@ -255,4 +274,3 @@ def to_sdf_string(sdf_dict):
 
 def to_sdf_file(filename, sdf_dict):
     Path(filename).write_text(to_sdf_string(sdf_dict))
-

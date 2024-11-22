@@ -1,5 +1,6 @@
 import sys
 import collections
+
 if sys.version_info.major == 3 and sys.version_info.minor >= 10:
     from collections.abc import MutableMapping, Mapping
 else:

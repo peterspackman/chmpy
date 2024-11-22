@@ -28,7 +28,9 @@ with open(os.path.join(os.path.dirname(__file__), "sgdata.json")) as f:
 SG_FROM_NUMBER = {k: [_sgdata._make(x) for x in v] for k, v in _sgdata_dict.items()}
 
 SG_FROM_SYMOPS = {tuple(x.symops): x for k, sgs in SG_FROM_NUMBER.items() for x in sgs}
-SG_FROM_SYMBOL = {x.international.split("=")[-1]: x for k, sgs in SG_FROM_NUMBER.items() for x in sgs}
+SG_FROM_SYMBOL = {
+    x.international.split("=")[-1]: x for k, sgs in SG_FROM_NUMBER.items() for x in sgs
+}
 SG_CHOICES = {int(k): [x.choice for x in v] for k, v in SG_FROM_NUMBER.items()}
 SG_DEFAULT_SETTING_CHOICE = {
     48: "2",
@@ -379,8 +381,8 @@ class SpaceGroup:
                 if sgdata is not None:
                     break
             else:
-                raise ValueError("Could not find matching space group for '{}'".format(symbol))
+                raise ValueError(
+                    "Could not find matching space group for '{}'".format(symbol)
+                )
 
-            
         return SpaceGroup(sgdata.number, choice=sgdata.choice)
-

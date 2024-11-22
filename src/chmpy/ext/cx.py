@@ -20,7 +20,6 @@ def tonto_pair_energy(wavefunctions, transforms, na, nb):
 
     (rot_a, shift_a), (rot_b, shift_b) = transforms
     with TemporaryDirectory() as working_directory:
-
         fchk_a = Path(working_directory, "mol_a.fchk")
         fchk_b = Path(working_directory, "mol_b.fchk")
         fchk_a.write_text(wavefunctions[0])

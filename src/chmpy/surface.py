@@ -1,4 +1,5 @@
 """Isosurfaces for molecules in crystals or isolation."""
+
 import numpy as np
 from collections import namedtuple
 import time

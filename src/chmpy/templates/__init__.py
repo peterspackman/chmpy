@@ -1,4 +1,5 @@
 """Module to store jinja2 templates for ccpy"""
+
 from os.path import dirname, abspath, split
 import logging
 from jinja2 import Environment, FileSystemLoader, Template

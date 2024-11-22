@@ -364,14 +364,15 @@ class Molecule:
     @classmethod
     def from_mol2_string(cls, contents, **kwargs):
         from chmpy.fmt.mol2 import parse_mol2_string
+
         atoms, bonds = parse_mol2_string(contents)
         elements = [Element[x] for x in atoms.pop("type")]
 
         N = len(elements)
 
-        positions = np.array([
-            tuple(p) for p in zip(atoms.pop("x"), atoms.pop("y"), atoms.pop("z"))
-        ])
+        positions = np.array(
+            [tuple(p) for p in zip(atoms.pop("x"), atoms.pop("y"), atoms.pop("z"))]
+        )
 
         labels = None
         if "name" in atoms:
@@ -384,7 +385,9 @@ class Molecule:
             for a, b, t in zip(bonds["origin"], bonds["target"], bonds["type"]):
                 bondlist[a - 1, b - 1] = int(t)
 
-        return cls(elements, positions, bonds=bondlist, labels=labels, **atoms, **kwargs)
+        return cls(
+            elements, positions, bonds=bondlist, labels=labels, **atoms, **kwargs
+        )
 
     @classmethod
     def from_mol2_file(cls, filename, **kwargs):
@@ -405,8 +408,7 @@ class Molecule:
         return {}
 
     def _ext_save_map(self):
-        return {".xyz": self.to_xyz_file,
-                ".sdf": self.to_sdf_file}
+        return {".xyz": self.to_xyz_file, ".sdf": self.to_sdf_file}
 
     def _fname_save_map(self):
         return {}
@@ -452,7 +454,6 @@ class Molecule:
                 bonds_left.append(x + 1)
                 bonds_right.append(y + 1)
 
-
         sdf_dict = {
             "header": [self.name, "created by chmpy", ""],
             "atoms": {
@@ -464,7 +465,7 @@ class Molecule:
             "bonds": {
                 "left": np.array(bonds_left),
                 "right": np.array(bonds_right),
-            }
+            },
         }
         return to_sdf_string(sdf_dict)
 
@@ -479,7 +480,6 @@ class Molecule:
             kwargs: Keyword arguments to be passed to `self.to_sdf_string`
         """
         Path(filename).write_text(self.to_sdf_string(**kwargs))
-
 
     def to_xyz_string(self, header=True) -> str:
         """
@@ -1005,17 +1005,17 @@ class Molecule:
     def inertia_tensor(self):
         masses = np.asarray([x.mass for x in self.elements])
         d = self.positions - self.center_of_mass
-        d2 = d ** 2
+        d2 = d**2
         r2 = (d2).sum(axis=1)
         tensor = np.empty((3, 3))
         tensor[0, 0] = np.sum(masses * (d2[:, 1] + d2[:, 2]))
         tensor[1, 1] = np.sum(masses * (d2[:, 0] + d2[:, 2]))
         tensor[2, 2] = np.sum(masses * (d2[:, 0] + d2[:, 1]))
-        tensor[0, 1] = - np.sum(masses * d[:, 0] * d[:, 1])
+        tensor[0, 1] = -np.sum(masses * d[:, 0] * d[:, 1])
         tensor[1, 0] = tensor[0, 1]
-        tensor[0, 2] = - np.sum(masses * d[:, 0] * d[:, 2])
+        tensor[0, 2] = -np.sum(masses * d[:, 0] * d[:, 2])
         tensor[2, 0] = tensor[0, 2]
-        tensor[1, 2] = - np.sum(masses * d[:, 1] * d[:, 2])
+        tensor[1, 2] = -np.sum(masses * d[:, 1] * d[:, 2])
         tensor[2, 1] = tensor[1, 2]
         return tensor
 
@@ -1026,12 +1026,12 @@ class Molecule:
     def rotational_constants(self, unit="MHz"):
         from scipy.constants import Planck, speed_of_light, Avogadro
         from chmpy.util.unit import BOHR_TO_ANGSTROM
+
         # convert amu angstrom^2 to g cm^2
         moments = self.principle_moments_of_inertia() / Avogadro / 1e16
 
         # convert g cm^2 to kg m^2
         return 1e5 * Planck / (8 * np.pi * np.pi * speed_of_light * moments)
-
 
     def positions_in_molecular_axis_frame(self, method="pca"):
         if method not in ("pca",):

@@ -159,7 +159,6 @@ class CrystalTestCase(unittest.TestCase):
         )
 
     def test_handles_higher_occupation(self):
-
         asym = deepcopy(ice_ii_asym())
         natom = len(asym) + 1
         natom_old = len(asym)

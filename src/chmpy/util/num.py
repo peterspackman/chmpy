@@ -70,6 +70,7 @@ def spherical_to_cartesian(rtp: np.ndarray, dtype=np.float64) -> np.ndarray:
 
     return xyz
 
+
 def spherical_to_cartesian_mgrid(r: np.ndarray, t: np.ndarray, p: np.ndarray):
     """
     Given 3 arrays of (r, theta, phi) spherical coordinates
@@ -97,6 +98,7 @@ def spherical_to_cartesian_mgrid(r: np.ndarray, t: np.ndarray, p: np.ndarray):
     """
     return r * np.sin(t) * np.cos(p), r * np.sin(t) * np.sin(p), r * np.cos(t)
 
+
 def cartesian_to_spherical_mgrid(x: np.ndarray, y: np.ndarray, z: np.ndarray):
     """
     Given 3 arrays of of (x, y, z) Cartesian coordinates
@@ -118,7 +120,7 @@ def cartesian_to_spherical_mgrid(x: np.ndarray, y: np.ndarray, z: np.ndarray):
     Returns:
         Tuple[np.ndarray]: 3 arrays of r, theta, phi spherical coordinates
     """
-    r = np.sqrt(x*x + y*y + z*z)
+    r = np.sqrt(x * x + y * y + z * z)
     return r, np.arccos(z / r), np.arctan2(y, x)
 
 

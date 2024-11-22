@@ -28,7 +28,6 @@ def self_interaction_term(areas, k=1.0694):
 
 
 def minimize_cosmo_energy(points, areas, charges, **kwargs):
-
     from chmpy.util.unit import BOHR_TO_ANGSTROM, AU_TO_KJ_PER_MOL
 
     if kwargs.get("unit", "angstrom").lower() == "angstrom":

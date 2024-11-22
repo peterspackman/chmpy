@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class AssocLegendre:
     def __init__(self, lm):
         self.lmax = lm
@@ -12,8 +13,7 @@ class AssocLegendre:
         a = 1.0
         for k in range(1, np.abs(m) + 1):
             a *= (2 * k + 1) / (2 * k)
-        return np.sqrt( a / (4 * np.pi))
-
+        return np.sqrt(a / (4 * np.pi))
 
     @staticmethod
     def _amn(m, n):
@@ -21,9 +21,8 @@ class AssocLegendre:
 
     @staticmethod
     def _bmn(m, n):
-        return - np.sqrt(
-            (2 * n + 1) * ((n - 1)*(n - 1) - m * m) / 
-            ((2 * n- 3) * (n * n - m * m))
+        return -np.sqrt(
+            (2 * n + 1) * ((n - 1) * (n - 1) - m * m) / ((2 * n - 3) * (n * n - m * m))
         )
 
     @staticmethod
@@ -43,14 +42,14 @@ class AssocLegendre:
         idx = 0
         for m in range(0, self.lmax + 1):
             for l in range(m, self.lmax + 1):
-                if(l == m):
+                if l == m:
                     result[idx] = self.a[l, m] * (1 - x * x) ** (0.5 * m)
-                elif (l == (m + 1)):
+                elif l == (m + 1):
                     result[idx] = self.a[l, m] * x * self.cache[l - 1, m]
                 else:
                     result[idx] = (
-                        self.a[l, m] * x * self.cache[l - 1, m] +
-                        self.b[l, m] * self.cache[l - 2, m]
+                        self.a[l, m] * x * self.cache[l - 1, m]
+                        + self.b[l, m] * self.cache[l - 2, m]
                     )
                 self.cache[l, m] = result[idx]
                 idx += 1

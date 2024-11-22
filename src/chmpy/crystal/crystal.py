@@ -33,6 +33,7 @@ def _nearest_molecule_idx(vertices, el, pos):
     u, idxs = np.unique(l, return_inverse=True)
     return np.arange(len(u), dtype=np.uint8)[idxs]
 
+
 def _nearest_atom_idx(vertices, el, pos):
     from scipy.sparse.csgraph import connected_components
     import pandas as pd
@@ -43,6 +44,7 @@ def _nearest_atom_idx(vertices, el, pos):
     d, idxs = tree.query(vertices, k=1)
     t2 = time()
     return idxs
+
 
 class Crystal:
     """
@@ -1028,6 +1030,7 @@ class Crystal:
         meshes = []
         extra_props = {}
         isos = []
+
         def nearest_atomic_number(pos, n_e, n_p):
             return np.array(n_e[_nearest_atom_idx(pos, n_e, n_p)], dtype=np.uint8)
 
@@ -1052,8 +1055,12 @@ class Crystal:
                     extra_props["fragment_patch"] = lambda x: _nearest_molecule_idx(
                         x, n_e, n_p
                     )
-                extra_props["nearest_atom_external"] = lambda x: nearest_atomic_number(x, n_e, n_p)
-                extra_props["nearest_atom_internal"] = lambda x: nearest_atomic_number(x, mol.atomic_numbers, mol.positions)
+                extra_props["nearest_atom_external"] = lambda x: nearest_atomic_number(
+                    x, n_e, n_p
+                )
+                extra_props["nearest_atom_internal"] = lambda x: nearest_atomic_number(
+                    x, mol.atomic_numbers, mol.positions
+                )
                 s = StockholderWeight.from_arrays(
                     mol.atomic_numbers, mol.positions, n_e, n_p
                 )
@@ -1640,9 +1647,9 @@ class Crystal:
             data_block_name = self.titl
         if "cif_data" in self.properties:
             cif_data = self.properties["cif_data"]
-            cif_data[
-                "audit_creation_method"
-            ] = f"chmpy python library version {version}"
+            cif_data["audit_creation_method"] = (
+                f"chmpy python library version {version}"
+            )
             cif_data["atom_site_fract_x"] = self.asymmetric_unit.positions[:, 0]
             cif_data["atom_site_fract_y"] = self.asymmetric_unit.positions[:, 1]
             cif_data["atom_site_fract_z"] = self.asymmetric_unit.positions[:, 2]

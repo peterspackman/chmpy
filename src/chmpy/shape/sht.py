@@ -1,46 +1,51 @@
 import numpy as np
 from chmpy.util.num import spherical_to_cartesian_mgrid
 from ._sht import (
-    AssocLegendre, analysis_kernel_real, analysis_kernel_cplx,
-    synthesis_kernel_real, synthesis_kernel_cplx,
-    expand_coeffs_to_full
+    AssocLegendre,
+    analysis_kernel_real,
+    analysis_kernel_cplx,
+    synthesis_kernel_real,
+    synthesis_kernel_cplx,
+    expand_coeffs_to_full,
 )
 from scipy.special import roots_legendre
 from scipy.fft import fft, ifft
 
 _SHT_CACHE = {}
 
+
 def _next_power_of_2(n):
-  i = 1
-  while i < n: i *= 2
-  return i
+    i = 1
+    while i < n:
+        i *= 2
+    return i
 
 
 def _closest_int_with_only_prime_factors_up_to_fmax(n, fmax=7):
-    if (n <= fmax):
+    if n <= fmax:
         return n
-    if (fmax < 2):
+    if fmax < 2:
         return 0
-    if (fmax == 2):
-        return _next_power_of_2(n);
+    if fmax == 2:
+        return _next_power_of_2(n)
 
     n -= 2 - (n & 1)
     f = 2
-    while (f != n):
+    while f != n:
         n += 2
         f = 2
-        while ((2*f <= n) and ((n & f) == 0)):
-            f *= 2 # no divisions for factor 2.
+        while (2 * f <= n) and ((n & f) == 0):
+            f *= 2  # no divisions for factor 2.
         k = 3
-        while ((k<=fmax) and (k*f <= n)):
-            while ((k*f <= n) and (n%(k*f)==0)):
+        while (k <= fmax) and (k * f <= n):
+            while (k * f <= n) and (n % (k * f) == 0):
                 f *= k
             k += 2
 
-    k = _next_power_of_2(n) # what is the closest power of 2 ?
+    k = _next_power_of_2(n)  # what is the closest power of 2 ?
 
-    if ((k - n) * 33 < n):
-        return k # rather choose power of 2 if not too far (3%)
+    if (k - n) * 33 < n:
+        return k  # rather choose power of 2 if not too far (3%)
     return n
 
 
@@ -75,13 +80,15 @@ class SHT:
 
         if ntheta is None:
             n = self.lmax + 1
-            n += (n & 1)
+            n += n & 1
             n = ((n + 7) // 8) * 8
             self.ntheta = n
         else:
             self.ntheta = ntheta
-        
-        self.cos_theta, self.weights, self.total_weight = roots_legendre(self.ntheta, mu=True)
+
+        self.cos_theta, self.weights, self.total_weight = roots_legendre(
+            self.ntheta, mu=True
+        )
         self.weights *= 4 * np.pi / self.total_weight
         self.theta = np.arccos(self.cos_theta)
 
@@ -125,10 +132,10 @@ class SHT:
         for itheta, (ct, w) in enumerate(zip(self.cos_theta, self.weights)):
             self.fft_work_array[:] = values[itheta, :]
 
-            fft(self.fft_work_array, norm="forward", overwrite_x=True) 
+            fft(self.fft_work_array, norm="forward", overwrite_x=True)
             self.plm.evaluate_batch(ct, result=self.plm_work_array)
             plm_idx = 0
-	        # m = 0 case
+            # m = 0 case
             for l in range(self.lmax + 1):
                 p = self.plm_work_array[plm_idx]
                 coeffs[plm_idx] += self.fft_work_array[0] * p * w
@@ -167,7 +174,7 @@ class SHT:
         for itheta, (ct, w) in enumerate(zip(self.cos_theta, self.weights)):
             self.fft_work_array[:] = values[itheta, :]
 
-            fft(self.fft_work_array, norm="forward", overwrite_x=True) 
+            fft(self.fft_work_array, norm="forward", overwrite_x=True)
             self.plm.evaluate_batch(ct, result=self.plm_work_array)
 
             plm_idx = 0
@@ -190,13 +197,12 @@ class SHT:
                     rr = sign * self.fft_work_array[m_idx_pos] * pw
                     ii = sign * self.fft_work_array[m_idx_neg] * pw
                     if m & 1:
-                        ii = - ii
+                        ii = -ii
 
                     coeffs[l_offset - m] = coeffs[l_offset - m] + ii
                     coeffs[l_offset + m] = coeffs[l_offset + m] + rr
                     plm_idx += 1
         return coeffs
-
 
     def synthesis_pure_python_cplx(self, coeffs):
         """
@@ -220,7 +226,7 @@ class SHT:
             self.plm.evaluate_batch(ct, result=self.plm_work_array)
 
             plm_idx = 0
-	        # m = 0 case
+            # m = 0 case
             for l in range(self.lmax + 1):
                 l_offset = l * (l + 1)
                 p = self.plm_work_array[plm_idx]
@@ -230,7 +236,6 @@ class SHT:
             for m in range(1, self.lmax + 1):
                 sign = -1 if m & 1 else 1
                 for l in range(m, self.lmax + 1):
-
                     l_offset = l * (l + 1)
                     p = self.plm_work_array[plm_idx]
                     m_idx_neg = self.nphi - m
@@ -238,12 +243,12 @@ class SHT:
                     rr = sign * coeffs[l_offset + m] * p
                     ii = sign * coeffs[l_offset - m] * p
                     if m & 1:
-                        ii = - ii
+                        ii = -ii
                     self.fft_work_array[m_idx_neg] += ii
                     self.fft_work_array[m_idx_pos] += rr
                     plm_idx += 1
 
-            ifft(self.fft_work_array, norm="forward", overwrite_x=True) 
+            ifft(self.fft_work_array, norm="forward", overwrite_x=True)
             values[itheta, :] = self.fft_work_array[:]
         return values
 
@@ -267,7 +272,7 @@ class SHT:
             self.plm.evaluate_batch(ct, result=self.plm_work_array)
 
             plm_idx = 0
-	        # m = 0 case
+            # m = 0 case
             for l in range(self.lmax + 1):
                 p = self.plm_work_array[plm_idx]
                 self.fft_work_array[0] += coeffs[plm_idx] * p
@@ -281,7 +286,7 @@ class SHT:
                     self.fft_work_array[m] += rr
                     plm_idx += 1
 
-            ifft(self.fft_work_array, norm="forward", overwrite_x=True) 
+            ifft(self.fft_work_array, norm="forward", overwrite_x=True)
             values[itheta, :] = self.fft_work_array[:].real
         return values
 
@@ -307,7 +312,7 @@ class SHT:
         for itheta, (ct, w) in enumerate(zip(self.cos_theta, self.weights)):
             self.fft_work_array[:] = values[itheta, :]
 
-            fft(self.fft_work_array, norm="forward", overwrite_x=True) 
+            fft(self.fft_work_array, norm="forward", overwrite_x=True)
             self.plm.evaluate_batch(ct, result=self.plm_work_array)
             kernel(self, w, coeffs)
         return coeffs
@@ -323,7 +328,7 @@ class SHT:
         Returns:
             np.ndarray the evaluated function at the SHT grid points
         """
-        real = (coeffs.size == self.nplm())
+        real = coeffs.size == self.nplm()
         if real:
             kernel = synthesis_kernel_real
             values = np.zeros(self.grid[0].shape)
@@ -335,7 +340,7 @@ class SHT:
             self.fft_work_array[:] = 0
             self.plm.evaluate_batch(ct, result=self.plm_work_array)
             kernel(self, coeffs)
-            ifft(self.fft_work_array, norm="forward", overwrite_x=True) 
+            ifft(self.fft_work_array, norm="forward", overwrite_x=True)
 
             if real:
                 values[itheta, :] = self.fft_work_array[:].real
@@ -353,7 +358,6 @@ class SHT:
             result += self.plm_work_array[plm_idx] * coeffs[plm_idx].real
             plm_idx += 1
 
-
         mv = 2 * np.exp(1j * np.arange(1, self.lmax + 1) * phi)
         sign = 1
         for m in range(1, self.lmax + 1):
@@ -363,8 +367,8 @@ class SHT:
                 # m +ve and m -ve
                 tmp += sign * self.plm_work_array[plm_idx] * coeffs[plm_idx]
                 plm_idx += 1
-            
-            result += (tmp.real * mv[m - 1].real + tmp.imag * mv[m - 1].imag)
+
+            result += tmp.real * mv[m - 1].real + tmp.imag * mv[m - 1].imag
         return result
 
     def _eval_at_points_cplx(self, coeffs, theta, phi):
@@ -394,17 +398,21 @@ class SHT:
                 tmpc = -tmpc
             cos_vals += np.real(mv[self.lmax + m]) * (tmpr + tmpc)
             sin_vals += np.imag(mv[self.lmax - m]) * (tmpr - tmpc)
-        result += np.real(cos_vals) - np.imag(sin_vals) + 1j * (np.imag(cos_vals) + np.real(sin_vals))
+        result += (
+            np.real(cos_vals)
+            - np.imag(sin_vals)
+            + 1j * (np.imag(cos_vals) + np.real(sin_vals))
+        )
         return result
 
     def evaluate_at_points(self, coeffs, theta, phi):
         r"""
         Evaluate the value of the function described in terms of the provided SH
-        coefficients at the provided (angular) points. 
+        coefficients at the provided (angular) points.
         Will attempt to detect if the provided coefficients are from a real
         or a complex transform.
 
-        Note that this can be quite slow, especially in comparison with just 
+        Note that this can be quite slow, especially in comparison with just
         synthesis step.
 
         Arguments:
@@ -415,7 +423,7 @@ class SHT:
         Returns:
             np.ndarray the evaluated function values
         """
-        real = (coeffs.size == self.nplm())
+        real = coeffs.size == self.nplm()
         if real:
             return self._eval_at_points_real(coeffs, theta, phi)
         # assumes coeffs are the real transform order
@@ -438,11 +446,8 @@ class SHT:
 
     @property
     def grid(self):
-        "The set of grid points [\theta, \phi] for this SHT"
-        return np.meshgrid(
-            self.theta,
-            self.phi, indexing="ij"
-        )
+        r"The set of grid points [\theta, \phi] for this SHT"
+        return np.meshgrid(self.theta, self.phi, indexing="ij")
 
     @property
     def grid_cartesian(self):
@@ -450,7 +455,6 @@ class SHT:
         theta, phi = self.grid
         r = np.ones_like(theta)
         return spherical_to_cartesian_mgrid(r, theta, phi)
-
 
     def power_spectrum(self, coeffs) -> np.ndarray:
         r"""
@@ -464,27 +468,29 @@ class SHT:
             np.ndarray the evaluated power spectrum
         """
 
-        real = (coeffs.size == self.nplm())
+        real = coeffs.size == self.nplm()
         if real:
             n = len(coeffs)
             l_max = int((-3 + np.sqrt(8 * n + 1)) // 2)
             spectrum = np.zeros(l_max + 1)
-            
-            pattern = np.concatenate([np.arange(m, l_max + 1) for m in range(l_max + 1)])
+
+            pattern = np.concatenate(
+                [np.arange(m, l_max + 1) for m in range(l_max + 1)]
+            )
             boundary = l_max + 1
-            np.add.at(spectrum, pattern[:boundary], np.abs(coeffs[:boundary])**2)
-            np.add.at(spectrum, pattern[boundary:], 2 * np.abs(coeffs[boundary:])**2)
-            spectrum /= (2 * pattern[:boundary] + 1)
-            
+            np.add.at(spectrum, pattern[:boundary], np.abs(coeffs[:boundary]) ** 2)
+            np.add.at(spectrum, pattern[boundary:], 2 * np.abs(coeffs[boundary:]) ** 2)
+            spectrum /= 2 * pattern[:boundary] + 1
+
             return spectrum
         else:
             l_max = int(np.sqrt(len(coeffs))) - 1
             spectrum = np.empty(l_max + 1)
-            coeffs2 = np.abs(coeffs) **2
+            coeffs2 = np.abs(coeffs) ** 2
             idx = 0
             for l in range(l_max + 1):
                 count = 2 * l + 1
-                spectrum[l] = np.sum(coeffs2[idx:idx + count]) / count
+                spectrum[l] = np.sum(coeffs2[idx : idx + count]) / count
                 idx += count
             return spectrum
 
@@ -534,9 +540,9 @@ class SHT:
                             self.fft_work_array[m] += rr
                         plm_idx += 1
 
-                ifft(self.fft_work_array, norm="forward", overwrite_x=True) 
+                ifft(self.fft_work_array, norm="forward", overwrite_x=True)
                 values[itheta, :] = self.fft_work_array[:].real
-            invariants[lvalue] = np.sum(values ** 2) / values.size / (2 * lvalue + 1)
+            invariants[lvalue] = np.sum(values**2) / values.size / (2 * lvalue + 1)
         return invariants
 
     def faces(self):
@@ -552,12 +558,12 @@ class SHT:
                 triangle1 = [
                     i * self.nphi + j,
                     i * self.nphi + (j + 1) % self.nphi,
-                    (i + 1) * self.nphi + j
+                    (i + 1) * self.nphi + j,
                 ]
                 triangle2 = [
                     (i + 1) * self.nphi + j,
                     i * self.nphi + (j + 1) % self.nphi,
-                    (i + 1) * self.nphi + (j + 1) % self.nphi
+                    (i + 1) * self.nphi + (j + 1) % self.nphi,
                 ]
                 faces.append(triangle1)
                 faces.append(triangle2)
@@ -565,12 +571,19 @@ class SHT:
 
 
 def test_func(theta, phi):
-    return (1.0 + 0.01 * np.cos(theta) +
-                0.1 * (3.0 * np.cos(theta) * np.cos(theta) - 1.0) +
-                (np.cos(phi) + 0.3 * np.sin(phi)) * np.sin(theta) +
-                (np.cos(2.0 * phi) + 0.1 * np.sin(2.0 * phi)) * 
-                 np.sin(theta) * np.sin(theta) * (7.0 * np.cos(theta) * np.cos(theta) - 1.0) * 3.0/8.0
-           )
+    return (
+        1.0
+        + 0.01 * np.cos(theta)
+        + 0.1 * (3.0 * np.cos(theta) * np.cos(theta) - 1.0)
+        + (np.cos(phi) + 0.3 * np.sin(phi)) * np.sin(theta)
+        + (np.cos(2.0 * phi) + 0.1 * np.sin(2.0 * phi))
+        * np.sin(theta)
+        * np.sin(theta)
+        * (7.0 * np.cos(theta) * np.cos(theta) - 1.0)
+        * 3.0
+        / 8.0
+    )
+
 
 def plot_sphere(name, grid, values):
     """Plot a function on a spherical surface.

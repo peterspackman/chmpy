@@ -3,7 +3,6 @@ from io import StringIO
 
 
 class FchkFile:
-
     UNIT_CONVERSIONS = {"kj/mol": 2625.499638, "hartree": 1.0}
     CONVERSIONS = {"R": float, "I": int, "C": str}
 

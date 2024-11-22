@@ -1,8 +1,10 @@
 import numpy as np
 from pathlib import Path
 
+
 class Pdb:
     "Very basic PDB parser"
+
     def __init__(self, pdb_data):
         self.data = pdb_data
         self.content_lines = []
@@ -22,11 +24,11 @@ class Pdb:
         self.space_group = "P 1"
 
         if line_length > 55:
-            self.space_group = line[55:min(line_length, 65)].strip()
+            self.space_group = line[55 : min(line_length, 65)].strip()
 
         self.z = 1
         if line_length > 66:
-            self.z = int(line[66:min(line_length, 69)])
+            self.z = int(line[66 : min(line_length, 69)])
 
     def parse_atom_lines(self):
         self.atoms = {
@@ -43,7 +45,7 @@ class Pdb:
             "occupancy": [],
             "temp_factor": [],
             "element": [],
-            "charge": []
+            "charge": [],
         }
 
         # TODO handle MODEL/ENDMDL
@@ -66,7 +68,6 @@ class Pdb:
                 chg = line[78:80].strip()
                 chg = float(chg[::-1]) if chg else 0.0
                 self.atoms["charge"].append(chg)
-
 
     def parse_header(self):
         for self.line_index, line in enumerate(self.content_lines):
@@ -103,4 +104,3 @@ class Pdb:
         c.content_lines = contents.split("\n")
         c.parse()
         return c
-

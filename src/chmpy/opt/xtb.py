@@ -25,7 +25,6 @@ def find_energies(stdout):
 
 
 class XtbOptimizer:
-
     xtb_param_fmt = "param_gfn{}-xtb.txt"
 
     def __init__(self, gfn=0, name="molecule", **kwargs):
@@ -91,7 +90,11 @@ class XtbOptimizer:
 
     def minimize_crystal(self, crystal, engine="inertial"):
         input_contents = turbomole_string(
-            crystal, opt=dict(engine=engine, maxcycle=self.maxcycle,),
+            crystal,
+            opt=dict(
+                engine=engine,
+                maxcycle=self.maxcycle,
+            ),
         )
         LOG.debug("Input contents:\n%s", input_contents)
         result = None
@@ -135,7 +138,11 @@ class XtbOptimizer:
 
     def minimize_molecule(self, molecule, engine="rf"):
         input_contents = turbomole_string(
-            molecule, opt=dict(engine=engine, maxcycle=self.maxcycle,),
+            molecule,
+            opt=dict(
+                engine=engine,
+                maxcycle=self.maxcycle,
+            ),
         )
         LOG.debug("Input contents:\n%s", input_contents)
         result = None

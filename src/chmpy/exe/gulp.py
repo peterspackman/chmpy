@@ -30,10 +30,7 @@ class Gulp(AbstractExecutable):
         self.kwargs = kwargs.copy()
         self.working_directory = working_directory
         self.arg = Path(self.input_file).with_suffix("")
-        LOG.debug(
-            "Initializing gulp calculation, timeout = %s",
-            self.timeout
-        )
+        LOG.debug("Initializing gulp calculation, timeout = %s", self.timeout)
         self.error_contents = None
 
     @property
@@ -52,7 +49,9 @@ class Gulp(AbstractExecutable):
         """Do whatever needs to be done before running
         the job (e.g. write input file etc.)"""
         LOG.debug("Writing GULP input file to %s", self.input_file)
-        Path(self.input_file).write_text(self.input_contents + f"\noutput drv {self.drv_file}")
+        Path(self.input_file).write_text(
+            self.input_contents + f"\noutput drv {self.drv_file}"
+        )
 
     def result(self):
         return self.output_contents

@@ -2,7 +2,11 @@ from chmpy import Crystal, Molecule
 from collections.abc import Iterable
 from chmpy.exe.gulp import Gulp
 from chmpy.exe import ReturnCodeError, TimeoutExpired
-from chmpy.fmt.gulp import crystal_to_gulp_input, molecule_to_gulp_input, parse_gulp_output
+from chmpy.fmt.gulp import (
+    crystal_to_gulp_input,
+    molecule_to_gulp_input,
+    parse_gulp_output,
+)
 from pathlib import Path
 import os
 import logging
@@ -18,13 +22,10 @@ single_line_value_regex = re.compile(r"\s*(.*)\s*[:=]\s*(.+)")
 
 def find_outputs(stdout):
     matches = single_line_value_regex.findall(stdout)
-    return {
-        k.strip(): v.strip() for k, v in matches
-    }
+    return {k.strip(): v.strip() for k, v in matches}
 
 
 class GulpOptimizer:
-
     def __init__(self, name="molecule", **kwargs):
         self.ff = kwargs.pop("ff", "gfn-ff")
         LOG.debug("Initializing GulpOptimizer(ff=%s)", self.ff)
@@ -39,10 +40,12 @@ class GulpOptimizer:
         if "temperature" in kwargs:
             self.additional_keywords["temperature"] = kwargs["temperature"]
         if "supercell" in kwargs:
-            self.additional_keywords["supercell"] = "{} {} {}".format(*kwargs["supercell"])
+            self.additional_keywords["supercell"] = "{} {} {}".format(
+                *kwargs["supercell"]
+            )
 
     def _run_in_tempdir(self, input_contents):
-      with TemporaryDirectory(prefix=self.prefix) as tmpdirname:
+        with TemporaryDirectory(prefix=self.prefix) as tmpdirname:
             exe = Gulp(
                 input_contents,
                 name=self.name,
@@ -67,7 +70,7 @@ class GulpOptimizer:
         input_contents = crystal_to_gulp_input(
             crystal,
             keywords=self.keywords,
-            additional_keywords=self.additional_keywords
+            additional_keywords=self.additional_keywords,
         )
         LOG.debug("Input contents:\n%s", input_contents)
         return self._run_in_tempdir(input_contents)
@@ -76,7 +79,7 @@ class GulpOptimizer:
         input_contents = crystal_to_gulp_input(
             crystal,
             keywords=self.keywords + ["opti", "rfo"],
-            additional_keywords=self.additional_keywords
+            additional_keywords=self.additional_keywords,
         )
         return self._run_in_tempdir(input_contents)
 

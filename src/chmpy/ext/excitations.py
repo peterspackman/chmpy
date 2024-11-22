@@ -31,7 +31,7 @@ def plot_spectra(
     kind="gaussian",
     gamma=12.5,
     label=None,
-    **kwargs
+    **kwargs,
 ):
     """Plot the (UV-Vis) spectra.
 
