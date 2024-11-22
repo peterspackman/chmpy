@@ -2,7 +2,6 @@ import numpy as np
 from collections import namedtuple
 import os
 import json
-import re
 from copy import deepcopy
 from chmpy.util.text import subscript, overline
 from .point_group import PointGroup
@@ -74,7 +73,8 @@ class SpaceGroup:
         centering (str): The space group centering (if applicable)
         schoenflies (str): The Schoenflies space group symbol
         centrosymmetric (bool): Whether or not the space group is centrosymmetric
-        symmetry_operations (List[SymmetryOperation]): List of symmetry operations making up this space group
+        symmetry_operations (List[SymmetryOperation]): List of symmetry operations
+            making up this space group
     """
 
     def __init__(self, international_tables_number, choice=""):
@@ -322,7 +322,8 @@ class SpaceGroup:
         return reduced_symmetry_list(self.symmetry_operations, self.latt)
 
     def has_hexagonal_rhombohedral_choices(self) -> bool:
-        "returns true if this space group could be represented as hexagonal or rhombohedral"
+        "returns true if this space group could be "
+        "represented as hexagonal or rhombohedral"
         return self.international_tables_number in (146, 148, 155, 160, 161, 166, 167)
 
     @classmethod
@@ -334,11 +335,14 @@ class SpaceGroup:
         type.
 
         Args:
-            symops (List[SymmetryOperation]): a reduced or full list of symmetry operations
-            expand_latt (int, optional): the SHELX LATT number to expand this list of symmetry operations
+            symops (List[SymmetryOperation]): a reduced or full list
+                of symmetry operations
+            expand_latt (int, optional): the SHELX LATT number to expand
+                this list of symmetry operations
 
         Returns:
-            SpaceGroup: the matching `SpaceGroup` for the provided symmetry operations and LATT
+            SpaceGroup: the matching `SpaceGroup` for the provided symmetry
+                operations and LATT
 
         """
         if expand_latt is not None:

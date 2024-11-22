@@ -12,9 +12,10 @@ class AsymmetricUnit:
     asymmetric unit
 
     Attributes:
-        elements (List[Element]): N length list of elements associated with the sites in this asymmetric
-            unit
-        positions (array_like): (N, 3) array of site positions in fractional coordinates
+        elements (List[Element]): N length list of elements associated with
+            the sites in this asymmetric unit
+        positions (array_like): (N, 3) array of site positions in fractional
+            coordinates
         labels (array_like): N length array of string labels for each site
     """
 
@@ -25,9 +26,12 @@ class AsymmetricUnit:
 
 
         Arguments:
-            elements (List[Element]): N length list of elements associated with the sites
-            positions (array_like): (N, 3) array of site positions in fractional coordinates
-            labels (array_like, optional): labels (array_like): N length array of string labels for each site
+            elements (List[Element]): N length list of elements associated
+                with the sites
+            positions (array_like): (N, 3) array of site positions in
+                fractional coordinates
+            labels (array_like, optional): labels (array_like): N length
+                array of string labels for each site
             **kwargs: Additional properties (will populate the properties member)
                 to store in this asymmetric unit
 

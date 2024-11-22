@@ -2,8 +2,7 @@ import logging
 import unittest
 import numpy as np
 from os.path import join, dirname
-from chmpy.crystal import Crystal, UnitCell
-from tempfile import TemporaryDirectory
+from chmpy.crystal import UnitCell
 
 LOG = logging.getLogger(__name__)
 _ICE_II = join(dirname(__file__), "iceII.cif")
@@ -24,7 +23,7 @@ class UnitCellTestCase(unittest.TestCase):
 
     def test_handle_bad_angles(self):
         # should warn
-        c = UnitCell.from_lengths_and_angles([2.0] * 3, [90] * 3)
+        UnitCell.from_lengths_and_angles([2.0] * 3, [90] * 3)
 
     def test_repr(self):
         c = UnitCell.cubic(2.0)

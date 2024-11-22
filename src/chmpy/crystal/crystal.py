@@ -19,30 +19,27 @@ LOG = logging.getLogger(__name__)
 
 def _nearest_molecule_idx(vertices, el, pos):
     from scipy.sparse.csgraph import connected_components
-    import pandas as pd
     from time import time
 
-    t1 = time()
+    time()
     m = Molecule.from_arrays(el, pos)
     m.guess_bonds()
     nfrag, labels = connected_components(m.bonds)
     tree = KDTree(pos)
     d, idxs = tree.query(vertices, k=1)
-    t2 = time()
+    time()
     l = labels[idxs]
     u, idxs = np.unique(l, return_inverse=True)
     return np.arange(len(u), dtype=np.uint8)[idxs]
 
 
 def _nearest_atom_idx(vertices, el, pos):
-    from scipy.sparse.csgraph import connected_components
-    import pandas as pd
     from time import time
 
-    t1 = time()
+    time()
     tree = KDTree(pos)
     d, idxs = tree.query(vertices, k=1)
-    t2 = time()
+    time()
     return idxs
 
 
@@ -132,23 +129,27 @@ class Crystal:
 
     def to_cartesian(self, coords) -> np.ndarray:
         """
-        Convert coordinates (row major) from fractional to cartesian coordinates.
+        Convert coordinates (row major) from fractional to
+        Cartesian coordinates.
 
         Arguments:
-            coords (np.ndarray): (N, 3) array of positions assumed to be in fractional coordinates
+            coords (np.ndarray): (N, 3) array of positions assumed to be in
+                fractional coordinates
 
         Returns:
-            (N, 3) array of positions transformed to cartesian (orthogonal) coordinates
-            by the unit cell of this crystal.
+            (N, 3) array of positions transformed to Cartesian (orthogonal)
+                coordinates by the unit cell of this crystal.
         """
         return self.unit_cell.to_cartesian(coords)
 
     def to_fractional(self, coords) -> np.ndarray:
         """
-        Convert coordinates (row major) from cartesian to fractional coordinates.
+        Convert coordinates (row major) from Cartesian to
+        fractional coordinates.
 
         Args:
-            coords (np.ndarray): (N, 3) array of positions assumed to be in cartesian (orthogonal) coordinates
+            coords (np.ndarray): (N, 3) array of positions assumed to be
+                in Cartesian (orthogonal) coordinates
 
         Returns:
             (N, 3) array of positions transformed to fractional coordinates
@@ -324,7 +325,8 @@ class Crystal:
         symmetry unique molecules times number of symmetry operations.
 
         Args:
-            bond_tolerance (float, optional): Bonding tolerance (bonded if d < cov_a + cov_b + bond_tolerance)
+            bond_tolerance (float, optional): Bonding tolerance
+                (bonded if d < cov_a + cov_b + bond_tolerance)
 
         Returns:
             A list of all connected molecules in this crystal, which
@@ -395,11 +397,12 @@ class Crystal:
         `mol_idx`, within the given `radius` using the specified `method`.
 
         Arguments:
-            mol_idx (int, optional): The index (into `symmetry_unique_molecules`) of the central
-                molecule for the shell
-            radius (float, optional): The maximum distance (Angstroms) between the central
-                molecule and the neighbours.
-            method (str, optional): the method to use when determining inclusion of neighbours.
+            mol_idx (int, optional): The index (into `symmetry_unique_molecules`)
+                of the central molecule for the shell
+            radius (float, optional): The maximum distance (Angstroms) between
+                the central molecule and the neighbours.
+            method (str, optional): the method to use when determining inclusion
+                of neighbours.
 
         Returns:
             A list of neighbouring molecules using the given method.
@@ -451,7 +454,8 @@ class Crystal:
         calls to this function will be a no-op.
 
         Args:
-            bond_tolerance (float, optional): Bonding tolerance (bonded if d < cov_a + cov_b + bond_tolerance)
+            bond_tolerance (float, optional): Bonding tolerance
+                (bonded if d < cov_a + cov_b + bond_tolerance)
 
         Returns:
             List of all connected molecules in the asymmetric_unit of this
@@ -501,7 +505,8 @@ class Crystal:
                         break
                 else:
                     LOG.warn(
-                        "No equivalent asymmetric unit molecule found!? -- this should not happen!"
+                        "No equivalent asymmetric unit molecule found!?"
+                        "-- this should not happen!"
                     )
         return molecules
 
@@ -514,8 +519,8 @@ class Crystal:
         their information and caches it.
 
         Args:
-            bounds (Tuple, optional): Tuple of upper and lower corners (hkl) describing the bounds
-                of the slab.
+            bounds (Tuple, optional): Tuple of upper and lower corners (hkl) 
+                describing the bounds of the slab.
 
         Returns:
             A dictionary of arrays associated with all sites contained
@@ -571,7 +576,8 @@ class Crystal:
         `origin`.
 
         Arguments:
-            radius (float): the maximum distance (Angstroms) from the origin for inclusion
+            radius (float): the maximum distance (Angstroms) from the origin
+                for inclusion
             origin (Tuple, optional): the origin in fractional coordinates
 
         Returns:
@@ -595,7 +601,8 @@ class Crystal:
         each atomic site in the asymmetric unit.
 
         Arguments:
-            radius (float): the maximum distance (Angstroms) from the origin for inclusion
+            radius (float): the maximum distance (Angstroms) from the origin
+                for inclusion
 
         Returns:
             A list of atomic number, Cartesian position for both the
@@ -643,7 +650,8 @@ class Crystal:
         group of atoms in the asymetric unit.
 
         Arguments:
-            radius (float): the maximum distance (Angstroms) from the origin for inclusion
+            radius (float): the maximum distance (Angstroms) from the origin
+                for inclusion
 
         Returns:
             A list of atomic number, Cartesian position for both the
@@ -691,10 +699,10 @@ class Crystal:
 
         Args:
             mol (Molecule): the molecule whose environment to calculate
-            radius (float, optional): Maximum distance in Angstroms between any atom in the molecule
-                and the resulting neighbouring atoms
-            threshold (float, optional): tolerance for detecting the neighbouring sites as part of the
-                given molecule.
+            radius (float, optional): Maximum distance in Angstroms between
+                any atom in the molecule and the resulting neighbouring atoms
+            threshold (float, optional): tolerance for detecting the neighbouring
+                sites as part of the given molecule.
 
         Returns:
             A list of tuples of (Molecule, elements, positions)
@@ -732,10 +740,10 @@ class Crystal:
         in this crystal within the given radius.
 
         Args:
-            radius (float, optional): Maximum distance in Angstroms between any atom in the molecule
-                and the resulting neighbouring atoms
-            threshold (float, optional): tolerance for detecting the neighbouring sites as part of the
-                given molecule.
+            radius (float, optional): Maximum distance in Angstroms between
+                any atom in the molecule and the resulting neighbouring atoms
+            threshold (float, optional): tolerance for detecting the neighbouring
+                sites as part of the given molecule.
 
         Returns:
             A list of tuples of (Molecule, elements, positions)
@@ -754,14 +762,15 @@ class Crystal:
         in this crystal within the given radius.
 
         Args:
-            radius (float, optional): Maximum distance in Angstroms between any atom in the molecule
-                and the resulting neighbouring atoms
+            radius (float, optional): Maximum distance in Angstroms between
+                any atom in the molecule and the resulting neighbouring atoms
             kind (str, optional): the functional group type
 
         Returns:
             A list of tuples of (func_el, func_pos, neigh_el, neigh_pos)
             where `func_el` and `neigh_el` are `np.ndarray` of atomic numbers,
-            and `func_pos` and `neigh_pos` are `np.ndarray` of Cartesian atomic positions
+            and `func_pos` and `neigh_pos` are `np.ndarray` of 
+            Cartesian atomic positions
         """
         results = []
         for mol in self.symmetry_unique_molecules():
@@ -809,13 +818,16 @@ class Crystal:
 
                 Options are:
                 ```
-                isovalue (float, optional): level set value for the isosurface (default=0.002) in au.
-                separation (float, optional): separation between density grid used in the surface calculation
-                    (default 0.2) in Angstroms.
-                color (str, optional): surface property to use for vertex coloring, one of ('d_norm_i',
-                    'd_i', 'd_norm_e', 'd_e')
-                colormap (str, optional): matplotlib colormap to use for surface coloring (default 'viridis_r')
-                midpoint (float, optional): midpoint of the segmented colormap (if applicable)
+                isovalue (float, optional): level set value for the isosurface
+                    (default=0.002) in au.
+                separation (float, optional): separation between density grid
+                    used in the surface calculation (default 0.2) in Angstroms.
+                color (str, optional): surface property to use for vertex coloring,
+                    one of ('d_norm_i', 'd_i', 'd_norm_e', 'd_e')
+                colormap (str, optional): matplotlib colormap to use for surface
+                    coloring (default 'viridis_r')
+                midpoint (float, optional): midpoint of the segmented
+                    colormap (if applicable)
                 ```
 
         Returns:
@@ -877,9 +889,10 @@ class Crystal:
 
                 Options are:
                 ```
-                isovalue (float, optional): level set value for the isosurface (default=0.002) in au.
-                separation (float, optional): separation between density grid used in the surface calculation
-                    (default 0.2) in Angstroms.
+                isovalue (float, optional): level set value for the 
+                    isosurface (default=0.002) in au.
+                separation (float, optional): separation between density grid
+                    used in the surface calculation (default 0.2) in Angstroms.
                 ```
 
         Returns:
@@ -991,8 +1004,8 @@ class Crystal:
         for each symmetry unique molecule or atom in this crystal.
 
         Args:
-            kind (str, optional): dictates whether we calculate surfaces for each unique molecule
-                or for each unique atom
+            kind (str, optional): dictates whether we calculate surfaces
+                for each unique molecule or for each unique atom
             kwargs: keyword arguments passed to `stockholder_weight_isosurface`.
 
                 Options include:
@@ -1010,7 +1023,8 @@ class Crystal:
                     surface property to use for vertex coloring, one of ('d_norm_i',
                     'd_i', 'd_norm_e', 'd_e', 'd_norm', 'fragment_patch')
                 colormap: str, optional
-                    matplotlib colormap to use for surface coloring (default 'viridis_r')
+                    matplotlib colormap to use for surface coloring 
+                    (default 'viridis_r')
                 midpoint: float, optional, default 0.0 if using d_norm
                     use the midpoint norm (as is used in CrystalExplorer)
                 ```
@@ -1092,15 +1106,17 @@ class Crystal:
         self, l_max=5, radius=6.0, kind="carboxylic_acid"
     ) -> np.ndarray:
         """
-        Calculate the shape descriptors `[1,2]` for the all atoms in the functional group
-        given for all symmetry unique molecules in this crystal.
+        Calculate the shape descriptors `[1,2]` for the all atoms in 
+        the functional group given for all symmetry unique molecules in this crystal.
 
         Args:
-            l_max (int, optional): maximum level of angular momenta to include in the spherical harmonic
-                transform of the molecular shape function. (default: 5)
-            radius (float, optional): maximum distance (Angstroms) of neighbouring atoms to include in
-                stockholder weight calculation (default: 5)
-            kind (str, optional): Identifier for the functional group type (default: 'carboxylic_acid')
+            l_max (int, optional): maximum level of angular momenta to include
+                in the spherical harmonic transform of the molecular shape function.
+                (default: 5)
+            radius (float, optional): maximum distance (Angstroms) of neighbouring
+                atoms to include in stockholder weight calculation (default: 5)
+            kind (str, optional): Identifier for the functional group 
+                type (default: 'carboxylic_acid')
 
         Returns:
             shape description vector
@@ -1150,11 +1166,13 @@ class Crystal:
         the provided molecule in the crystal.
 
         Args:
-            l_max (int, optional): maximum level of angular momenta to include in the spherical harmonic
+            l_max (int, optional): maximum level of angular momenta to include
+                in the spherical harmonic
                 transform of the molecular shape function.
-            radius (float, optional): maximum distance (Angstroms) to include surroundings
+            radius (float, optional): maximum distance (Angstroms) to include 
+                surroundings in the shape description
+            with_property (str, optional): name of the surface property to include
                 in the shape description
-            with_property (str, optional): name of the surface property to include in the shape description
 
         Returns:
             shape description vector
@@ -1195,12 +1213,14 @@ class Crystal:
         molecules in this crystal.
 
         Args:
-            l_max (int, optional): maximum level of angular momenta to include in the spherical harmonic
-                transform of the molecular shape function.
-            radius (float, optional): maximum distance (Angstroms) to include surroundings
+            l_max (int, optional): maximum level of angular momenta to include
+                in the spherical harmonic transform of the molecular shape function.
+            radius (float, optional): maximum distance (Angstroms) to include
+                surroundings in the shape description
+            with_property (str, optional): name of the surface property to include
                 in the shape description
-            with_property (str, optional): name of the surface property to include in the shape description
-            return_coefficients (bool, optional): also return the spherical harmonic coefficients
+            return_coefficients (bool, optional): also return the spherical
+                harmonic coefficients
 
         Returns:
             shape description vector
@@ -1254,12 +1274,14 @@ class Crystal:
         atoms in this crystal.
 
         Args:
-            l_max (int, optional): maximum level of angular momenta to include in the spherical harmonic
-                transform of the molecular shape function.
-            radius (float, optional): maximum distance (Angstroms) to include surroundings
+            l_max (int, optional): maximum level of angular momenta to include
+                in the spherical harmonic transform of the molecular shape function.
+            radius (float, optional): maximum distance (Angstroms) to include
+                surroundings in the shape description
+            with_property (str, optional): name of the surface property to include
                 in the shape description
-            with_property (str, optional): name of the surface property to include in the shape description
-            return_coefficients (bool, optional): also return the spherical harmonic coefficients
+            return_coefficients (bool, optional): also return the spherical 
+                harmonic coefficients
 
         Returns:
             shape description vector
@@ -1309,11 +1331,12 @@ class Crystal:
         group in this crystal.
 
         Args:
-            atoms (Tuple): atoms to include in the as the 'inside' of the shape description.
-            l_max (int, optional): maximum level of angular momenta to include in the spherical harmonic
-                transform of the molecular shape function.
-            radius (float, optional): maximum distance (Angstroms) to include surroundings
-                in the shape description
+            atoms (Tuple): atoms to include in the as the 'inside' 
+                of the shape description.
+            l_max (int, optional): maximum level of angular momenta to include
+                in the spherical harmonic transform of the molecular shape function.
+            radius (float, optional): maximum distance (Angstroms) to include
+                surroundings in the shape description
 
         Returns:
             shape description vector
@@ -1618,8 +1641,6 @@ class Crystal:
 
     @classmethod
     def from_gen_file(cls, filename, **kwargs):
-        from chmpy.fmt.gen import parse_gen_file
-
         p = Path(filename)
         titl = p.stem
         return cls.from_gen_string(p.read_text(), titl=titl, **kwargs)
@@ -1696,8 +1717,8 @@ class Crystal:
         tt, f2 = powder_pattern(self, **kwargs)
         if not hasattr(self, "_have_warned_powder"):
             LOG.warn(
-                "Warning -- pattern calculation is a work in progress, currently values may "
-                "be incorrect for many systems. USE AT YOUR OWN RISK"
+                "Warning -- pattern calculation is a work in progress, currently"
+                "values may be incorrect for many systems. USE AT YOUR OWN RISK"
             )
             self._have_warned_powder = True
         return PowderPattern(tt, f2, **kwargs)
@@ -1807,8 +1828,8 @@ class Crystal:
         rhombohedral or hexagonal cell
 
         Args:
-            choice (str, optional): The choice of the resulting lattice, either 'H' for hexagonal
-                or 'R' for rhombohedral (default 'H').
+            choice (str, optional): The choice of the resulting lattice,
+                either 'H' for hexagonal or 'R' for rhombohedral (default 'H').
         """
         if not self.space_group.has_hexagonal_rhombohedral_choices():
             raise ValueError("Invalid space group for choose_trigonal_lattice")
@@ -1899,8 +1920,8 @@ class Crystal:
         in this crystal within the given radius.
 
         Args:
-            radius (float, optional): Maximum distance in Angstroms between any atom in the molecule
-                and the resulting neighbouring atoms
+            radius (float, optional): Maximum distance in Angstroms between any
+                atom in the molecule and the resulting neighbouring atoms
 
         Returns:
             A dictionary of dimers (Molecule, elements, positions)
@@ -1908,8 +1929,6 @@ class Crystal:
                 and `positions` is an `np.ndarray` of Cartesian atomic positions
         """
         from chmpy.core.dimer import Dimer
-        from copy import deepcopy
-        from collections import defaultdict
 
         hklmax = np.array([-np.inf, -np.inf, -np.inf])
         hklmin = np.array([np.inf, np.inf, np.inf])
@@ -1941,7 +1960,8 @@ class Crystal:
             dimers_a = []
             for mol_b in self.unit_cell_molecules():
                 for shift, shift_frac in zip(shifts, shifts_frac):
-                    # shift_frac assumes the molecule is generated from the [0, 0, 0] cell, it's not
+                    # shift_frac assumes the molecule is generated from 
+                    # the [0, 0, 0] cell, it's not
                     mol_bt = mol_b.translated(shift)
                     r = mol_a.distance_to(mol_bt, method=distance_method)
                     if r > 1e-1 and r < radius:
@@ -1973,7 +1993,10 @@ class Crystal:
         nidx = []
         dimers = mol_dimers[mol_idx]
         neighbour_info = []
-        symm_string = lambda x: str(SymmetryOperation.from_integer_code(x[0]))
+
+        def symm_string(x):
+            return str(SymmetryOperation.from_integer_code(x[0]))
+
         for i, (unique_idx, d) in enumerate(dimers):
             npos.append(d.b.positions)
             nidx.append(np.ones(len(d.b), dtype=np.uint8) * i)
@@ -2002,12 +2025,11 @@ class Crystal:
         pos_cart = self.to_cartesian(self.asymmetric_unit.positions)
         H_idxs = np.where(nums == 1)[0]
         conn, t = self.unit_cell_connectivity(bond_tolerance=bond_tolerance, **kwargs)
-        d = 0.0
         for key in conn.keys():
             for h in H_idxs:
                 if h in key:
                     at = key[1 if key.index(h) == 0 else 0]
-                    d = conn[key]
+                    conn[key]
                     break
             else:
                 continue

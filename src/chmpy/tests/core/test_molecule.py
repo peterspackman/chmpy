@@ -26,7 +26,7 @@ class MoleculeTestCase(unittest.TestCase):
     def test_construction(self):
         bonds = np.diag(np.ones(2))
         labels = np.array(["H1", "H2"])
-        m = Molecule.from_arrays(self.els, self.pos, bonds=bonds, labels=labels)
+        Molecule.from_arrays(self.els, self.pos, bonds=bonds, labels=labels)
 
     def test_distances(self):
         m1 = self.load_water()

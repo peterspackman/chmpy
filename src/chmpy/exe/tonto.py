@@ -1,4 +1,4 @@
-from .exe import AbstractExecutable, run_subprocess, ReturnCodeError
+from .exe import AbstractExecutable
 from chmpy.util.exe import which
 from pathlib import Path
 import logging

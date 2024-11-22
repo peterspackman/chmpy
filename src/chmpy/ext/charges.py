@@ -1,4 +1,3 @@
-from collections import namedtuple
 import numpy as np
 
 EEM_KAPPA = 0.529176

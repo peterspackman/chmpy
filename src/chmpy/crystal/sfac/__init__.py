@@ -85,10 +85,9 @@ def reflections(crystal, wavelength=LAMBDA_Cu, dmin=LAMBDA_Cu / 2, sort=True):
     h_max, k_max, l_max = hklmax(crystal.unit_cell, dmin)
     recip = crystal.unit_cell.reciprocal_lattice.copy()
     system = crystal.space_group.crystal_system
-    centering = (
+    (
         "*" if system != "monoclinic" else crystal.space_group.choice[0] + "face"
     )
-    laue_class = crystal.space_group.laue_class
     if (
         crystal.space_group.has_hexagonal_rhombohedral_choices()
         and crystal.unit_cell.is_rhombohedral
@@ -163,7 +162,7 @@ def structure_factors(crystal, wavelength=LAMBDA_Cu):
         for el in crystal.asymmetric_unit.elements
     ]
     indices = [asym_sfac_idx[i] for i in uc["asym_atom"]]
-    N = len(indices)
+    len(indices)
     unique_indices = set(asym_sfac_idx)
     sintl = q / 2
     sintl2 = sintl * sintl
@@ -181,6 +180,6 @@ def structure_factors(crystal, wavelength=LAMBDA_Cu):
         hkl_dot_pos = hkl @ pos
         sfac += fj * np.exp(exp_fac * hkl_dot_pos)
         normalization += fj * fj
-    f000 = sfac[0]
+    sfac[0]
     sfac *= facs
     return StructureFactors(hkl, G, q, sfac, normalization)

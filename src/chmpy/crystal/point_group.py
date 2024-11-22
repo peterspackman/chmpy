@@ -1,4 +1,3 @@
-from typing import Tuple
 from dataclasses import dataclass
 from chmpy.crystal.symmetry_operation import SymmetryOperation
 import numpy as np

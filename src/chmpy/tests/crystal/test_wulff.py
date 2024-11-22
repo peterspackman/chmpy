@@ -1,7 +1,6 @@
 import logging
 import unittest
 import numpy as np
-from os.path import join, dirname
 from chmpy.crystal.wulff import WulffConstruction, WulffSHT
 
 LOG = logging.getLogger(__name__)
@@ -55,11 +54,9 @@ class WulffConstructionTestCase(unittest.TestCase):
         l_max = 20
         s = WulffSHT(facets, facet_energies, l_max=l_max)
         invariants_expected = s.power_spectrum()
-        coeffs = None
 
         for rot in Rotation.random(100):
             facets_r = facets @ rot.as_matrix()
             s = WulffSHT(facets_r, facet_energies, l_max=l_max)
             inv = s.power_spectrum()
-            coeffs = s.coeffs
             np.testing.assert_allclose(inv, invariants_expected, rtol=1e-3, atol=1e-1)

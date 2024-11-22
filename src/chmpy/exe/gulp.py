@@ -5,7 +5,6 @@ from pathlib import Path
 from chmpy.util.exe import which
 import copy
 from tempfile import TemporaryFile
-import numpy as np
 
 GULP_EXEC = which("gulp")
 LOG = logging.getLogger("gulp")

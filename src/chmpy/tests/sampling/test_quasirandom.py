@@ -1,7 +1,5 @@
-import logging
 import unittest
 import numpy as np
-from chmpy import Element
 from chmpy.sampling import (
     quasirandom_kgf as kgf,
     quasirandom_sobol as sobol,

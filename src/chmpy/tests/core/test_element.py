@@ -1,8 +1,5 @@
-import logging
 import unittest
 import numpy as np
-from os.path import join, dirname
-from tempfile import TemporaryDirectory
 from chmpy.core.element import (
     Element,
     vdw_radii,
@@ -67,4 +64,4 @@ class ElementTestCase(unittest.TestCase):
 
         for m in (cov_radii, vdw_radii, element_symbols, element_names):
             with self.assertRaises(ValueError):
-                x = m(nums_invalid)
+                m(nums_invalid)

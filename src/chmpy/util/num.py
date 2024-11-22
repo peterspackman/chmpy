@@ -1,6 +1,5 @@
 import numpy as np
 from numbers import Number
-from typing import Tuple
 
 
 def is_perfect_square(value: Number) -> bool:

@@ -1,9 +1,7 @@
 import pyparsing as pp
 from pyparsing import Literal as Lit
 from pyparsing import Optional as Opt
-from pyparsing import Regex, oneOf
-from chmpy.core.element import Element
-import numpy as np
+from pyparsing import Regex
 
 pp.ParserElement.enablePackrat()
 

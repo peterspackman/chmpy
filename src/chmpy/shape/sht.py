@@ -59,10 +59,12 @@ class SHT:
         nphi: the number of phi angular grid points
         ntheta: the number of theta angular grid points
         phi: the phi angular grid points (equispaced) between [i, 2 \pi]
-        cos_theta: cos values of the theta grid (evaluated as Gauss-Legendre quadrature points)
+        cos_theta: cos values of the theta grid (evaluated as Gauss-Legendre 
+            quadrature points)
         weights: the Gauss-Legendre grid weights
         theta: the theta angular grid points (derived from cos_theta)
-        fft_work_array: an internal work array for the various FFTs done in the transform
+        fft_work_array: an internal work array for the various FFTs done 
+            in the transform
         plm_work_array: an internal work array for the evaluate of plm values
 
     """
@@ -169,8 +171,8 @@ class SHT:
         """
 
         coeffs = np.zeros(self.nlm(), dtype=np.complex128)
-        rlm = np.zeros(self.nlm(), dtype=np.complex128)
-        ilm = np.zeros(self.nlm(), dtype=np.complex128)
+        np.zeros(self.nlm(), dtype=np.complex128)
+        np.zeros(self.nlm(), dtype=np.complex128)
         for itheta, (ct, w) in enumerate(zip(self.cos_theta, self.weights)):
             self.fft_work_array[:] = values[itheta, :]
 
@@ -407,8 +409,8 @@ class SHT:
 
     def evaluate_at_points(self, coeffs, theta, phi):
         r"""
-        Evaluate the value of the function described in terms of the provided SH
-        coefficients at the provided (angular) points.
+        Evaluate the value of the function described in terms of the
+        provided SH coefficients at the provided (angular) points.
         Will attempt to detect if the provided coefficients are from a real
         or a complex transform.
 
@@ -440,7 +442,8 @@ class SHT:
             coefficients (np.ndarray): the set of spherical harmonic coefficients
 
         Returns:
-            np.ndarray the full set of spherical harmonic coefficients for a complext transform
+            np.ndarray the full set of spherical harmonic coefficients for a 
+                complex transform
         """
         return expand_coeffs_to_full(self.lmax, coeffs)
 
@@ -458,8 +461,8 @@ class SHT:
 
     def power_spectrum(self, coeffs) -> np.ndarray:
         r"""
-        Evaluate the power spectrum of the function described in terms of the provided SH
-        coefficients.
+        Evaluate the power spectrum of the function described in terms of the
+        provided SH coefficients.
 
         Arguments:
             coeffs (np.ndarray): the set of spherical harmonic coefficients
@@ -549,7 +552,8 @@ class SHT:
         """
         Generate the triangular faces for the grid vertices.
         Returns:
-            list: A list of lists representing the faces, where each inner list contains the indices of the vertices that form a triangular face.
+            list: A list of lists representing the faces, where each inner list 
+                contains the indices of the vertices that form a triangular face.
         """
         faces = []
         for i in range(self.ntheta - 1):
@@ -597,8 +601,7 @@ def plot_sphere(name, grid, values):
     values: array_like
         scalar values of the function associated with each grid point
     """
-    from mpl_toolkits.mplot3d import Axes3D
-    from matplotlib import cm, colors
+    from matplotlib import cm
     import matplotlib.pyplot as plt
 
     fig = plt.figure(figsize=plt.figaspect(1.0))

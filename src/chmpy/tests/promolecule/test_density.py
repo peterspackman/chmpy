@@ -1,6 +1,5 @@
 import unittest
 import numpy as np
-from os.path import join, dirname
 from chmpy import PromoleculeDensity, StockholderWeight
 from .. import TEST_FILES
 
@@ -15,7 +14,7 @@ class PromoleculeDensityTestCase(unittest.TestCase):
     def test_construction(self):
         self.assertEqual(self.dens.natoms, 2)
         with self.assertRaises(ValueError):
-            dens = PromoleculeDensity((np.ones(2) * 300, self.pos))
+            _ = PromoleculeDensity((np.ones(2) * 300, self.pos))
 
     def test_rho(self):
         pts = np.array(self.pos) + (1.0, 0.0, 0.0)
@@ -25,10 +24,7 @@ class PromoleculeDensityTestCase(unittest.TestCase):
         np.testing.assert_allclose(rho, expected, atol=1e-5)
 
     def test_bb(self):
-        from chmpy import Element
-
         bbox = self.dens.bb()
-        buff = Element[1].vdw + 3.8
         expected = np.array(((-4.89, -4.89, -4.89), (5.89, 4.89, 4.89)))
         np.testing.assert_allclose(bbox, expected, atol=1e-5)
 
@@ -43,7 +39,7 @@ class PromoleculeDensityTestCase(unittest.TestCase):
         np.testing.assert_allclose(vecs, expected_vecs, atol=1e-5)
 
     def test_from_xyz_file(self):
-        dens = PromoleculeDensity.from_xyz_file(TEST_FILES["water.xyz"])
+        _ = PromoleculeDensity.from_xyz_file(TEST_FILES["water.xyz"])
 
 
 class StockholderWeightTestCase(unittest.TestCase):

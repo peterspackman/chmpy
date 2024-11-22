@@ -26,8 +26,8 @@ class UnitCell:
         units are Angstroms, and angular units are radians.
 
         Args:
-            vectors (array_like): (3, 3) array of lattice vectors, row major i.e. vectors[0, :] is
-                lattice vector A etc.
+            vectors (array_like): (3, 3) array of lattice vectors, row major
+                i.e. vectors[0, :] is lattice vector A etc.
         """
         self.set_vectors(vectors)
 
@@ -83,9 +83,10 @@ class UnitCell:
         a parallelipiped.
 
         Args:
-            lengths (array_like): array of (a, b, c), the unit cell side lengths in Angstroms.
-            angles (array_like): array of (alpha, beta, gamma), the unit cell angles lengths
-                in radians.
+            lengths (array_like): array of (a, b, c), the unit cell side
+                lengths in Angstroms.
+            angles (array_like): array of (alpha, beta, gamma), the unit
+                cell angles lengths in radians.
         """
         self.lengths = lengths
         self.angles = angles
@@ -125,8 +126,8 @@ class UnitCell:
 
 
         Args:
-            vectors (array_like): (3, 3) array of lattice vectors, row major i.e. vectors[0, :] is
-                lattice vector A etc.
+            vectors (array_like): (3, 3) array of lattice vectors,
+                row major i.e. vectors[0, :] is lattice vector A etc.
         """
         self.direct = vectors
         params = zeros(6)
@@ -262,7 +263,8 @@ class UnitCell:
 
     @property
     def is_hexagonal(self) -> bool:
-        """Returns true if lengths a == b, a != c, alpha and beta == 90 and gamma == 120"""
+        "Returns true if lengths a == b, a != c, "
+        "alpha and beta == 90 and gamma == 120"
         return (
             close(self.a, self.b)
             and (not close(self.a, self.c))
@@ -404,8 +406,10 @@ class UnitCell:
 
         Args:
             lengths (array_like): Lattice side lengths (a, b, c) in Angstroms.
-            angles (array_like): Lattice angles (alpha, beta, gamma) in provided units (default radians)
-            unit (str, optional): Unit for angles i.e. 'radians' or 'degrees' (default radians).
+            angles (array_like): Lattice angles (alpha, beta, gamma)
+                in provided units (default radians)
+            unit (str, optional): Unit for angles i.e. 'radians' or
+                'degrees' (default radians).
 
         Returns:
             UnitCell: A new unit cell object representing the provided lattice.
@@ -453,7 +457,8 @@ class UnitCell:
         Construct a new UnitCell from the provided side lengths and angles.
 
         Args:
-            params (array_like): Lattice side lengths and angles (a, b, c, alpha, beta, gamma)
+            params (array_like): Lattice side lengths and angles
+                (a, b, c, alpha, beta, gamma)
 
         Returns:
             UnitCell: A new unit cell object representing the provided lattice.

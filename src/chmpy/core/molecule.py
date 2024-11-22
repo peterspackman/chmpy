@@ -24,13 +24,15 @@ class Molecule:
 
     Attributes:
         elements: list of element information for each atom in this molecule
-        positions: (N, 3) array of Cartesian coordinates for each atom in this molecule (Angstroms)
+        positions: (N, 3) array of Cartesian coordinates for each atom in this
+            molecule (Angstroms)
         bonds: (N, N) adjacency matrix of bond lengths for connected atoms, 0 otherwise.
             If not provided this will be calculated.
         labels: (N,) vector of string labels for each atom in this molecule
             If not provided this will assigned default labels i.e. numbered in order.
-        proerties: Additional keyword arguments will be stored in the `properties` member, and
-            some may be utilized in methods, raising an exception if they are not set.
+        proerties: Additional keyword arguments will be stored in the `properties`
+            member, and some may be utilized in methods, raising an exception if they
+            are not set.
     """
 
     positions: np.ndarray
@@ -44,11 +46,16 @@ class Molecule:
         Initialize a new molecule.
 
         Arguments:
-            elements (List[Element]): N length list of elements associated with the sites
-            positions (array_like): (N, 3) array of site positions in Cartesian coordinates
-            bonds (dok_matrix, optional): if bonds are already calculated provide them here
-            labels (array_like, optional): labels (array_like): N length array of string labels for each site
-            **kwargs: Additional properties (will populate the properties member) to store in this molecule
+            elements (List[Element]): N length list of elements associated with
+                the sites
+            positions (array_like): (N, 3) array of site positions in Cartesian
+                coordinates
+            bonds (dok_matrix, optional): if bonds are already calculated provide
+                them here
+            labels (array_like, optional): labels (array_like): N length array of
+                string labels for each site
+            **kwargs: Additional properties (will populate the properties member)
+                to store in this molecule
         """
         self.positions = positions
         self.elements = elements
@@ -108,7 +115,8 @@ class Molecule:
 
 
         Args:
-            tolerance (float, optional): Additional tolerance for attributing two sites as 'bonded'.
+            tolerance (float, optional): Additional tolerance for attributing
+                two sites as 'bonded'.
                 The default is 0.4 angstroms, which is recommended by the CCDC
         """
         tree = KDTree(self.positions)
@@ -159,7 +167,8 @@ class Molecule:
         return molecules
 
     def assign_default_labels(self):
-        "Assign the default labels to atom sites in this molecule (number them by element)"
+        "Assign the default labels to atom sites in this molecule"
+        "(number them by element)"
         counts = defaultdict(int)
         labels = []
         for el, _ in self:
@@ -240,12 +249,12 @@ class Molecule:
         in atomic units.
 
         Args:
-            positions (np.ndarray): (N, 3) array of locations where the molecular ESP should
-                be calculated. Assumed to be in Angstroms.
+            positions (np.ndarray): (N, 3) array of locations where the
+                molecular ESP should be calculated. Assumed to be in Angstroms.
 
         Returns:
-            np.ndarray: (N,) array of electrostatic potential values (atomic units) at the given
-            positions.
+            np.ndarray: (N,) array of electrostatic potential values (atomic units)
+            at the given positions.
         """
         if "esp_cube" in self.properties:
             return self.electrostatic_potential_from_cube(
@@ -696,12 +705,13 @@ class Molecule:
         in :obj:`chmpy.crystal.Crystal`.
 
         Args:
-            l_max (int, optional): maximum level of angular momenta to include in the spherical harmonic
-                transform of the shape function. (default=5)
-            radius (float, optional): Maximum distance in Angstroms between any atom in the molecule
-                and the resulting neighbouring atoms (default=6.0)
-            background (float, optional): 'background' density to ensure closed surfaces for isolated atoms
-                (default=1e-5)
+            l_max (int, optional): maximum level of angular momenta to include
+                in the spherical harmonic transform of the shape function. (default=5)
+            radius (float, optional): Maximum distance in Angstroms between
+                any atom in the molecule and the resulting neighbouring
+                atoms (default=6.0)
+            background (float, optional): 'background' density to ensure closed
+                surfaces for isolated atoms (default=1e-5)
 
         Returns:
             shape description vector
@@ -767,7 +777,8 @@ class Molecule:
                 use the midpoint norm (as is used in CrystalExplorer)
 
         Returns:
-            List[trimesh.Trimesh]: A list of meshes representing the stockholder weight isosurfaces
+            List[trimesh.Trimesh]: A list of meshes representing the stockholder
+                weight isosurfaces
         """
 
         from chmpy import StockholderWeight
@@ -827,13 +838,15 @@ class Molecule:
         this molecule using the promolecule density.
 
         Args:
-            l_max (int, optional): maximum level of angular momenta to include in the spherical harmonic
-                transform of the molecular shape function.
+            l_max (int, optional): maximum level of angular momenta to include in
+                the spherical harmonic transform of the molecular shape function.
 
         Keyword Args:
-            with_property (str, optional): describe the combination of the radial shape function and a surface
-                property in the real, imaginary channels of a complex function
-            isovalue (float, optional): the isovalue for the promolecule density surface (default 0.0002 au)
+            with_property (str, optional): describe the combination of the radial
+                shape function and a surface property in the real, imaginary channels
+                of a complex function
+            isovalue (float, optional): the isovalue for the promolecule density
+                surface (default 0.0002 au)
 
         Returns:
             shape description vector
@@ -914,7 +927,8 @@ class Molecule:
 
     @property
     def name(self):
-        "The name of this molecule, checks 'GENERIC_NAME' and 'name' keys in `self.properties`"
+        "The name of this molecule, checks 'GENERIC_NAME' and 'name'"
+        "keys in `self.properties`"
         return self.properties.get(
             "GENERIC_NAME", self.properties.get("name", self.__class__.__name__)
         )
@@ -930,7 +944,8 @@ class Molecule:
             net_charge = np.sum(self.partial_charges)
             if np.abs(net_charge) > 1e-3:
                 LOG.warn(
-                    "Molecular dipole will be origin dependent: molecule has a net charge (%f)",
+                    "Molecular dipole will be origin dependent: molecule "
+                    "has a net charge (%f)",
                     net_charge,
                 )
             r = ANGSTROM_TO_BOHR * (self.positions - self.center_of_mass)
@@ -939,7 +954,8 @@ class Molecule:
 
     @property
     def asym_symops(self):
-        "the symmetry operations which generate this molecule (default x,y,z if not set)"
+        "the symmetry operations which generate this molecule"
+        "(default x,y,z if not set)"
         return self.properties.get("generator_symop", [16484] * len(self))
 
     @classmethod
@@ -949,8 +965,10 @@ class Molecule:
         will be passed through to the Molecule constructor.
 
         Args:
-            elements (np.ndarray): (N,) array of atomic numbers for each atom in this molecule
-            positions (np.ndarray): (N, 3) array of Cartesian coordinates for each atom in this molecule (Angstroms)
+            elements (np.ndarray): (N,) array of atomic numbers for each
+                atom in this molecule
+            positions (np.ndarray): (N, 3) array of Cartesian coordinates
+                for each atom in this molecule (Angstroms)
 
         Returns:
             Molecule: a new molecule object
@@ -959,11 +977,12 @@ class Molecule:
 
     def mask(self, mask, **kwargs):
         """
-        Convenience method to construct a new molecule from this molecule with the given mask
-        array.
+        Convenience method to construct a new molecule from this molecule
+        with the given mask array.
 
         Args:
-            mask (np.ndarray): a numpy mask array used to filter which atoms to keep in the new molecule.
+            mask (np.ndarray): a numpy mask array used to filter which
+                atoms to keep in the new molecule.
 
         Returns:
             Molecule: a new `Molecule`, with atoms filtered by the mask.
@@ -1006,7 +1025,7 @@ class Molecule:
         masses = np.asarray([x.mass for x in self.elements])
         d = self.positions - self.center_of_mass
         d2 = d**2
-        r2 = (d2).sum(axis=1)
+        (d2).sum(axis=1)
         tensor = np.empty((3, 3))
         tensor[0, 0] = np.sum(masses * (d2[:, 1] + d2[:, 2]))
         tensor[1, 1] = np.sum(masses * (d2[:, 0] + d2[:, 2]))
@@ -1025,7 +1044,6 @@ class Molecule:
 
     def rotational_constants(self, unit="MHz"):
         from scipy.constants import Planck, speed_of_light, Avogadro
-        from chmpy.util.unit import BOHR_TO_ANGSTROM
 
         # convert amu angstrom^2 to g cm^2
         moments = self.principle_moments_of_inertia() / Avogadro / 1e16
@@ -1057,7 +1075,8 @@ class Molecule:
             rotation (np.ndarray): A (3, 3) rotation matrix
 
         Returns:
-            Molecule: a new copy of this `Molecule` rotated by the given rotation matrix.
+            Molecule: a new copy of this `Molecule` rotated by the
+                given rotation matrix.
         """
         from copy import deepcopy
 
@@ -1071,7 +1090,8 @@ class Molecule:
         translation vector
 
         Args:
-            translation (np.ndarray): A (3,) vector of x, y, z coordinates of the translation
+            translation (np.ndarray): A (3,) vector of x, y, z coordinates
+            of the translation
         """
         self.positions += translation
 
@@ -1081,10 +1101,12 @@ class Molecule:
         translated by a given translation vector
 
         Args:
-            translation (np.ndarray): A (3,) vector of x, y, z coordinates of the translation
+            translation (np.ndarray): A (3,) vector of x, y, z coordinates
+                of the translation
 
         Returns:
-            Molecule: a new copy of this `Molecule` translated by the given vector.
+            Molecule: a new copy of this `Molecule` translated by the
+                given vector.
         """
         import copy
 
@@ -1099,7 +1121,8 @@ class Molecule:
 
         Args:
             rotation (np.ndarray): A (3,3) rotation matrix
-            translation (np.ndarray): A (3,) vector of x, y, z coordinates of the translation
+            translation (np.ndarray): A (3,) vector of x, y, z
+                coordinates of the translation
         """
 
         if rotation is not None:
@@ -1114,10 +1137,12 @@ class Molecule:
 
         Args:
             rotation (np.ndarray): A (3,3) rotation matrix
-            translation (np.ndarray): A (3,) vector of x, y, z coordinates of the translation
+            translation (np.ndarray): A (3,) vector of x, y, z
+                coordinates of the translation
 
         Returns:
-            Molecule: a new copy of this `Molecule` transformed by the provided matrix and vector.
+            Molecule: a new copy of this `Molecule` transformed by the
+                provided matrix and vector.
         """
 
         from copy import deepcopy
@@ -1170,7 +1195,9 @@ class Molecule:
 
         sdf_data = parse_sdf_file(filename, **kwargs)
         progress = kwargs.get("progress", False)
-        update = lambda x: None
+
+        def update(x):
+            return None
 
         if progress:
             from tqdm import tqdm

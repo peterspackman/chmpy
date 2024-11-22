@@ -2,10 +2,9 @@ import logging
 import unittest
 import numpy as np
 from copy import deepcopy
-from chmpy.crystal import Crystal, AsymmetricUnit, UnitCell, SpaceGroup
+from chmpy.crystal import Crystal, UnitCell, SpaceGroup
 from chmpy.fmt.cif import Cif
 from tempfile import TemporaryDirectory
-from chmpy import Element
 from .test_asymmetric_unit import ice_ii_asym
 from .. import TEST_FILES
 from pathlib import Path
@@ -81,7 +80,7 @@ class CrystalTestCase(unittest.TestCase):
 
         from chmpy.fmt.shelx import parse_shelx_file
 
-        shelx_data = parse_shelx_file(TEST_FILES["acetic_acid.res"])
+        parse_shelx_file(TEST_FILES["acetic_acid.res"])
 
         c = Crystal.from_cif_file(
             TEST_FILES["acetic_acid.cif"], data_block_name="acetic_acid"
@@ -130,8 +129,8 @@ class CrystalTestCase(unittest.TestCase):
         c = Crystal(_ICE_II_CELL, _ICE_II_SG, ice_ii_asym())
         c.properties["titl"] = "iceII"
         s = c.to_cif_string()
-        c2 = Crystal.from_cif_string(s)
-        c2 = Crystal.from_cif_string(s, data_block_name="iceII")
+        Crystal.from_cif_string(s)
+        Crystal.from_cif_string(s, data_block_name="iceII")
 
     def test_crystal_molecules(self):
         c = Crystal.load(TEST_FILES["iceII.cif"])
@@ -190,10 +189,10 @@ class CrystalTestCase(unittest.TestCase):
     def test_environments_functions(self):
         for c in ("ice_ii", "acetic", "r3c_example"):
             x = getattr(self, c)
-            atoms = x.atoms_in_radius(5.0)
-            atoms = x.atomic_surroundings()
-            atoms = x.atom_group_surroundings([0, 1, 2])
-            environments = x.molecule_environments()
+            x.atoms_in_radius(5.0)
+            x.atomic_surroundings()
+            x.atom_group_surroundings([0, 1, 2])
+            x.molecule_environments()
 
     def test_cartesian_symmetry_operations(self):
         for c in ("ice_ii", "acetic", "r3c_example"):

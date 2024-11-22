@@ -1,7 +1,5 @@
-import logging
 import unittest
 import numpy as np
-from os.path import join, dirname
 from chmpy.crystal import Crystal
 from .. import TEST_FILES
 

@@ -4,7 +4,7 @@ from chmpy.interpolate._density import (
     sphere_stockholder_radii,
     sphere_promolecule_radii,
 )
-from ._invariants import p_invariants_c, p_invariants_r
+from ._invariants import p_invariants_c
 import logging
 import numpy as np
 
@@ -43,7 +43,8 @@ def make_invariants(l_max, coefficients, kinds="NP") -> np.ndarray:
         kinds (str, optional): which kinds of invariants to include
 
     Returns:
-        np.ndarray the `N` and/or `P` type rotational invariants based on these coefficients
+        np.ndarray the `N` and/or `P` type rotational invariants based on these
+            coefficients
     """
 
     global _HAVE_WARNED_ABOUT_LMAX_P
@@ -130,17 +131,17 @@ def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
     )
     if np.any(r < 0):
         raise ValueError(
-            f"Unable to find isovalue {isovalue:.2f} in all directions for bounds ({r_min:.2f}, {r_max:.2f})"
+            f"Unable to find isovalue {isovalue:.2f} in all directions"
+            f"for bounds ({r_min:.2f}, {r_max:.2f})"
         )
     real = True
     if property_function is not None:
         if property_function == "d_norm":
-            property_function = lambda x: s.d_norm(x)[3]
+            def property_function(x):
+                return s.d_norm(x)[3]
         elif property_function == "esp":
             from chmpy import Molecule
 
-            els = s.dens_a.elements
-            pos = s.dens_a.positions
             property_function = Molecule.from_arrays(
                 s.dens_a.elements, s.dens_a.positions
             ).electrostatic_potential
@@ -196,12 +197,14 @@ def promolecule_density_descriptor(sht, n_i, p_i, **kwargs):
     ).reshape(sht.grid[0].shape)
     if np.any(r < 0):
         raise ValueError(
-            f"Unable to find isovalue {isovalue:.2f} in all directions for bounds ({r_min:.2f}, {r_max:.2f})"
+            f"Unable to find isovalue {isovalue:.2f} in all "
+            f"directions for bounds ({r_min:.2f}, {r_max:.2f})"
         )
     real = True
     if property_function is not None:
         if property_function == "d_norm":
-            property_function = lambda x: pro.d_norm(x)[1]
+            def property_function(x):
+                return pro.d_norm(x)[1]
         elif property_function == "esp":
             from chmpy import Molecule
 

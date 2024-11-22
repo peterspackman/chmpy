@@ -1,4 +1,3 @@
-import numpy as np
 import logging
 from chmpy.exe import Gaussian, Tonto
 from chmpy.templates import load_template
@@ -68,7 +67,6 @@ def interaction_energies(c, model="CE-B3LYP", radius=3.8, nthreads=1):
     from concurrent.futures import ThreadPoolExecutor
     from chmpy import Molecule
     from chmpy.crystal.symmetry_operation import SymmetryOperation
-    from chmpy.util.num import kabsch_rotation_matrix
 
     LOG.debug("Calculating %s model interaction_energies for %s", model, c)
     mols = c.symmetry_unique_molecules()
@@ -108,7 +106,7 @@ def interaction_energies(c, model="CE-B3LYP", radius=3.8, nthreads=1):
         wavefunctions = (wfn_a, wfn_b)
         mol_fchk_a = Molecule.from_fchk_string(wfn_a)
         mol_fchk_b = Molecule.from_fchk_string(wfn_b)
-        symop = SymmetryOperation.from_integer_code(
+        SymmetryOperation.from_integer_code(
             d.b.properties["generator_symop"][0]
         )
         shift_a = d.a.centroid

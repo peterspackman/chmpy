@@ -1,12 +1,11 @@
 from scipy.spatial import ConvexHull
 import numpy as np
-from chmpy.crystal import Crystal
 
 
 def expand_symmetry_related_planes(hkl, energies, crystal):
-    nfacets = hkl.shape[0]
+    hkl.shape[0]
     sg = crystal.sg
-    nsymop = len(sg)
+    len(sg)
     expanded_facets = []
 
     R = crystal.uc.reciprocal_lattice
@@ -219,7 +218,7 @@ class WulffConstruction:
     def _extract_wulff_from_dual_mesh(self):
         # Get the simplices and reshape them for indexing
         simplices = self.dual_hull.simplices
-        tmp = self.facet_dual_vectors[simplices]
+        self.facet_dual_vectors[simplices]
         a, b, c = np.rollaxis(self.facet_dual_vectors[simplices], 1)
 
         normals = np.cross(b - a, c - a)
@@ -280,4 +279,7 @@ class WulffConstruction:
         return cls(facet_normals, energies, labels=energies)
 
     def __repr__(self):
-        return f"WulffConstruction<verts={len(self.wulff_vertices)}, facets={len(self.wulff_facets)}>"
+        return (
+            f"WulffConstruction<verts={len(self.wulff_vertices)},"
+            f"facets={len(self.wulff_facets)}>"
+        )

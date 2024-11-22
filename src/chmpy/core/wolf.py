@@ -5,16 +5,17 @@ def wolf_sum(crystal, cutoff=16.0, eta=0.2, charges=None):
 
     Arguments:
         crystal (Crystal): the crystal for which to compute the Wolf sum.
-        cutoff (float, optional): the cutoff radius (in Angstroms) for which to compute the
-            neighbouring charges (default=16)
-        eta (float, optional): the eta parameter (1/Angstroms), if unsure just leave this at
-            its default (default=0.2)
-        charges (array_like, optional): charges of the atoms in the asymmetric unit, if not
-            provided then they will be 'guessed' using the EEM method on the isolated molecules
+        cutoff (float, optional): the cutoff radius (in Angstroms) for
+            which to compute the neighbouring charges (default=16)
+        eta (float, optional): the eta parameter (1/Angstroms), if unsure
+            just leave this at its default (default=0.2)
+        charges (array_like, optional): charges of the atoms in the asymmetric
+            unit, if not provided then they will be 'guessed' using the EEM
+            method on the isolated molecules
 
         Returns:
-            the total electrostatic energy of the asymmetric unit in the provided crystal
-            (Hartrees)
+            the total electrostatic energy of the asymmetric unit in the
+            provided crystal (Hartrees)
     """
     import numpy as np
     from chmpy.util.unit import ANGSTROM_TO_BOHR

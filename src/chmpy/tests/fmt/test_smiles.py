@@ -1,9 +1,5 @@
 import unittest
-import numpy as np
-from tempfile import TemporaryDirectory
-from pathlib import Path
 import logging
-from .. import TEST_FILES
 from chmpy.fmt.smiles import parse
 
 LOG = logging.getLogger(__name__)

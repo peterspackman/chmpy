@@ -1,7 +1,6 @@
 import logging
 import unittest
 import numpy as np
-from os.path import join, dirname
 from chmpy.crystal import SymmetryOperation, SpaceGroup
 from chmpy.crystal.space_group import expanded_symmetry_list, reduced_symmetry_list
 
@@ -88,17 +87,17 @@ class SpaceGroupTestCase(unittest.TestCase):
     def test_construction(self):
         for invalid_num in (-1, 0, 231, 1000):
             with self.assertRaises(ValueError):
-                sg = SpaceGroup(invalid_num)
+                SpaceGroup(invalid_num)
 
         for invalid_choice in ("a", 1, "b"):
             with self.assertRaises(ValueError):
-                sg = SpaceGroup(148, choice=invalid_choice)
+                SpaceGroup(148, choice=invalid_choice)
 
-        sg_148_h = SpaceGroup(148, choice="H")
-        sg_148_r = SpaceGroup(148, choice="R")
+        SpaceGroup(148, choice="H")
+        SpaceGroup(148, choice="R")
         for invalid_latt in (-8, 10, -4):
             with self.assertRaises(ValueError):
-                sg = SpaceGroup.from_symmetry_operations(
+                SpaceGroup.from_symmetry_operations(
                     [SymmetryOperation.identity()], invalid_latt
                 )
 

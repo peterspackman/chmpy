@@ -1,4 +1,3 @@
-import numpy as np
 from pathlib import Path
 
 
@@ -88,7 +87,7 @@ class Pdb:
         self.parse_header()
 
         while self.line_index < line_count:
-            line = self.content_lines[self.line_index].strip()
+            self.content_lines[self.line_index].strip()
             self.line_index += 1
         return self.data
 

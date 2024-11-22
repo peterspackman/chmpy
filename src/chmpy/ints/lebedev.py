@@ -1,6 +1,5 @@
 import numpy as np
 from pathlib import Path
-from chmpy.util.num import spherical_to_cartesian
 
 _GRIDS = {k: v for k, v in np.load(Path(__file__).parent / "lebedev_grids.npz").items()}
 _GRID_LMAX_LIST = tuple(sorted(int(k.split("_")[-1]) for k in _GRIDS.keys()))
@@ -10,7 +9,6 @@ _GRIDS_NUM_POINTS = {k: v.shape[0] for k, v in _GRIDS.items()}
 def load_grid(l_max):
     for g in _GRID_LMAX_LIST:
         if g > l_max:
-            lowest_grid = g
             break
     else:
         raise ValueError(f"No available Lebedev grid for l_max = {l_max}")

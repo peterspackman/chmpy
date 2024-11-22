@@ -7,13 +7,10 @@ from chmpy.fmt.gulp import (
     molecule_to_gulp_input,
     parse_gulp_output,
 )
-from pathlib import Path
-import os
 import logging
 import time
 from tempfile import TemporaryDirectory
 import re
-import numpy as np
 
 LOG = logging.getLogger(__name__)
 NUMERIC_CONST_PATTERN = r"[-+]?(?:(?:\d*\.\d+)|(?:\d+\.?))(?:[Ee][+-]?\d+)?"
@@ -53,13 +50,13 @@ class GulpOptimizer:
                 **self.kwargs,
             )
             self.last_input_contents = input_contents
-            t1 = time.time()
+            time.time()
             try:
                 exe.run()
             except (ReturnCodeError, TimeoutExpired) as exc:
                 LOG.exception("Error in Gulp minimization: %s", exc)
                 return None
-            t2 = time.time()
+            time.time()
             success = exe.output_contents is not None
             self.last_output_contents = exe.output_contents
             self.last_drv_contents = exe.drv_contents
@@ -112,7 +109,8 @@ class GulpOptimizer:
             return [self.minimize(x, **kwargs) for x in obj]
         else:
             raise NotImplementedError(
-                f"GulpOptimizer only implemented for Crystal, Molecule types not {obj.__class__.__name__}"
+                "GulpOptimizer only implemented for Crystal, Molecule "
+                f"types not {obj.__class__.__name__}"
             )
 
     def single_point(self, obj, **kwargs):
@@ -124,7 +122,8 @@ class GulpOptimizer:
             return [self.single_point(x, **kwargs) for x in obj]
         else:
             raise NotImplementedError(
-                f"GulpOptimizer only implemented for Crystal, Molecule types not {obj.__class__.__name__}"
+                "GulpOptimizer only implemented for Crystal, Molecule "
+                f"types not {obj.__class__.__name__}"
             )
 
     def __call__(self, obj, **kwargs):

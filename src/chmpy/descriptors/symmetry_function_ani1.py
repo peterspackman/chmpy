@@ -1,5 +1,3 @@
-from chmpy import Crystal, Molecule
-from scipy.spatial.distance import cdist
 from scipy.spatial import cKDTree as KDTree
 from itertools import combinations_with_replacement
 import numpy as np
@@ -99,7 +97,6 @@ class SymmetryFunctionsANI1:
         # Get xyz data
         mol = crys.asym_mols()[0]
         cm_xyz = mol.positions.copy()
-        numbers = mol.atomic_numbers
         labels = [e.symbol for e in mol.elements]
 
         if not args["separate_radial"]:
@@ -173,7 +170,8 @@ def calc_radial_function(
     Radial function (eq (3) of Smith et al. (2017))
     For a given atom returns a list of radial functions of length r_s
 
-    mol_xyz : list of xyz of all atoms in a finite cluster larger than cutoff not in the central molecule
+    mol_xyz : list of xyz of all atoms in a finite cluster larger than cutoff
+        not in the central molecule
     cm_atom_xyz : xyz of a given atom in the central molecule
     cutoff : float, max L1 distance where atom contributions are included
     r_s : list of hyperparameters controlling position of each gaussian
@@ -200,7 +198,6 @@ def calc_radial_function(
         for atom in unique_atoms:
             fc_temp = np.copy(fc)
             fc_temp[els != atom] = 0
-            #        G1_list.append(np.sum(np.exp(g * -eta) * fc_temp[:, np.newaxis], axis=0))
             G1_list.append(fc_temp.dot(np.exp(g * -eta)))
         G1_list = np.array(G1_list)
         return np.ravel(G1_list)
@@ -224,9 +221,11 @@ def calc_angular_function(
 ):
     """
     Angular function (eq (4) of Smith et al. (2017))
-    For a given atom returns a list of angular functions of length r_s (and theta - they must be the same length)
+    For a given atom returns a list of angular functions of length r_s
+    (and theta - they must be the same length)
 
-    mol_xyz : list of xyz of all atoms in a finite cluster larger than cutoff not in the central molecule
+    mol_xyz : list of xyz of all atoms in a finite cluster larger than cutoff
+        not in the central molecule
     cm_atom_xyz : xyz of a given atom in the central molecule
     cutoff : float, max L1 distance where atom contributions are included
     r_s : list of hyperparameters controlling position of each gaussian
@@ -252,7 +251,7 @@ def calc_angular_function(
 
     center_atom = distances < 1e-3
 
-    dims = distances.shape[0]
+    distances.shape[0]
 
     fc = 0.5 * np.cos(distances * np.pi / cutoff) + 0.5
     fc[center_atom] = 0
@@ -279,7 +278,7 @@ def calc_angular_function(
     unique_atoms = np.unique(els)
     atoms_pairs = np.triu(np.outer(unique_atoms, unique_atoms))
 
-    if separate_angular == True:
+    if separate_angular is True:
         G2_list = []
         for pair in atoms_pairs[atoms_pairs != 0]:
             fjfk_temp = np.copy(fjfk)

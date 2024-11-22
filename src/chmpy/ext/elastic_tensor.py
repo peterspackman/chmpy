@@ -12,7 +12,6 @@ See the page, and the source here:
 
 import numpy as np
 from scipy import optimize
-import random
 
 
 def angles_to_cartesian(theta, phi):
@@ -87,8 +86,8 @@ class ElasticTensor:
         # Put it in a more useful representation
         try:
             self.s_voigt = np.linalg.inv(self.c_voigt)
-        except:
-            raise ValueError("matrix is singular")
+        except np.linalg.LinalgError as e:
+            raise ValueError(f"Error inverting s_voigt: {e}")
 
         vm = np.array(((0, 5, 4), (5, 1, 3), (4, 3, 2)))
 
@@ -128,8 +127,8 @@ class ElasticTensor:
             # Convert to float
             try:
                 mat = [[float(x) for x in line.split()] for line in lines]
-            except:
-                raise ValueError("not all entries are numbers")
+            except ValueError as e:
+                raise ValueError(f"not all entries are numbers: {e}")
         return cls(mat)
 
     def youngs_modulus_angular(self, theta, phi):

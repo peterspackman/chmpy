@@ -1,7 +1,4 @@
 from chmpy.templates import load_template
-from chmpy.core import Element, Molecule
-from chmpy.crystal import AsymmetricUnit, UnitCell, SpaceGroup
-import numpy as np
 import logging
 import re
 from collections import namedtuple

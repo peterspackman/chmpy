@@ -1,7 +1,4 @@
 from chmpy.templates import load_template
-from chmpy import Element
-from pathlib import Path
-import numpy as np
 import logging
 
 LOG = logging.getLogger(__name__)

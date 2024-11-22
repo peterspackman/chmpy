@@ -1,7 +1,5 @@
-from chmpy import Molecule
 from chmpy.ext.elastic_tensor import ElasticTensor
 import unittest
-import numpy as np
 
 TENSOR = """
     48.137	11.411	12.783	0.000	-3.654	0.000

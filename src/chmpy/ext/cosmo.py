@@ -2,7 +2,6 @@ import logging
 import numpy as np
 from collections import namedtuple
 from scipy.spatial.distance import pdist
-from chmpy.util.unit import units
 from chmpy.ext.solvation_parameters import DIELECTRIC_CONSTANTS
 
 LOG = logging.getLogger(__name__)
@@ -36,7 +35,6 @@ def minimize_cosmo_energy(points, areas, charges, **kwargs):
 
     diis_tolerance = kwargs.get("diis_tolerance", 1e-6)
     diis_start = 1
-    surface_area_minimum = 1.0e-6
     convergence = kwargs.get("convergence", 1.0e-6)
     initial_charge_scale_factor = 0.0694
 

@@ -1,8 +1,6 @@
-from chmpy import Crystal
 from chmpy import Element
 from collections import Counter
 import numpy as np
-from scipy.spatial.distance import cdist
 
 
 def kpoints_string():
@@ -42,7 +40,6 @@ def generate_vasp_inputs(crystal, dest="."):
 
 
 def load_vasprun(filename):
-    from pathlib import Path
     import xml.etree.ElementTree as ET
     from chmpy.crystal import UnitCell, Crystal, AsymmetricUnit, SpaceGroup
 

@@ -3,7 +3,6 @@ from scipy.spatial import cKDTree as KDTree
 from os.path import join, dirname
 from chmpy.core.element import vdw_radii
 from ._density import PromoleculeDensity as cPromol, StockholderWeight as cStock
-import numpy as np
 
 _DATA_DIR = dirname(__file__)
 _INTERPOLATOR_DATA = np.load(join(_DATA_DIR, "thakkar_interp.npz"))
@@ -97,8 +96,7 @@ class StockholderWeight:
         return np.r_[self.dens_a.vdw_radii, self.dens_b.vdw_radii]
 
     def weights(self, positions):
-        pos = positions.astype(np.float32)
-        results = []
+        positions.astype(np.float32)
         return self.s.weights(positions.astype(np.float32))
 
     def d_norm(self, positions):

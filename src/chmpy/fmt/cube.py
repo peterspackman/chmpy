@@ -30,13 +30,11 @@ class CubeData:
         self.positions = units.angstrom(self._positions_bohr)
 
     def _parse_cube_buf(self, buf):
-        n_atom = -1
         self._parse_title_lines(buf.readline(), buf.readline())
         tokens = buf.readline().split()
-        self.natom = natom = int(tokens[0])
+        self.natom = int(tokens[0])
         self._volume_origin_bohr = np.fromstring(" ".join(tokens[1:]), sep=" ")
         self.volume_origin = units.angstrom(self._volume_origin_bohr)
-        atoms = []
         for ax in ("x", "y", "z"):
             tokens = buf.readline().split()
             setattr(self, f"n{ax}", int(tokens[0]))

@@ -2,8 +2,6 @@ from fractions import Fraction
 import logging
 import numpy as np
 import re
-from collections import namedtuple
-from copy import deepcopy
 
 LOG = logging.getLogger(__name__)
 
@@ -33,10 +31,10 @@ def encode_symm_str(rotation, translation):
     '+x+y+z,1/2+x+z,1/3+y'
 
     Args:
-        rotation (array_like): (3,3) matrix of -1, 0, or 1s encoding the rotation component
-            of the symmetry operation
-        translation (array_like): (3) vector of rational numbers encoding the translation component
-            of the symmetry operation
+        rotation (array_like): (3,3) matrix of -1, 0, or 1s encoding
+            the rotation component of the symmetry operation
+        translation (array_like): (3) vector of rational numbers encoding
+            the translation component of the symmetry operation
 
     Returns:
         str: the encoded symmetry operation
@@ -73,7 +71,8 @@ def decode_symm_str(s):
         s (str): the encoded symmetry operation string
 
     Returns:
-        Tuple[np.ndarray, np.ndarray]: a (3,3) rotation matrix and a (3) translation vector
+        Tuple[np.ndarray, np.ndarray]: a (3,3) rotation matrix and a (3)
+            translation vector
     """
     rotation = np.zeros((3, 3), dtype=np.float64)
     translation = np.zeros((3,), dtype=np.float64)
@@ -166,10 +165,10 @@ def encode_symm_int(rotation, translation):
     1433663
 
      Args:
-        rotation (array_like): (3,3) matrix of -1, 0, or 1s encoding the rotation component
-            of the symmetry operation
-        translation (array_like): (3) vector of rational numbers encoding the translation component
-            of the symmetry operation
+        rotation (array_like): (3,3) matrix of -1, 0, or 1s encoding
+            the rotation component of the symmetry operation
+        translation (array_like): (3) vector of rational numbers encoding
+            the translation component of the symmetry operation
 
     Returns:
         int: the encoded symmetry operation
@@ -256,7 +255,8 @@ class SymmetryOperation:
         Add a vector to this symmetry operation's translation vector.
 
         Returns:
-            SymmetryOperation: a copy of this symmetry operation under additional translation"
+            SymmetryOperation: a copy of this symmetry operation under 
+                additional translation"
         """
         return SymmetryOperation(self.rotation, self.translation + value)
 
@@ -265,7 +265,8 @@ class SymmetryOperation:
         Subtract a vector from this symmetry operation's translation.
 
         Returns:
-            SymmetryOperation: a copy of this symmetry operation under additional translation"
+            SymmetryOperation: a copy of this symmetry operation under
+                additional translation"
         """
         return SymmetryOperation(self.rotation, self.translation - value)
 
@@ -274,8 +275,8 @@ class SymmetryOperation:
         Apply this symmetry operation to a set of fractional coordinates.
 
         Args:
-            coordinates (np.ndarray): (N,3) or (N,4) array of fractional coordinates or homogeneous
-                fractional coordinates.
+            coordinates (np.ndarray): (N,3) or (N,4) array of fractional
+                coordinates or homogeneous fractional coordinates.
 
         Returns:
             np.ndarray: (N, 3) array of transformed coordinates
@@ -374,7 +375,8 @@ def expanded_symmetry_list(reduced_symops, lattice_type):
             7: C
             ```
     Returns:
-        List[SymmetryOperation]: an expanded list of symmetry operations given lattice type
+        List[SymmetryOperation]: an expanded list of symmetry operations
+            given lattice type
     """
     lattice_type_value = abs(lattice_type)
     translations = LATTICE_TYPE_TRANSLATIONS[lattice_type_value]

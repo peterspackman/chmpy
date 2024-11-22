@@ -38,7 +38,7 @@ class PhonopyAscii:
         for mode in metadata.split("#metaData: qpt=[")[1:]:
             arr = np.fromstring(mode.rstrip("]"), sep=",")
             qpoint = arr[:3]
-            eigenvalue = arr[3] ** 2
+            arr[3] ** 2
             arr = arr[4:].reshape((-1, 6))
         self.displacements = arr
         self.elements = elements

@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from chmpy.crystal import SymmetryOperation, SpaceGroup
+from chmpy.crystal import SymmetryOperation
 
 LOG = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ def _parse_symm(line):
 
 def _parse_atom_line(sfac, line):
     tokens = line.split()
-    ntokens = len(tokens)
+    len(tokens)
     label = tokens[0]
     LOG.debug("Parsing atom line: %s", line)
     sfac_idx = int(tokens[1])

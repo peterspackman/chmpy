@@ -1,4 +1,4 @@
-from chmpy.fmt.gen import parse_gen_string, parse_gen_file
+from chmpy.fmt.gen import parse_gen_file
 import unittest
 import numpy as np
 from .. import TEST_FILES

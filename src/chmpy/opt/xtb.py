@@ -68,14 +68,14 @@ class XtbOptimizer:
             )
             self.last_input_contents = input_contents
             Path(exe.input_file).write_text(input_contents)
-            t1 = time.time()
+            time.time()
             try:
                 exe.run()
             except (ReturnCodeError, TimeoutExpired) as exc:
                 LOG.exception("Error in XTB minimization: %s", exc)
                 Path("xtb.coord").write_text(input_contents)
                 return None
-            t2 = time.time()
+            time.time()
             success = exe.output_contents is not None
             self.last_output_contents = exe.output_contents
             self.last_log_contents = exe.opt_log_contents
@@ -113,13 +113,13 @@ class XtbOptimizer:
             )
             self.last_input_contents = input_contents
             Path(exe.input_file).write_text(input_contents)
-            t1 = time.time()
+            time.time()
             try:
                 exe.run()
             except (ReturnCodeError, TimeoutExpired) as exc:
                 LOG.exception("Error in XTB minimization: %s", exc)
                 return None
-            t2 = time.time()
+            time.time()
             success = exe.output_contents is not None
             self.last_output_contents = exe.output_contents
             self.last_log_contents = exe.opt_log_contents
@@ -160,13 +160,13 @@ class XtbOptimizer:
             if molecule.multiplicity != 1:
                 Path(exe.uhf_file).write_text(str(molecule.multiplicity))
 
-            t1 = time.time()
+            time.time()
             try:
                 exe.run()
             except (ReturnCodeError, TimeoutExpired) as exc:
                 LOG.exception("Error in XTB minimization: %s", exc)
                 return None
-            t2 = time.time()
+            time.time()
             success = exe.output_contents is not None
             self.last_output_contents = exe.output_contents
             self.last_log_contents = exe.opt_log_contents
@@ -199,13 +199,13 @@ class XtbOptimizer:
                 **self.kwargs,
             )
             Path(exe.input_file).write_text(input_contents)
-            t1 = time.time()
+            time.time()
             try:
                 exe.run()
             except (ReturnCodeError, TimeoutExpired) as exc:
                 LOG.exception("Error in XTB minimization: %s", exc)
                 return None
-            t2 = time.time()
+            time.time()
             success = exe.output_contents is not None
             self.last_output_contents = exe.output_contents
             self.last_log_contents = exe.opt_log_contents
@@ -229,7 +229,8 @@ class XtbOptimizer:
             return [self.minimize(x, **kwargs) for x in obj]
         else:
             raise NotImplementedError(
-                f"XtbOptimizer only implemented for Crystal, Molecule types not {obj.__class__.__name__}"
+                "XtbOptimizer only implemented for Crystal, Molecule "
+                f"types not {obj.__class__.__name__}"
             )
 
     def single_point(self, obj, **kwargs):
@@ -241,7 +242,8 @@ class XtbOptimizer:
             return [self.single_point(x, **kwargs) for x in obj]
         else:
             raise NotImplementedError(
-                f"XtbOptimizer only implemented for Crystal, Molecule types not {obj.__class__.__name__}"
+                "XtbOptimizer only implemented for Crystal, Molecule "
+                f"types not {obj.__class__.__name__}"
             )
 
     def __call__(self, obj, **kwargs):

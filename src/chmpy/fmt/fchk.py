@@ -1,4 +1,3 @@
-import numpy as np
 from io import StringIO
 
 
@@ -14,7 +13,6 @@ class FchkFile:
         self._buf = StringIO(file_content)
 
     def _parse(self):
-        energy = 0.0
         contents = {}
         with StringIO(self.file_content) as f:
             contents["header"] = (f.readline(), f.readline())
@@ -23,9 +21,8 @@ class FchkFile:
             while line:
                 name = line[:43].strip()
                 kind = line[43]
-                num = 1
                 if line[47:49] == "N=":
-                    num = int(line[49:].strip())
+                    int(line[49:].strip())
                     value = []
                     line = f.readline()
                     valid = True

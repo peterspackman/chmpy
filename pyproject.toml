@@ -38,3 +38,7 @@ where = ["src"]
 
 [tool.cibuildwheel]
 skip = "pp*"
+
+[tool.ruff.lint]
+select = ["E", "F"]
+ignore = ["E741"]

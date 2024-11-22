@@ -34,20 +34,11 @@ def molecule_to_meshes(molecule, **kwargs):
     """
 
     from trimesh.creation import icosphere, cylinder
-    from trimesh import Scene
-    from trimesh import Trimesh
     import numpy as np
-    from chmpy import Element
-    from copy import deepcopy
 
     representation = kwargs.get("representation", "ball_stick")
     base_sphere = icosphere(subdivisions=3)
-    mesh_primitives = []
     n_points = len(base_sphere.vertices)
-    vertices = []
-    faces = []
-    colors = []
-    offset = 0
     meshes = {}
     for i, (el, pos) in enumerate(molecule):
         m = base_sphere.copy()

@@ -15,13 +15,14 @@ class Dimer:
     Args:
             mol_a (Molecule):
                 one of the molecules in the pair (symmetry unique)
-            mol_b (Molecule): the neighbouring molecule (may be symmetry related to mol_a)
-            separation (float, optional): set the separation of the molecules (otherwise it
-                will be calculated)
-            transform_ab (np.ndarray, optional): specify the transform from mol_a to mol_b
+            mol_b (Molecule): the neighbouring molecule (may be symmetry 
+                related to mol_a)
+            separation (float, optional): set the separation of the molecules 
                 (otherwise it will be calculated)
-            frac_shift (np.ndarray, optional): specify the offset in fractions of a unit cell,
-                which combined with transform_ab will yield mol_b
+            transform_ab (np.ndarray, optional): specify the transform from mol_a 
+                to mol_b (otherwise it will be calculated)
+            frac_shift (np.ndarray, optional): specify the offset in fractions 
+                of a unit cell, which combined with transform_ab will yield mol_b
     """
 
     seitz_b = None
@@ -110,7 +111,8 @@ class Dimer:
 
     @property
     def separations(self):
-        """The closest atom, centroid-centroid, and center of mass - center of mass separations of mol_a and mol_b."""
+        "The closest atom, centroid-centroid, and center of mass -"
+        "center of mass separations of mol_a and mol_b."
         return np.array(
             (self.closest_separation, self.centroid_separation, self.com_separation)
         )

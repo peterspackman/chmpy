@@ -160,7 +160,7 @@ class Cif:
     def parse_quoted_block(self, delimiter=";"):
         "parse an entire quoted block, delimited by delimiter"
         LOG.debug("Parsing quoted block at line %d", self.line_index)
-        l1 = self.content_lines[self.line_index].strip()
+        self.content_lines[self.line_index].strip()
         i = self.line_index + 1
         j = i
         n = 1

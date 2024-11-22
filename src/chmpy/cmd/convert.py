@@ -18,8 +18,8 @@ def main():
     args = parser.parse_args()
     logging.basicConfig(level=args.log_level)
 
-    inpath = Path(args.input)
-    outpath = Path(args.output)
+    Path(args.input)
+    Path(args.output)
 
     in_kwargs = {}
     if args.input_format != "file_ext":
@@ -33,7 +33,7 @@ def main():
         try:
             x = cls.load(args.input, **in_kwargs)
             break
-        except KeyError as e:
+        except KeyError:
             pass
     else:
         LOG.error("Could not delegate parser for '%s'", args.input)
