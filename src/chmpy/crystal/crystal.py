@@ -1,25 +1,29 @@
 import logging
-from scipy.spatial import cKDTree as KDTree
-import numpy as np
-from scipy.sparse import dok_matrix
-import scipy.sparse.csgraph as csgraph
 from pathlib import Path
-from chmpy.fmt.cif import Cif
-from .unit_cell import UnitCell
-from .space_group import SpaceGroup, SymmetryOperation
-from .asymmetric_unit import AsymmetricUnit
+from typing import Union
+
+import numpy as np
+import scipy.sparse.csgraph as csgraph
+from scipy.sparse import dok_matrix
+from scipy.spatial import cKDTree as KDTree
+from trimesh import Trimesh
+
 from chmpy.core.element import Element
 from chmpy.core.molecule import Molecule
+from chmpy.fmt.cif import Cif
 from chmpy.util.num import cartesian_product
-from typing import List, Tuple, Union, Dict
-from trimesh import Trimesh
+
+from .asymmetric_unit import AsymmetricUnit
+from .space_group import SpaceGroup, SymmetryOperation
+from .unit_cell import UnitCell
 
 LOG = logging.getLogger(__name__)
 
 
 def _nearest_molecule_idx(vertices, el, pos):
-    from scipy.sparse.csgraph import connected_components
     from time import time
+
+    from scipy.sparse.csgraph import connected_components
 
     time()
     m = Molecule.from_arrays(el, pos)
@@ -123,7 +127,7 @@ class Crystal:
         return len(self.site_atoms)
 
     @property
-    def symmetry_operations(self) -> List[SymmetryOperation]:
+    def symmetry_operations(self) -> list[SymmetryOperation]:
         "Symmetry operations belonging to the space group symmetry of this crystal."
         return self.space_group.symmetry_operations
 
@@ -195,7 +199,7 @@ class Crystal:
         """
 
         if hasattr(self, "_unit_cell_atom_dict"):
-            return getattr(self, "_unit_cell_atom_dict")
+            return self._unit_cell_atom_dict
         pos = self.site_positions
         atoms = self.site_atoms
         natom = self.nsites
@@ -222,24 +226,20 @@ class Crystal:
         occupation = occupation[mask]
         if np.any(occupation > 1.0):
             LOG.debug("Some unit cell site occupations are > 1.0")
-        setattr(
-            self,
-            "_unit_cell_atom_dict",
-            {
-                "asym_atom": asym[mask],
-                "frac_pos": translated[mask],
-                "element": uc_nums[mask],
-                "symop": sym[mask],
-                "label": labels[mask],
-                "occupation": occupation,
-                "cart_pos": self.to_cartesian(translated[mask]),
-            },
-        )
-        return getattr(self, "_unit_cell_atom_dict")
+        self._unit_cell_atom_dict = {
+            "asym_atom": asym[mask],
+            "frac_pos": translated[mask],
+            "element": uc_nums[mask],
+            "symop": sym[mask],
+            "label": labels[mask],
+            "occupation": occupation,
+            "cart_pos": self.to_cartesian(translated[mask]),
+        }
+        return self._unit_cell_atom_dict
 
     def unit_cell_connectivity(
         self, tolerance=0.4, neighbouring_cells=1, **kwargs
-    ) -> Tuple:
+    ) -> tuple:
         """
         Periodic connectiviy for the unit cell, populates _uc_graph
         with a networkx.Graph object, where nodes are indices into the
@@ -268,7 +268,7 @@ class Crystal:
         """
 
         if hasattr(self, "_uc_graph"):
-            return getattr(self, "_uc_graph")
+            return self._uc_graph
         slab = self.slab(bounds=((-1, -1, -1), (1, 1, 1)))
         n_uc = slab["n_uc"]
         uc_pos = slab["frac_pos"][:n_uc]
@@ -315,10 +315,10 @@ class Crystal:
             uc_graph[i, j] = d
             properties[(i, j)] = cell
 
-        setattr(self, "_uc_graph", (uc_graph, properties))
-        return getattr(self, "_uc_graph")
+        self._uc_graph = uc_graph, properties
+        return self._uc_graph
 
-    def unit_cell_molecules(self, bond_tolerance=0.4, **kwargs) -> List[Molecule]:
+    def unit_cell_molecules(self, bond_tolerance=0.4, **kwargs) -> list[Molecule]:
         """
         Calculate the molecules for all sites in the unit cell,
         where the number of molecules will be equal to number of
@@ -336,14 +336,14 @@ class Crystal:
         """
 
         if hasattr(self, "_unit_cell_molecules"):
-            return getattr(self, "_unit_cell_molecules")
+            return self._unit_cell_molecules
         uc_graph, edge_cells = self.unit_cell_connectivity(
             tolerance=bond_tolerance, **kwargs
         )
         n_uc_mols, uc_mols = csgraph.connected_components(
             csgraph=uc_graph, directed=False, return_labels=True
         )
-        uc_dict = getattr(self, "_unit_cell_atom_dict")
+        uc_dict = self._unit_cell_atom_dict
         uc_frac = uc_dict["frac_pos"]
         uc_elements = uc_dict["element"]
         uc_asym = uc_dict["asym_atom"]
@@ -386,12 +386,12 @@ class Crystal:
             translation = self.to_cartesian(new_centroid - frac_centroid)
             mol.translate(translation)
             molecules.append(mol)
-        setattr(self, "_unit_cell_molecules", molecules)
+        self._unit_cell_molecules = molecules
         return molecules
 
     def molecular_shell(
         self, mol_idx=0, radius=3.8, method="nearest_atom"
-    ) -> List[Molecule]:
+    ) -> list[Molecule]:
         """
         Calculate the neighbouring molecules around the molecule with index
         `mol_idx`, within the given `radius` using the specified `method`.
@@ -445,7 +445,7 @@ class Crystal:
             result[f].append(m)
         return result
 
-    def symmetry_unique_molecules(self, bond_tolerance=0.4, **kwargs) -> List[Molecule]:
+    def symmetry_unique_molecules(self, bond_tolerance=0.4, **kwargs) -> list[Molecule]:
         """
         Calculate a list of connected molecules which contain
         every site in the asymmetric_unit
@@ -468,7 +468,7 @@ class Crystal:
         """
 
         if hasattr(self, "_symmetry_unique_molecules"):
-            return getattr(self, "_symmetry_unique_molecules")
+            return self._symmetry_unique_molecules
         uc_molecules = self.unit_cell_molecules(bond_tolerance=bond_tolerance, **kwargs)
         asym_atoms = np.zeros(len(self.asymmetric_unit), dtype=bool)
         molecules = []
@@ -477,7 +477,7 @@ class Crystal:
         def order(x):
             return len(np.where(x.asym_symops == 16484)[0]) / len(x)
 
-        for i, mol in enumerate(sorted(uc_molecules, key=order, reverse=True)):
+        for mol in sorted(uc_molecules, key=order, reverse=True):
             asym_atoms_in_g = np.unique(mol.properties["asymmetric_unit_atoms"])
             if np.all(asym_atoms[asym_atoms_in_g]):
                 continue
@@ -486,7 +486,7 @@ class Crystal:
             if np.all(asym_atoms):
                 break
         LOG.debug("%d symmetry unique molecules", len(molecules))
-        setattr(self, "_symmetry_unique_molecules", molecules)
+        self._symmetry_unique_molecules = molecules
         for i, mol in enumerate(molecules):
             mol.properties["asym_mol_idx"] = i
 
@@ -595,7 +595,7 @@ class Crystal:
         result["uc_atom"] = np.tile(np.arange(slab["n_uc"]), slab["n_cells"])[idxs]
         return result
 
-    def atomic_surroundings(self, radius=6.0) -> List[Dict]:
+    def atomic_surroundings(self, radius=6.0) -> list[dict]:
         """
         Calculate all atoms within the given `radius` of
         each atomic site in the asymmetric unit.
@@ -620,7 +620,9 @@ class Crystal:
         slab = self.slab(bounds=((hmin, kmin, lmin), (hmax, kmax, lmax)))
         tree = KDTree(slab["cart_pos"])
         results = []
-        for i, (n, pos) in enumerate(zip(self.asymmetric_unit.elements, cart_asym)):
+        for i, (n, pos) in enumerate(
+            zip(self.asymmetric_unit.elements, cart_asym, strict=False)
+        ):
             idxs = tree.query_ball_point(pos, radius)
             positions = slab["cart_pos"][idxs]
             elements = slab["element"][idxs]
@@ -644,7 +646,7 @@ class Crystal:
             )
         return results
 
-    def atom_group_surroundings(self, atoms, radius=6.0) -> Tuple:
+    def atom_group_surroundings(self, atoms, radius=6.0) -> tuple:
         """
         Calculate all atoms within the given `radius` of the specified
         group of atoms in the asymetric unit.
@@ -689,7 +691,7 @@ class Crystal:
             (elements[keep], positions[keep]),
         )
 
-    def molecule_environment(self, mol, radius=6.0, threshold=1e-3) -> Tuple:
+    def molecule_environment(self, mol, radius=6.0, threshold=1e-3) -> tuple:
         """
         Calculate the atomic information for all
         atoms surrounding the given molecule in this crystal
@@ -733,7 +735,7 @@ class Crystal:
                 keep[this_mol] = False
         return (mol, elements[keep], positions[keep])
 
-    def molecule_environments(self, radius=6.0, threshold=1e-3) -> List[Tuple]:
+    def molecule_environments(self, radius=6.0, threshold=1e-3) -> list[tuple]:
         """
         Calculate the atomic information for all
         atoms surrounding each symmetry unique molecule
@@ -755,7 +757,7 @@ class Crystal:
             for x in self.symmetry_unique_molecules()
         ]
 
-    def functional_group_surroundings(self, radius=6.0, kind="carboxylic_acid") -> List:
+    def functional_group_surroundings(self, radius=6.0, kind="carboxylic_acid") -> list:
         """
         Calculate the atomic information for all
         atoms surrounding each functional group in each symmetry unique molecule
@@ -808,7 +810,7 @@ class Crystal:
                 )
         return results
 
-    def promolecule_density_isosurfaces(self, **kwargs) -> List[Trimesh]:
+    def promolecule_density_isosurfaces(self, **kwargs) -> list[Trimesh]:
         """
         Calculate promolecule electron density isosurfaces
         for each symmetry unique molecule in this crystal.
@@ -843,7 +845,7 @@ class Crystal:
             from chmpy.util.color import property_to_color
             from chmpy.util.mesh import face_centroids
 
-            for i, (mol, n_e, n_p) in enumerate(
+            for i, (_mol, n_e, n_p) in enumerate(
                 self.molecule_environments(radius=radius)
             ):
                 surf = surfaces[i]
@@ -874,7 +876,9 @@ class Crystal:
         charges = np.empty(len(self.asymmetric_unit), dtype=np.float32)
         for mol in mols:
             for idx, charge in zip(
-                mol.properties["asymmetric_unit_atoms"], mol.partial_charges
+                mol.properties["asymmetric_unit_atoms"],
+                mol.partial_charges,
+                strict=False,
             ):
                 charges[idx] = charge
         return charges
@@ -899,8 +903,9 @@ class Crystal:
             the mesh representing the promolecule density void isosurface
         """
 
-        from chmpy import PromoleculeDensity
         import trimesh
+
+        from chmpy import PromoleculeDensity
         from chmpy.mc import marching_cubes
 
         vertex_color = kwargs.get("color", None)
@@ -998,7 +1003,7 @@ class Crystal:
         "Alias for `self.stockholder_weight_isosurfaces`"
         return self.stockholder_weight_isosurfaces(**kwargs)
 
-    def stockholder_weight_isosurfaces(self, kind="mol", **kwargs) -> List[Trimesh]:
+    def stockholder_weight_isosurfaces(self, kind="mol", **kwargs) -> list[Trimesh]:
         """
         Calculate stockholder weight isosurfaces (i.e. Hirshfeld surfaces)
         for each symmetry unique molecule or atom in this crystal.
@@ -1032,10 +1037,11 @@ class Crystal:
         Returns:
             A list of meshes representing the stockholder weight isosurfaces
         """
+        import trimesh
+
         from chmpy import StockholderWeight
         from chmpy.surface import stockholder_weight_isosurface
         from chmpy.util.color import property_to_color
-        import trimesh
 
         sep = kwargs.get("separation", kwargs.get("resolution", 0.2))
         radius = kwargs.get("radius", 12.0)
@@ -1060,20 +1066,27 @@ class Crystal:
                 iso = stockholder_weight_isosurface(s, isovalue=isovalue, sep=sep)
                 isos.append(iso)
         elif kind == "mol":
-            for i, (mol, n_e, n_p) in enumerate(
+            for _i, (mol, n_e, n_p) in enumerate(
                 self.molecule_environments(radius=radius)
             ):
+                extra_props = {}
                 if vertex_color == "esp":
                     extra_props["esp"] = mol.electrostatic_potential
                 elif vertex_color == "fragment_patch":
-                    extra_props["fragment_patch"] = lambda x: _nearest_molecule_idx(
-                        x, n_e, n_p
+                    extra_props["fragment_patch"] = (
+                        lambda x, _n_e=n_e, _n_p=n_p: _nearest_molecule_idx(
+                            x, _n_e, _n_p
+                        )
                     )
-                extra_props["nearest_atom_external"] = lambda x: nearest_atomic_number(
-                    x, n_e, n_p
+                extra_props["nearest_atom_external"] = (
+                    lambda x, _n_e=n_e, _n_p=n_p: nearest_atomic_number(x, _n_e, _n_p)
                 )
-                extra_props["nearest_atom_internal"] = lambda x: nearest_atomic_number(
-                    x, mol.atomic_numbers, mol.positions
+                extra_props["nearest_atom_internal"] = (
+                    lambda x,
+                    _atomic_nums=mol.atomic_numbers,
+                    _positions=mol.positions: nearest_atomic_number(
+                        x, _atomic_nums, _positions
+                    )
                 )
                 s = StockholderWeight.from_arrays(
                     mol.atomic_numbers, mol.positions, n_e, n_p
@@ -1387,9 +1400,7 @@ class Crystal:
                 self.properties["density"],
                 self.properties["lattice_energy"],
             )
-        return "<Crystal {} {}>".format(
-            self.asymmetric_unit.formula, self.space_group.symbol
-        )
+        return f"<Crystal {self.asymmetric_unit.formula} {self.space_group.symbol}>"
 
     @property
     def density(self):
@@ -1711,8 +1722,8 @@ class Crystal:
         return reflections(self, **kwargs)
 
     def powder_pattern(self, **kwargs):
-        from chmpy.crystal.sfac import powder_pattern
         from chmpy.crystal.powder import PowderPattern
+        from chmpy.crystal.sfac import powder_pattern
 
         tt, f2 = powder_pattern(self, **kwargs)
         if not hasattr(self, "_have_warned_powder"):
@@ -1803,7 +1814,10 @@ class Crystal:
             "ATOM": [
                 "{:3} {:3} {: 20.12f} {: 20.12f} {: 20.12f}".format(l, s, *pos)
                 for l, s, pos in zip(
-                    self.asymmetric_unit.labels, atom_sfac, self.site_positions
+                    self.asymmetric_unit.labels,
+                    atom_sfac,
+                    self.site_positions,
+                    strict=False,
                 )
             ],
         }
@@ -1959,7 +1973,7 @@ class Crystal:
         for mol_a in self.symmetry_unique_molecules():
             dimers_a = []
             for mol_b in self.unit_cell_molecules():
-                for shift, shift_frac in zip(shifts, shifts_frac):
+                for shift, shift_frac in zip(shifts, shifts_frac, strict=False):
                     # shift_frac assumes the molecule is generated from
                     # the [0, 0, 0] cell, it's not
                     mol_bt = mol_b.translated(shift)
@@ -1984,8 +1998,9 @@ class Crystal:
         return unique_dimers, mol_dimers
 
     def nearest_neighbour_info(self, points, mol_idx=0, **kwargs):
-        from scipy.spatial import cKDTree as KDTree
         from collections import namedtuple
+
+        from scipy.spatial import cKDTree as KDTree
 
         Neighbor = namedtuple("Neighbor", "asym_id generator_symop ab_symop separation")
         unique_dimers, mol_dimers = self.symmetry_unique_dimers(**kwargs)
@@ -1997,7 +2012,7 @@ class Crystal:
         def symm_string(x):
             return str(SymmetryOperation.from_integer_code(x[0]))
 
-        for i, (unique_idx, d) in enumerate(dimers):
+        for i, (_unique_idx, d) in enumerate(dimers):
             npos.append(d.b.positions)
             nidx.append(np.ones(len(d.b), dtype=np.uint8) * i)
             neighbour_info.append(

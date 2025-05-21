@@ -1,6 +1,8 @@
-from chmpy import Element
 from collections import Counter
+
 import numpy as np
+
+from chmpy import Element
 
 
 def kpoints_string():
@@ -41,7 +43,8 @@ def generate_vasp_inputs(crystal, dest="."):
 
 def load_vasprun(filename):
     import xml.etree.ElementTree as ET
-    from chmpy.crystal import UnitCell, Crystal, AsymmetricUnit, SpaceGroup
+
+    from chmpy.crystal import AsymmetricUnit, Crystal, SpaceGroup, UnitCell
 
     xml = ET.parse(filename)
     root = xml.getroot()

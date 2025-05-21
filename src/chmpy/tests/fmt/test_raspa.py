@@ -1,8 +1,8 @@
-import unittest
 import os
-import tempfile
-from pathlib import Path
 import shutil
+import tempfile
+import unittest
+from pathlib import Path
 
 from chmpy.fmt import raspa
 

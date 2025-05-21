@@ -1,20 +1,22 @@
-from chmpy import Crystal, Molecule
-from collections.abc import Iterable
-from chmpy.exe.xtb import Xtb
-from chmpy.exe import ReturnCodeError, TimeoutExpired
-from chmpy.fmt.xtb import turbomole_string, load_turbomole_string
-from os.path import join, exists
-from pathlib import Path
-import os
 import logging
-import time
-from tempfile import TemporaryDirectory
+import os
 import re
+import time
+from collections.abc import Iterable
+from os.path import exists, join
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
 import numpy as np
+
+from chmpy import Crystal, Molecule
+from chmpy.exe import ReturnCodeError, TimeoutExpired
+from chmpy.exe.xtb import Xtb
+from chmpy.fmt.xtb import load_turbomole_string, turbomole_string
 
 LOG = logging.getLogger(__name__)
 NUMERIC_CONST_PATTERN = r"[-+]?(?:(?:\d*\.\d+)|(?:\d+\.?))(?:[Ee][+-]?\d+)?"
-energy_regex = re.compile(r"total\s+energy\s+({})\s*Eh".format(NUMERIC_CONST_PATTERN))
+energy_regex = re.compile(rf"total\s+energy\s+({NUMERIC_CONST_PATTERN})\s*Eh")
 
 
 def find_energies(stdout):
@@ -91,10 +93,10 @@ class XtbOptimizer:
     def minimize_crystal(self, crystal, engine="inertial"):
         input_contents = turbomole_string(
             crystal,
-            opt=dict(
-                engine=engine,
-                maxcycle=self.maxcycle,
-            ),
+            opt={
+                "engine": engine,
+                "maxcycle": self.maxcycle,
+            },
         )
         LOG.debug("Input contents:\n%s", input_contents)
         result = None
@@ -139,10 +141,10 @@ class XtbOptimizer:
     def minimize_molecule(self, molecule, engine="rf"):
         input_contents = turbomole_string(
             molecule,
-            opt=dict(
-                engine=engine,
-                maxcycle=self.maxcycle,
-            ),
+            opt={
+                "engine": engine,
+                "maxcycle": self.maxcycle,
+            },
         )
         LOG.debug("Input contents:\n%s", input_contents)
         result = None

@@ -1,5 +1,6 @@
-from chmpy.ext.elastic_tensor import ElasticTensor
 import unittest
+
+from chmpy.ext.elastic_tensor import ElasticTensor
 
 TENSOR = """
     48.137	11.411	12.783	0.000	-3.654	0.000

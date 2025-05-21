@@ -3,9 +3,10 @@ This module is dedicated to sampling points, sequences and
 generation of random or quasi random object.
 """
 
+import numpy as np
+
 from ._lds import quasirandom_kgf, quasirandom_kgf_batch
 from ._sobol import quasirandom_sobol, quasirandom_sobol_batch
-import numpy as np
 
 __all__ = [
     "quasirandom_kgf",

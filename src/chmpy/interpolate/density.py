@@ -1,8 +1,12 @@
+from os.path import dirname, join
+
 import numpy as np
 from scipy.spatial import cKDTree as KDTree
-from os.path import join, dirname
+
 from chmpy.core.element import vdw_radii
-from ._density import PromoleculeDensity as cPromol, StockholderWeight as cStock
+
+from ._density import PromoleculeDensity as cPromol
+from ._density import StockholderWeight as cStock
 
 _DATA_DIR = dirname(__file__)
 _INTERPOLATOR_DATA = np.load(join(_DATA_DIR, "thakkar_interp.npz"))
@@ -47,9 +51,7 @@ class PromoleculeDensity:
         )
 
     def __repr__(self):
-        return "<PromoleculeDensity: {} atoms, centre={}>".format(
-            self.natoms, self.centroid
-        )
+        return f"<PromoleculeDensity: {self.natoms} atoms, centre={self.centroid}>"
 
     def d_norm(self, positions):
         pos = self.positions
@@ -58,7 +60,7 @@ class PromoleculeDensity:
         dists, idxs = tree.query(positions, k=min(6, self.natoms))
         d_norm = np.empty(dists.shape[0])
         vecs = np.empty(positions.shape)
-        for j, (d, i) in enumerate(zip(dists, idxs)):
+        for j, (d, i) in enumerate(zip(dists, idxs, strict=False)):
             i = i[i < pos.shape[0]]
             vdw = self.vdw_radii[i]
             d_n = (d - vdw) / vdw

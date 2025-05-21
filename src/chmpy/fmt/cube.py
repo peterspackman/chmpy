@@ -1,6 +1,8 @@
-from pathlib import Path
-import numpy as np
 from io import StringIO
+from pathlib import Path
+
+import numpy as np
+
 from chmpy.util.unit import units
 
 
@@ -87,6 +89,7 @@ class CubeData:
 
     def isosurface(self, isovalue=0.0):
         from trimesh import Trimesh
+
         from chmpy.mc import marching_cubes
 
         vol = self.data.reshape((self.nx, self.ny, self.nz))

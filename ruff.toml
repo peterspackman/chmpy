@@ -1,2 +1,44 @@
-# This file can be used for additional ruff configuration
-# Refer to pyproject.toml for the main configuration
+# Ruff configuration
+line-length = 88
+target-version = "py310"
+include = ["*.py", "*.pyi"]  # Exclude .pyx files
+exclude = ["*.pyx", "*/_*.pyx"]
+
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort
+    "W",   # pycodestyle warnings
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E741",  # ambiguous variable names like 'l', 'I', 'O'
+    "E501",  # line too long (handled by formatter)
+]
+
+# Allow autofix for all enabled rules (when `--fix` is provided)
+fixable = ["ALL"]
+unfixable = []
+
+# Add specific per-file ignores for math-heavy files
+[lint.per-file-ignores]
+"__init__.py" = ["F401"]  # unused imports in __init__.py
+"src/chmpy/tests/**/*.py" = ["E501"]  # allow long lines in tests
+"src/chmpy/shape/*.py" = ["E741"]  # allow single-letter math variables
+"src/chmpy/crystal/*.py" = ["E741"]  # allow single-letter math variables
+"src/chmpy/ints/*.py" = ["E741"]  # allow single-letter math variables
+"src/chmpy/interpolate/*.py" = ["E741"]  # allow single-letter math variables
+
+[format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+skip-magic-trailing-comma = false
+docstring-code-format = true
+
+[lint.isort]
+known-first-party = ["chmpy"]
+known-third-party = ["numpy", "scipy", "matplotlib", "seaborn", "trimesh", "jinja2"]

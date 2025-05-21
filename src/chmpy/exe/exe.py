@@ -1,13 +1,13 @@
 import abc
-import os
-import tempfile
 import logging
-from chmpy.util.path import dir_exists_or_is_creatable, path_exists_or_is_creatable
-from pathlib import Path
-from subprocess import PIPE, Popen, TimeoutExpired, CalledProcessError, CompletedProcess
+import os
 import signal
 import sys
+import tempfile
+from pathlib import Path
+from subprocess import PIPE, CalledProcessError, CompletedProcess, Popen, TimeoutExpired
 
+from chmpy.util.path import dir_exists_or_is_creatable, path_exists_or_is_creatable
 
 LOG = logging.getLogger(__name__)
 ABC = abc.ABCMeta("ABC", (object,), {})
@@ -43,13 +43,13 @@ def run_subprocess(
     with Popen(*popenargs, **kwargs) as process:
         try:
             stdout, stderr = process.communicate(input, timeout=timeout)
-        except TimeoutExpired:
+        except TimeoutExpired as e:
             if signal is None:
                 os.kill(process.pid)
             else:
                 process.send_signal(signal)
             stdout, stderr = process.communicate()
-            raise TimeoutExpired(process.args, timeout, output=stdout, stderr=stderr)
+            raise TimeoutExpired(process.args, timeout, output=stdout, stderr=stderr) from e
         except:
             if signal is None:
                 os.kill(process.pid)
@@ -165,7 +165,7 @@ class AbstractExecutable(ABC):
         self.resolve_dependencies()
         self.returncode = 130
         with Path(self.output_file).open("w+") as of:
-            cmd_list = [self.executable] + [x for x in args]
+            cmd_list = [self.executable] + list(args)
             command = run_subprocess(
                 cmd_list,
                 stdout=of,
@@ -183,7 +183,7 @@ class AbstractExecutable(ABC):
         self.returncode = 130
         with Path(self.input_file).open() as inp:
             with Path(self.output_file).open("w+") as of:
-                cmd_list = [self.executable] + [x for x in args]
+                cmd_list = [self.executable] + list(args)
                 command = run_subprocess(
                     cmd_list,
                     stdout=of,
@@ -209,7 +209,7 @@ class AbstractExecutable(ABC):
         raise NotImplementedError
 
     def __str__(self):
-        return "{}: {}".format(self.__class__.__name__, self.name)
+        return f"{self.__class__.__name__}: {self.name}"
 
     def __repr__(self):
         return str(self)

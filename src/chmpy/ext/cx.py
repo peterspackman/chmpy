@@ -1,8 +1,9 @@
 import logging
+from pathlib import Path
+
 from chmpy.exe import Gaussian, Tonto
 from chmpy.templates import load_template
 from chmpy.util.num import kabsch_rotation_matrix
-from pathlib import Path
 
 G09_SCF = load_template("gaussian_scf")
 TONTO_PAIR_ENERGY = load_template("tonto_pair_energy")
@@ -62,9 +63,11 @@ def parse_tonto_interaction_energies_stdout(stdout_contents):
 
 
 def interaction_energies(c, model="CE-B3LYP", radius=3.8, nthreads=1):
-    from tqdm import tqdm
-    import pandas as pd
     from concurrent.futures import ThreadPoolExecutor
+
+    import pandas as pd
+    from tqdm import tqdm
+
     from chmpy import Molecule
     from chmpy.crystal.symmetry_operation import SymmetryOperation
 

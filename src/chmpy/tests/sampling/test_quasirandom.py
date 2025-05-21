@@ -1,9 +1,17 @@
 import unittest
+
 import numpy as np
+
 from chmpy.sampling import (
     quasirandom_kgf as kgf,
-    quasirandom_sobol as sobol,
+)
+from chmpy.sampling import (
     quasirandom_kgf_batch as kgf_b,
+)
+from chmpy.sampling import (
+    quasirandom_sobol as sobol,
+)
+from chmpy.sampling import (
     quasirandom_sobol_batch as sobol_b,
 )
 

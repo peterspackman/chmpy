@@ -1,11 +1,12 @@
-from chmpy.crystal import Crystal, AsymmetricUnit, SpaceGroup
-from chmpy.fmt.xyz_file import parse_traj_file
 from pathlib import Path
+
+from chmpy.crystal import AsymmetricUnit, Crystal, SpaceGroup
+from chmpy.fmt.xyz_file import parse_traj_file
 
 
 def to_xyz_string(elements, positions, comment=""):
     lines = [f"{len(elements)}", comment]
-    for el, (x, y, z) in zip(elements, positions):
+    for el, (x, y, z) in zip(elements, positions, strict=False):
         lines.append(f"{el} {x: 20.12f} {y: 20.12f} {z: 20.12f}")
     return "\n".join(lines)
 

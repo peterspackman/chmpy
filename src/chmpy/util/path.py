@@ -3,7 +3,6 @@ import os
 import sys
 from pathlib import Path
 
-
 ERR_INVALID_NAME = 123  # windows specific error code
 
 

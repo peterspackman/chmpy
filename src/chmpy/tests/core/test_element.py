@@ -1,12 +1,14 @@
 import unittest
+
 import numpy as np
+
 from chmpy.core.element import (
     Element,
-    vdw_radii,
     chemical_formula,
     cov_radii,
     element_names,
     element_symbols,
+    vdw_radii,
 )
 
 
@@ -38,10 +40,10 @@ class ElementTestCase(unittest.TestCase):
         self.assertEqual(e1, e2)
 
         with self.assertRaises(NotImplementedError):
-            e1 == 1.3
+            print(e1 == 1.3)
 
         with self.assertRaises(NotImplementedError):
-            e1 < 1.3
+            print(e1 < 1.3)
 
         self.assertTrue(c < o)
         self.assertTrue(b < o)

@@ -1,7 +1,8 @@
-from chmpy.templates import load_template
 import logging
 import re
 from collections import namedtuple
+
+from chmpy.templates import load_template
 
 LOG = logging.getLogger(__name__)
 GULP_TEMPLATE = load_template("gulp")
@@ -57,26 +58,34 @@ def parse_value(string, with_units=False):
     return string
 
 
-def crystal_to_gulp_input(crystal, keywords=[], additional_keywords={}):
+def crystal_to_gulp_input(crystal, keywords=None, additional_keywords=None):
+    if additional_keywords is None:
+        additional_keywords = {}
+    if keywords is None:
+        keywords = []
     pos = crystal.asymmetric_unit.positions
     el = crystal.asymmetric_unit.elements
     return GULP_TEMPLATE.render(
         keywords=keywords,
         frac=True,
         cell=" ".join(f"{x:10.6f}" for x in crystal.unit_cell.parameters),
-        atoms=zip(el, pos),
+        atoms=zip(el, pos, strict=False),
         spacegroup=crystal.space_group.crystal17_spacegroup_symbol(),
         additional_keywords=additional_keywords,
     )
 
 
-def molecule_to_gulp_input(molecule, keywords=[], additional_keywords={}):
+def molecule_to_gulp_input(molecule, keywords=None, additional_keywords=None):
+    if additional_keywords is None:
+        additional_keywords = {}
+    if keywords is None:
+        keywords = []
     pos = molecule.positions
     el = molecule.elements
     return GULP_TEMPLATE.render(
         keywords=keywords,
         frac=False,
-        atoms=zip(el, pos),
+        atoms=zip(el, pos, strict=False),
         additional_keywords=additional_keywords,
     )
 

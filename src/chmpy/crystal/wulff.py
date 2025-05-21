@@ -1,5 +1,5 @@
-from scipy.spatial import ConvexHull
 import numpy as np
+from scipy.spatial import ConvexHull
 
 
 def expand_symmetry_related_planes(hkl, energies, crystal):
@@ -14,7 +14,7 @@ def expand_symmetry_related_planes(hkl, energies, crystal):
     print(frac)
     print(np.round(crystal.to_cartesian(frac) @ RI, 2).astype(int))
 
-    for i, s in enumerate(sg.symmetry_operations):
+    for s in sg.symmetry_operations:
         if len(np.nonzero(s.translation)[0]) > 0:
             continue
         print("Symop", s)

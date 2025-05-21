@@ -1,9 +1,11 @@
-from chmpy.crystal import Crystal
-from pathlib import Path
-from tqdm import tqdm
-from concurrent.futures import ProcessPoolExecutor, as_completed
 import logging
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from pathlib import Path
+
 import numpy as np
+from tqdm import tqdm
+
+from chmpy.crystal import Crystal
 
 LOG = logging.getLogger("test_describe")
 

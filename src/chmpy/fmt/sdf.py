@@ -1,7 +1,8 @@
-import numpy as np
 import logging
 from collections import defaultdict
 from pathlib import Path
+
+import numpy as np
 
 LOG = logging.getLogger(__name__)
 
@@ -103,7 +104,7 @@ def parse_property_line(line):
     n = int(line[:4])
     l = 4
     props = []
-    for i in range(n):
+    for _i in range(n):
         props.append((int(line[l : l + 4]), int(line[l + 4 : l + 8])))
     return props
 

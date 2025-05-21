@@ -1,16 +1,17 @@
-from chmpy import Crystal, Molecule
+import logging
+import re
+import time
 from collections.abc import Iterable
-from chmpy.exe.gulp import Gulp
+from tempfile import TemporaryDirectory
+
+from chmpy import Crystal, Molecule
 from chmpy.exe import ReturnCodeError, TimeoutExpired
+from chmpy.exe.gulp import Gulp
 from chmpy.fmt.gulp import (
     crystal_to_gulp_input,
     molecule_to_gulp_input,
     parse_gulp_output,
 )
-import logging
-import time
-from tempfile import TemporaryDirectory
-import re
 
 LOG = logging.getLogger(__name__)
 NUMERIC_CONST_PATTERN = r"[-+]?(?:(?:\d*\.\d+)|(?:\d+\.?))(?:[Ee][+-]?\d+)?"

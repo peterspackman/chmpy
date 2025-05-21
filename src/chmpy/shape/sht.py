@@ -1,15 +1,17 @@
 import numpy as np
+from scipy.fft import fft, ifft
+from scipy.special import roots_legendre
+
 from chmpy.util.num import spherical_to_cartesian_mgrid
+
 from ._sht import (
     AssocLegendre,
-    analysis_kernel_real,
     analysis_kernel_cplx,
-    synthesis_kernel_real,
-    synthesis_kernel_cplx,
+    analysis_kernel_real,
     expand_coeffs_to_full,
+    synthesis_kernel_cplx,
+    synthesis_kernel_real,
 )
-from scipy.special import roots_legendre
-from scipy.fft import fft, ifft
 
 _SHT_CACHE = {}
 
@@ -131,14 +133,16 @@ class SHT:
             np.ndarray the set of spherical harmonic coefficients
         """
         coeffs = np.zeros(self.nplm(), dtype=np.complex128)
-        for itheta, (ct, w) in enumerate(zip(self.cos_theta, self.weights)):
+        for itheta, (ct, w) in enumerate(
+            zip(self.cos_theta, self.weights, strict=False)
+        ):
             self.fft_work_array[:] = values[itheta, :]
 
             fft(self.fft_work_array, norm="forward", overwrite_x=True)
             self.plm.evaluate_batch(ct, result=self.plm_work_array)
             plm_idx = 0
             # m = 0 case
-            for l in range(self.lmax + 1):
+            for _l in range(self.lmax + 1):
                 p = self.plm_work_array[plm_idx]
                 coeffs[plm_idx] += self.fft_work_array[0] * p * w
                 plm_idx += 1
@@ -148,7 +152,7 @@ class SHT:
             # which alternates with m and l
             for m in range(1, self.lmax + 1):
                 sign = -1 if m & 1 else 1
-                for l in range(m, self.lmax + 1):
+                for _l in range(m, self.lmax + 1):
                     p = self.plm_work_array[plm_idx]
                     coeffs[plm_idx] += sign * self.fft_work_array[m] * p * w
                     plm_idx += 1
@@ -173,7 +177,9 @@ class SHT:
         coeffs = np.zeros(self.nlm(), dtype=np.complex128)
         np.zeros(self.nlm(), dtype=np.complex128)
         np.zeros(self.nlm(), dtype=np.complex128)
-        for itheta, (ct, w) in enumerate(zip(self.cos_theta, self.weights)):
+        for itheta, (ct, w) in enumerate(
+            zip(self.cos_theta, self.weights, strict=False)
+        ):
             self.fft_work_array[:] = values[itheta, :]
 
             fft(self.fft_work_array, norm="forward", overwrite_x=True)
@@ -275,14 +281,14 @@ class SHT:
 
             plm_idx = 0
             # m = 0 case
-            for l in range(self.lmax + 1):
+            for _l in range(self.lmax + 1):
                 p = self.plm_work_array[plm_idx]
                 self.fft_work_array[0] += coeffs[plm_idx] * p
                 plm_idx += 1
 
             for m in range(1, self.lmax + 1):
                 sign = -1 if m & 1 else 1
-                for l in range(m, self.lmax + 1):
+                for _l in range(m, self.lmax + 1):
                     p = self.plm_work_array[plm_idx]
                     rr = 2 * sign * coeffs[plm_idx] * p
                     self.fft_work_array[m] += rr
@@ -311,7 +317,9 @@ class SHT:
         else:
             kernel = analysis_kernel_cplx
             coeffs = np.zeros(self.nlm(), dtype=np.complex128)
-        for itheta, (ct, w) in enumerate(zip(self.cos_theta, self.weights)):
+        for itheta, (ct, w) in enumerate(
+            zip(self.cos_theta, self.weights, strict=False)
+        ):
             self.fft_work_array[:] = values[itheta, :]
 
             fft(self.fft_work_array, norm="forward", overwrite_x=True)
@@ -356,7 +364,7 @@ class SHT:
         result = 0.0
         self.plm.evaluate_batch(cos_theta, result=self.plm_work_array)
         plm_idx = 0
-        for l in range(0, self.lmax + 1):
+        for _l in range(0, self.lmax + 1):
             result += self.plm_work_array[plm_idx] * coeffs[plm_idx].real
             plm_idx += 1
 
@@ -365,7 +373,7 @@ class SHT:
         for m in range(1, self.lmax + 1):
             tmp = 0.0
             sign *= -1
-            for l in range(m, self.lmax + 1):
+            for _l in range(m, self.lmax + 1):
                 # m +ve and m -ve
                 tmp += sign * self.plm_work_array[plm_idx] * coeffs[plm_idx]
                 plm_idx += 1
@@ -601,8 +609,8 @@ def plot_sphere(name, grid, values):
     values: array_like
         scalar values of the function associated with each grid point
     """
-    from matplotlib import cm
     import matplotlib.pyplot as plt
+    from matplotlib import cm
 
     fig = plt.figure(figsize=plt.figaspect(1.0))
     theta, phi = grid
@@ -618,5 +626,5 @@ def plot_sphere(name, grid, values):
         x, y, z, rstride=1, cstride=1, facecolors=cm.viridis(fcolors), shade=True
     )
     ax.set_axis_off()
-    plt.title("Contours of {}".format(name))
-    plt.savefig("{}.png".format(name), dpi=300, bbox_inches="tight")
+    plt.title(f"Contours of {name}")
+    plt.savefig(f"{name}.png", dpi=300, bbox_inches="tight")

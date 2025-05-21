@@ -33,22 +33,23 @@ def molecule_to_meshes(molecule, **kwargs):
         list: a list of meshes representing atoms and (optionally) bonds
     """
 
-    from trimesh.creation import icosphere, cylinder
     import numpy as np
+    from trimesh.creation import cylinder, icosphere
 
     representation = kwargs.get("representation", "ball_stick")
     base_sphere = icosphere(subdivisions=3)
     n_points = len(base_sphere.vertices)
     meshes = {}
-    for i, (el, pos) in enumerate(molecule):
+    for atom_index, (el, pos) in enumerate(molecule):
         m = base_sphere.copy()
         m.apply_scale(getattr(el, f"{representation}_radius"))
         m.apply_translation(pos)
         m.visual.vertex_colors = np.repeat([el.color], n_points, axis=0)
-        meshes[f"atom_{molecule.labels[i]}"] = m
+        meshes[f"atom_{molecule.labels[atom_index]}"] = m
+        LOG.debug("Add atom %d", atom_index)
     if representation == "ball_stick":
         bond_thickness = 0.12
-        for i, (a, b, d) in enumerate(molecule.unique_bonds):
+        for bond_index, (a, b, d) in enumerate(molecule.unique_bonds):
             x1 = molecule.positions[a]
             x3 = molecule.positions[b]
             cyl = cylinder(bond_thickness, d, segment=(x1, x3))
@@ -60,6 +61,7 @@ def molecule_to_meshes(molecule, **kwargs):
                 axis=0,
             )
             bond_label = f"bond_{molecule.labels[a]}_{molecule.labels[b]}"
+            LOG.debug("Add bond %d", bond_index)
             meshes[bond_label] = cyl
     return meshes
 
@@ -73,7 +75,7 @@ def face_centroids(mesh):
 def color_mesh(f, mesh, faces=False, **kwargs):
     from chmpy.util.color import property_to_color
 
-    is_function = hasattr(f, "__call__")
+    is_function = callable(f)
 
     if faces:
         if is_function:

@@ -1,9 +1,10 @@
 """Module for static information about chemical elements."""
 
-import re
 import functools
-from collections import Counter
 import numbers
+import re
+from collections import Counter
+
 import numpy as np
 
 _SYMBOL_REGEX = re.compile("([A-Z]+).*", re.IGNORECASE)
@@ -333,10 +334,10 @@ class Element(metaclass=_ElementMeta):
         """
         m = re.match(_SYMBOL_REGEX, label)
         if m is None:
-            raise ValueError("Could not determine symbol from {}".format(label))
+            raise ValueError(f"Could not determine symbol from {label}")
         sym = m.group(1).strip().capitalize()
         if sym not in _EL_FROM_SYM:
-            raise ValueError("Could not determine symbol from {}".format(label))
+            raise ValueError(f"Could not determine symbol from {label}")
         return Element(*_EL_FROM_SYM[sym])
 
     @staticmethod
@@ -417,9 +418,9 @@ def chemical_formula(elements, subscript=False):
     """Calculate the chemical formula for the given list of elements.
 
     Examples:
-        >>> chemical_formula(['O', 'C', 'O'])
+        >>> chemical_formula(["O", "C", "O"])
         'CO2'
-        >>> chemical_formula(['C', 'H', 'O', 'B'])
+        >>> chemical_formula(["C", "H", "O", "B"])
         'BCHO'
 
     Args:

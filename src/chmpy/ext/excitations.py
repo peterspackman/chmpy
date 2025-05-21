@@ -1,4 +1,5 @@
 import logging
+
 import numpy as np
 
 LOG = logging.getLogger(__name__)
@@ -44,7 +45,7 @@ def plot_spectra(
 
     x = np.linspace(bounds[0], bounds[1], bins)
     total = 0
-    for e, f in zip(energies, osc):
+    for e, f in zip(energies, osc, strict=False):
         if kind == "gaussian":
             peak = add_gaussian_curve_contribution(x, e, f, std)
         else:

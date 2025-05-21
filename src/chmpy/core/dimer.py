@@ -1,7 +1,9 @@
 """Module for pairs of molecules, handling symmetry relations and more."""
 
-import numpy as np
 import logging
+
+import numpy as np
+
 from chmpy.core import Molecule
 
 LOG = logging.getLogger(__name__)

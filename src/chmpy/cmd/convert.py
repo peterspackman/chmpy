@@ -1,7 +1,8 @@
 import logging
-from pathlib import Path
-from chmpy import Molecule, Crystal
 import sys
+from pathlib import Path
+
+from chmpy import Crystal, Molecule
 
 LOG = logging.getLogger("chmpy-convert")
 

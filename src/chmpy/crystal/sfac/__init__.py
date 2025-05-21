@@ -1,7 +1,8 @@
-from . import _sfac
-import numpy as np
 from collections import namedtuple
 
+import numpy as np
+
+from . import _sfac
 
 StructureFactors = namedtuple("StructureFactors", "hkl q q_mag values normalization")
 Reflections = namedtuple("Reflection", "q q_mag hkl")

@@ -1,8 +1,9 @@
 import unittest
-import numpy as np
-from chmpy.crystal import AsymmetricUnit
-from chmpy import Element
 
+import numpy as np
+
+from chmpy import Element
+from chmpy.crystal import AsymmetricUnit
 
 _ICE_II_LABELS = (
     "O1",

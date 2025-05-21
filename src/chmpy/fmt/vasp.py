@@ -1,5 +1,7 @@
 import logging
+
 import numpy as np
+
 from chmpy.core.element import Element
 
 LOG = logging.getLogger(__name__)
@@ -20,7 +22,7 @@ def parse_poscar(poscar_string):
         " ".join(lines[2:5]), sep=" "
     ).reshape((3, 3))
     elements = []
-    for el, x in zip(lines[5].split(), lines[6].split()):
+    for el, x in zip(lines[5].split(), lines[6].split(), strict=False):
         elements += [Element[el]] * int(x)
     result["elements"] = elements
     result["coord_type"] = lines[7].strip().lower()

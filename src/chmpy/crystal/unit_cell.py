@@ -1,6 +1,8 @@
 import logging
+
 import numpy as np
-from numpy import zeros, allclose as close
+from numpy import allclose as close
+from numpy import zeros
 
 LOG = logging.getLogger(__name__)
 

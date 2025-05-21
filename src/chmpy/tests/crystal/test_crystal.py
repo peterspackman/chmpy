@@ -1,13 +1,16 @@
 import logging
 import unittest
-import numpy as np
 from copy import deepcopy
-from chmpy.crystal import Crystal, UnitCell, SpaceGroup
-from chmpy.fmt.cif import Cif
-from tempfile import TemporaryDirectory
-from .test_asymmetric_unit import ice_ii_asym
-from .. import TEST_FILES
 from pathlib import Path
+from tempfile import TemporaryDirectory
+
+import numpy as np
+
+from chmpy.crystal import Crystal, SpaceGroup, UnitCell
+from chmpy.fmt.cif import Cif
+
+from .. import TEST_FILES
+from .test_asymmetric_unit import ice_ii_asym
 
 LOG = logging.getLogger(__name__)
 _ICE_II_CELL = UnitCell.rhombohedral(7.78, 113.1, unit="degrees")
@@ -202,7 +205,7 @@ class CrystalTestCase(unittest.TestCase):
             pos_frac = x.to_fractional(pos)
             symops_cart = x.cartesian_symmetry_operations()
             symops_frac = x.symmetry_operations
-            for (r, t), sf in zip(symops_cart, symops_frac):
+            for (r, t), sf in zip(symops_cart, symops_frac, strict=False):
                 pos_a = np.dot(pos, r) + t
                 pos_b = x.to_cartesian(sf.apply(pos_frac))
                 np.testing.assert_allclose(pos_a, pos_b)

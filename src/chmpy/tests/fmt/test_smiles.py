@@ -1,5 +1,6 @@
-import unittest
 import logging
+import unittest
+
 from chmpy.fmt.smiles import parse
 
 LOG = logging.getLogger(__name__)

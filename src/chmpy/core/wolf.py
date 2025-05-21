@@ -18,8 +18,9 @@ def wolf_sum(crystal, cutoff=16.0, eta=0.2, charges=None):
             provided crystal (Hartrees)
     """
     import numpy as np
-    from chmpy.util.unit import ANGSTROM_TO_BOHR
     from scipy.special import erfc
+
+    from chmpy.util.unit import ANGSTROM_TO_BOHR
 
     if charges is None:
         charges = np.empty(len(crystal.asym))

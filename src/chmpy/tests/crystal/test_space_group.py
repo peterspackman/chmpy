@@ -1,7 +1,9 @@
 import logging
 import unittest
+
 import numpy as np
-from chmpy.crystal import SymmetryOperation, SpaceGroup
+
+from chmpy.crystal import SpaceGroup, SymmetryOperation
 from chmpy.crystal.space_group import expanded_symmetry_list, reduced_symmetry_list
 
 LOG = logging.getLogger(__name__)
@@ -124,13 +126,13 @@ class SpaceGroupTestCase(unittest.TestCase):
             "hexagonal",
             "cubic",
         )
-        for s, sys in zip(sgs, systems):
+        for s, sys in zip(sgs, systems, strict=False):
             self.assertEqual(s.crystal_system, sys)
 
         sg_bad = SpaceGroup(1)
         sg_bad.international_tables_number = -1
         with self.assertRaises(ValueError):
-            sg_bad.crystal_system
+            print(sg_bad.crystal_system)
 
     def test_lattice_type(self):
         sgs = (
@@ -140,7 +142,7 @@ class SpaceGroupTestCase(unittest.TestCase):
             SpaceGroup(148, choice="R"),
         )
         latt = ("monoclinic", "hexagonal", "hexagonal", "rhombohedral")
-        for s, sys in zip(sgs, latt):
+        for s, sys in zip(sgs, latt, strict=False):
             self.assertEqual(s.lattice_type, sys)
 
     def test_ordered_symmetry_operations(self):
@@ -159,15 +161,13 @@ class SpaceGroupTestCase(unittest.TestCase):
 
     def test_hash(self):
         self.assertEqual(
-            set(
-                (
-                    SpaceGroup(148, choice="R"),
-                    SpaceGroup(148),
-                    SpaceGroup(148),
-                    SpaceGroup(1),
-                )
-            ),
-            set((SpaceGroup(148, choice="R"), SpaceGroup(148), SpaceGroup(1))),
+            {
+                SpaceGroup(148, choice="R"),
+                SpaceGroup(148),
+                SpaceGroup(148),
+                SpaceGroup(1),
+            },
+            {SpaceGroup(148, choice="R"), SpaceGroup(148), SpaceGroup(1)},
         )
 
     def test_reduced_expand(self):

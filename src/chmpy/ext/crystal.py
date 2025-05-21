@@ -1,9 +1,11 @@
 import logging
+
 import numpy as np
-from spglib import standardize_cell, get_symmetry_dataset
+from spglib import get_symmetry_dataset, standardize_cell
+
 from chmpy import Element
+from chmpy.crystal import AsymmetricUnit, Crystal, UnitCell
 from chmpy.crystal.space_group import SpaceGroup
-from chmpy.crystal import Crystal, AsymmetricUnit, UnitCell
 
 LOG = logging.getLogger(__name__)
 

@@ -1,4 +1,5 @@
 import unittest
+
 import numpy as np
 
 
@@ -71,9 +72,10 @@ class SHTTestCase(unittest.TestCase):
     def test_plot(self):
         _, _, z = self.sht.grid_cartesian
         vals = z**2 * np.exp(-np.ones(z.shape)) * 0.5
-        from tempfile import TemporaryDirectory
-        from chmpy.shape.sht import plot_sphere
         from os.path import join
+        from tempfile import TemporaryDirectory
+
+        from chmpy.shape.sht import plot_sphere
 
         with TemporaryDirectory() as tmpdirname:
             plot_sphere(join(tmpdirname, "test.png"), self.sht.grid, vals)

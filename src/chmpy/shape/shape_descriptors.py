@@ -1,12 +1,15 @@
-from chmpy import StockholderWeight, PromoleculeDensity
-from chmpy.shape._sht import expand_coeffs_to_full
-from chmpy.interpolate._density import (
-    sphere_stockholder_radii,
-    sphere_promolecule_radii,
-)
-from ._invariants import p_invariants_c
 import logging
+
 import numpy as np
+
+from chmpy import PromoleculeDensity, StockholderWeight
+from chmpy.interpolate._density import (
+    sphere_promolecule_radii,
+    sphere_stockholder_radii,
+)
+from chmpy.shape._sht import expand_coeffs_to_full
+
+from ._invariants import p_invariants_c
 
 LOG = logging.getLogger(__name__)
 _HAVE_WARNED_ABOUT_LMAX_P = False

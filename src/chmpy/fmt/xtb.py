@@ -1,9 +1,11 @@
-from chmpy.templates import load_template
-from chmpy.core import Element, Molecule
-from chmpy.crystal import AsymmetricUnit, UnitCell, SpaceGroup
-import numpy as np
 import logging
 from collections import namedtuple
+
+import numpy as np
+
+from chmpy.core import Element, Molecule
+from chmpy.crystal import AsymmetricUnit, SpaceGroup, UnitCell
+from chmpy.templates import load_template
 
 LOG = logging.getLogger(__name__)
 TMOL_TEMPLATE = load_template("turbomole")
@@ -19,7 +21,7 @@ def crystal_to_turbomole_string(crystal, **kwargs):
         periodic=True,
         lattice=crystal.unit_cell.lattice.T,
         lattice_units="angs",
-        atoms=zip(pos, el),
+        atoms=zip(pos, el, strict=False),
         units="frac",
         blocks=kwargs,
     )
@@ -27,7 +29,7 @@ def crystal_to_turbomole_string(crystal, **kwargs):
 
 def molecule_to_turbomole_string(molecule, **kwargs):
     return TMOL_TEMPLATE.render(
-        atoms=zip(molecule.positions, molecule.elements),
+        atoms=zip(molecule.positions, molecule.elements, strict=False),
         units="angs",
         blocks=kwargs,
     )

@@ -1,7 +1,9 @@
-from .exe import AbstractExecutable
-from chmpy.util.exe import which
-from pathlib import Path
 import logging
+from pathlib import Path
+
+from chmpy.util.exe import which
+
+from .exe import AbstractExecutable
 
 LOG = logging.getLogger("tonto")
 
@@ -96,8 +98,8 @@ class Tonto(AbstractExecutable):
             output_file.write_text(self.stdout_contents)
 
     def run(self, *args, **kwargs):
-        from os import environ
         from copy import deepcopy
+        from os import environ
 
         env = deepcopy(environ)
         env.update(

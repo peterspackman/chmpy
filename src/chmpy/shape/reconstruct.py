@@ -1,6 +1,9 @@
 import logging
+
 import numpy as np
+
 from chmpy.util.num import cartesian_to_spherical_mgrid
+
 from .sht import SHT
 
 LOG = logging.getLogger(__name__)
@@ -64,8 +67,8 @@ def reconstruct(coefficients, real=True, pole_extension_factor=2):
 
 
 def reconstructed_surface_convex(coefficients, real=True):
-    from trimesh import Trimesh
     from scipy.spatial import ConvexHull
+    from trimesh import Trimesh
 
     pts, _ = reconstruct(coefficients, real=real)
     cvx = ConvexHull(pts)

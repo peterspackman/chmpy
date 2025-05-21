@@ -1,9 +1,9 @@
 from .assoc_legendre import AssocLegendre
-from .sht import SHT
 from .shape_descriptors import (
-    stockholder_weight_descriptor,
     promolecule_density_descriptor,
+    stockholder_weight_descriptor,
 )
+from .sht import SHT
 
 __all__ = [
     "AssocLegendre",

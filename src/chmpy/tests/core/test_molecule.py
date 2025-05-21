@@ -1,9 +1,12 @@
-import unittest
-import numpy as np
-from chmpy import Molecule
-from tempfile import TemporaryDirectory
-from pathlib import Path
 import logging
+import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+import numpy as np
+
+from chmpy import Molecule
+
 from .. import TEST_FILES
 
 LOG = logging.getLogger(__name__)

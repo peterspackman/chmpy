@@ -1,6 +1,7 @@
-from scipy.spatial import cKDTree as KDTree
 from itertools import combinations_with_replacement
+
 import numpy as np
+from scipy.spatial import cKDTree as KDTree
 
 SYMF_DEFAULT_PARAMETERS = {
     "radial_eta": 50,
@@ -30,10 +31,10 @@ class SymmetryFunctionsANI1:
     def __init__(self, labels, n_radial, n_angular, n_theta):
         self.labels = labels
         self.unique_atoms = np.unique(labels).tolist()
-        self.pairs = list(
+        self.pairs = [
             tuple(sorted(x))
             for x in combinations_with_replacement(self.unique_atoms, 2)
-        )
+        ]
         self.radial = np.zeros(
             (self.n_atoms, self.n_atom_types * n_radial), dtype=np.float64
         )
@@ -243,7 +244,7 @@ def calc_angular_function(
     if np.min(distances) > 0.001:
         raise Exception(
             """
-        Central Atom is probabaly not at (0, 0, 0). This means that atoms in 
+        Central Atom is probabaly not at (0, 0, 0). This means that atoms in
         the original molecule cannot be found in the cluster (ball).
         Check line 37 if "direct" should be replaced by "direct.T"
         """

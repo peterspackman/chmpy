@@ -1,6 +1,8 @@
 import logging
 import unittest
+
 import numpy as np
+
 from chmpy.crystal.wulff import WulffConstruction, WulffSHT
 
 LOG = logging.getLogger(__name__)

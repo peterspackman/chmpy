@@ -1,7 +1,9 @@
 import logging
-import numpy as np
 from collections import namedtuple
+
+import numpy as np
 from scipy.spatial.distance import pdist
+
 from chmpy.ext.solvation_parameters import DIELECTRIC_CONSTANTS
 
 LOG = logging.getLogger(__name__)
@@ -27,7 +29,7 @@ def self_interaction_term(areas, k=1.0694):
 
 
 def minimize_cosmo_energy(points, areas, charges, **kwargs):
-    from chmpy.util.unit import BOHR_TO_ANGSTROM, AU_TO_KJ_PER_MOL
+    from chmpy.util.unit import AU_TO_KJ_PER_MOL, BOHR_TO_ANGSTROM
 
     if kwargs.get("unit", "angstrom").lower() == "angstrom":
         points = points / BOHR_TO_ANGSTROM
@@ -93,7 +95,7 @@ def minimize_cosmo_energy(points, areas, charges, **kwargs):
 
         rms_err = np.sqrt(dq.dot(dq) / N)
         e_q = -0.5 * qinit.dot(qcur)
-        LOG.debug("{:3d} {:14.8f} {:9.5f} {:16.9f}".format(k, e_q, qcur.sum(), rms_err))
+        LOG.debug(f"{k:3d} {e_q:14.8f} {qcur.sum():9.5f} {rms_err:16.9f}")
         if rms_err < convergence:
             break
         qprev[:] = qcur[:]

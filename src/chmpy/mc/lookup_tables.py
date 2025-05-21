@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 CASESCLASSIC = (
     (256, 16),
     """

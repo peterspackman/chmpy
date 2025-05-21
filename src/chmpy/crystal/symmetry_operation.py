@@ -1,7 +1,8 @@
-from fractions import Fraction
 import logging
-import numpy as np
 import re
+from fractions import Fraction
+
+import numpy as np
 
 LOG = logging.getLogger(__name__)
 
@@ -25,9 +26,9 @@ def encode_symm_str(rotation, translation):
     Encode a rotation matrix (of -1, 0, 1s) and (rational) translation vector
     into string form e.g. 1/2-x,z-1/3,-y-1/6
 
-    >>> encode_symm_str(((-1, 0, 0), (0, 0, 1), (0, 1, 0)), (0, 0.5, 1/3))
+    >>> encode_symm_str(((-1, 0, 0), (0, 0, 1), (0, 1, 0)), (0, 0.5, 1 / 3))
     '-x,1/2+z,1/3+y'
-    >>> encode_symm_str(((1, 1, 1), (1, 0, 1), (0, 1, 0)), (0, 0.5, 1/3))
+    >>> encode_symm_str(((1, 1, 1), (1, 0, 1), (0, 1, 0)), (0, 0.5, 1 / 3))
     '+x+y+z,1/2+x+z,1/3+y'
 
     Args:
@@ -231,10 +232,8 @@ class SymmetryOperation:
     def integer_code(self) -> int:
         "Represent this SymmetryOperation as a packed integer"
         if not hasattr(self, "_integer_code"):
-            setattr(
-                self, "_integer_code", encode_symm_int(self.rotation, self.translation)
-            )
-        return getattr(self, "_integer_code")
+            self._integer_code = encode_symm_int(self.rotation, self.translation)
+        return self._integer_code
 
     @property
     def cif_form(self) -> str:
@@ -288,10 +287,8 @@ class SymmetryOperation:
 
     def __str__(self):
         if not hasattr(self, "_string_code"):
-            setattr(
-                self, "_string_code", encode_symm_str(self.rotation, self.translation)
-            )
-        return getattr(self, "_string_code")
+            self._string_code = encode_symm_str(self.rotation, self.translation)
+        return self._string_code
 
     def __lt__(self, other):
         return self.integer_code < other.integer_code
@@ -303,7 +300,7 @@ class SymmetryOperation:
         return int(self.integer_code)
 
     def __repr__(self):
-        return "<{}: {}>".format(self.__class__.__name__, self)
+        return f"<{self.__class__.__name__}: {self}>"
 
     def __call__(self, coordinates):
         return self.apply(coordinates)
@@ -325,7 +322,7 @@ class SymmetryOperation:
 
         rot, trans = decode_symm_int(code)
         s = SymmetryOperation(rot, trans)
-        setattr(s, "_integer_code", code)
+        s._integer_code = code
         return s
 
     @classmethod
@@ -344,7 +341,7 @@ class SymmetryOperation:
         """
         rot, trans = decode_symm_str(code)
         s = SymmetryOperation(rot, trans)
-        setattr(s, "_string_code", code)
+        s._string_code = code
         return s
 
     def is_identity(self) -> bool:

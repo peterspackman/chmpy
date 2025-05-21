@@ -9,10 +9,10 @@ and more.
 import json
 import re
 from pathlib import Path
-from typing import Dict, Union, Any
+from typing import Any
 
 
-def parse_raspa_json(file_path: Union[str, Path]) -> Dict[str, Any]:
+def parse_raspa_json(file_path: str | Path) -> dict[str, Any]:
     """
     Parse a RASPA3 JSON output file.
 
@@ -24,13 +24,13 @@ def parse_raspa_json(file_path: Union[str, Path]) -> Dict[str, Any]:
     """
     file_path = Path(file_path)
 
-    with open(file_path, "r") as f:
+    with open(file_path) as f:
         data = json.load(f)
 
     return data
 
 
-def parse_adsorption_data(content: str) -> Dict[str, Dict[str, Dict[str, float]]]:
+def parse_adsorption_data(content: str) -> dict[str, dict[str, dict[str, float]]]:
     """
     Parse adsorption data from RASPA output content.
 
@@ -93,7 +93,7 @@ def parse_adsorption_data(content: str) -> Dict[str, Dict[str, Dict[str, float]]
     return adsorption_data
 
 
-def parse_energy_data(content: str) -> Dict[str, float]:
+def parse_energy_data(content: str) -> dict[str, float]:
     """
     Parse energy data from RASPA output content.
 
@@ -130,7 +130,7 @@ def parse_energy_data(content: str) -> Dict[str, float]:
             last_cycle_data,
         )
 
-        for comp_name, value, avg_value in energy_components:
+        for comp_name, value, _avg_value in energy_components:
             comp_name = comp_name.strip()
             if comp_name != "Total potential energy":  # Already captured
                 energy_data[comp_name.lower().replace(" ", "_")] = float(value)
@@ -138,7 +138,7 @@ def parse_energy_data(content: str) -> Dict[str, float]:
     return energy_data
 
 
-def parse_pressure_data(content: str) -> Dict[str, float]:
+def parse_pressure_data(content: str) -> dict[str, float]:
     """
     Parse pressure data from RASPA output content.
 
@@ -176,7 +176,7 @@ def parse_pressure_data(content: str) -> Dict[str, float]:
     return pressure_data
 
 
-def parse_enthalpy_data(content: str) -> Dict[str, Dict[str, float]]:
+def parse_enthalpy_data(content: str) -> dict[str, dict[str, float]]:
     """
     Parse enthalpy of adsorption data from RASPA output content.
 
@@ -199,7 +199,7 @@ def parse_enthalpy_data(content: str) -> Dict[str, Dict[str, float]]:
     return enthalpy_data
 
 
-def parse_raspa_txt(file_path: Union[str, Path]) -> Dict[str, Any]:
+def parse_raspa_txt(file_path: str | Path) -> dict[str, Any]:
     """
     Parse a RASPA3 text output file.
 
@@ -211,7 +211,7 @@ def parse_raspa_txt(file_path: Union[str, Path]) -> Dict[str, Any]:
     """
     file_path = Path(file_path)
 
-    with open(file_path, "r") as f:
+    with open(file_path) as f:
         content = f.read()
 
     # Extract basic information
@@ -247,7 +247,7 @@ def parse_raspa_txt(file_path: Union[str, Path]) -> Dict[str, Any]:
     return result
 
 
-def extract_adsorption_data(parsed_data: Dict[str, Any]) -> Dict[str, Any]:
+def extract_adsorption_data(parsed_data: dict[str, Any]) -> dict[str, Any]:
     """
     Extract adsorption data from parsed RASPA output.
 
@@ -268,7 +268,7 @@ def extract_adsorption_data(parsed_data: Dict[str, Any]) -> Dict[str, Any]:
     return {}
 
 
-def extract_energy_data(parsed_data: Dict[str, Any]) -> Dict[str, Any]:
+def extract_energy_data(parsed_data: dict[str, Any]) -> dict[str, Any]:
     """
     Extract energy data from parsed RASPA output.
 
@@ -289,7 +289,7 @@ def extract_energy_data(parsed_data: Dict[str, Any]) -> Dict[str, Any]:
     return {}
 
 
-def extract_enthalpy_data(parsed_data: Dict[str, Any]) -> Dict[str, Any]:
+def extract_enthalpy_data(parsed_data: dict[str, Any]) -> dict[str, Any]:
     """
     Extract enthalpy of adsorption data from parsed RASPA output.
 
@@ -314,7 +314,7 @@ def extract_enthalpy_data(parsed_data: Dict[str, Any]) -> Dict[str, Any]:
     return {}
 
 
-def parse_output_directory(directory_path: Union[str, Path]) -> Dict[str, Any]:
+def parse_output_directory(directory_path: str | Path) -> dict[str, Any]:
     """
     Parse all RASPA output files in a directory.
 

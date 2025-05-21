@@ -1,16 +1,19 @@
-import numpy as np
-from collections import namedtuple
-import os
 import json
+import logging
+import os
+from collections import namedtuple
 from copy import deepcopy
-from chmpy.util.text import subscript, overline
+
+import numpy as np
+
+from chmpy.util.text import overline, subscript
+
 from .point_group import PointGroup
 from .symmetry_operation import (
     SymmetryOperation,
     expanded_symmetry_list,
     reduced_symmetry_list,
 )
-import logging
 
 LOG = logging.getLogger(__name__)
 
@@ -92,7 +95,7 @@ class SpaceGroup:
                     sgdata = candidate
                     break
             else:
-                raise ValueError("Could not find choice {}".format(choice))
+                raise ValueError(f"Could not find choice {choice}")
         self.symbol = sgdata.short
         self.full_symbol = sgdata.full
         self.choice = sgdata.choice
@@ -112,7 +115,7 @@ class SpaceGroup:
     def cif_section(self) -> str:
         "Representation of the SpaceGroup in CIF files"
         return "\n".join(
-            "{} {}".format(i, sym.cif_form)
+            f"{i} {sym.cif_form}"
             for i, sym in enumerate(self.symmetry_operations, start=1)
         )
 
@@ -305,9 +308,7 @@ class SpaceGroup:
         return generator_symop, transformed
 
     def __repr__(self):
-        return "<{} {}: {}>".format(
-            self.__class__.__name__, self.international_tables_number, self.full_symbol
-        )
+        return f"<{self.__class__.__name__} {self.international_tables_number}: {self.full_symbol}>"
 
     def __eq__(self, other):
         return (
@@ -385,8 +386,6 @@ class SpaceGroup:
                 if sgdata is not None:
                     break
             else:
-                raise ValueError(
-                    "Could not find matching space group for '{}'".format(symbol)
-                )
+                raise ValueError(f"Could not find matching space group for '{symbol}'")
 
         return SpaceGroup(sgdata.number, choice=sgdata.choice)

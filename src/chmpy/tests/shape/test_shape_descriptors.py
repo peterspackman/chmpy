@@ -1,6 +1,9 @@
 import unittest
+
 import numpy as np
+
 from chmpy.crystal import Crystal
+
 from .. import TEST_FILES
 
 
@@ -22,7 +25,7 @@ class ShapeDescriptorTestCase(unittest.TestCase):
         self.assertEqual(desc.shape, (8,))
 
     def test_invariants(self):
-        from chmpy.shape.shape_descriptors import make_N_invariants, make_invariants
+        from chmpy.shape.shape_descriptors import make_invariants, make_N_invariants
 
         coeffs = np.random.rand(16).astype(np.complex128)
         inv = make_N_invariants(coeffs)

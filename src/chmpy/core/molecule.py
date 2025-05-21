@@ -1,13 +1,13 @@
 import logging
 from collections import defaultdict
+from pathlib import Path
+
+import numpy as np
+from scipy.sparse import dok_matrix
 from scipy.spatial import cKDTree as KDTree
 from scipy.spatial.distance import cdist
-from scipy.sparse import dok_matrix
-from pathlib import Path
-import numpy as np
-from .element import Element
-from typing import Tuple, List, Union
 
+from .element import Element
 
 _FUNCTIONAL_GROUP_SUBGRAPHS = {}
 LOG = logging.getLogger(__name__)
@@ -78,8 +78,7 @@ class Molecule:
             self.labels = labels
 
     def __iter__(self):
-        for atom in zip(self.elements, self.positions):
-            yield atom
+        yield from zip(self.elements, self.positions, strict=False)
 
     def __len__(self):
         return len(self.elements)
@@ -90,14 +89,14 @@ class Molecule:
         return cdist(self.positions, self.positions)
 
     @property
-    def unique_bonds(self) -> List:
+    def unique_bonds(self) -> list:
         """The unique bonds for this molecule. If bonds are not assigned,
         this will `None`"""
         if self.bonds is None:
             return None
         return tuple(
             (a, b, self.bonds[a, b])
-            for a, b in set(tuple(sorted(x)) for x in self.bonds.keys())
+            for a, b in {tuple(sorted(x)) for x in self.bonds.keys()}
         )
 
     def guess_bonds(self, tolerance=0.40):
@@ -136,7 +135,7 @@ class Molecule:
         except Exception:
             pass
 
-    def connected_fragments(self) -> List:
+    def connected_fragments(self) -> list:
         """
         Separate this molecule into fragments/molecules based
         on covalent bonding criteria.
@@ -144,8 +143,9 @@ class Molecule:
         Returns:
             a list of connected `Molecule` objects
         """
-        from chmpy.util.num import cartesian_product
         from scipy.sparse.csgraph import connected_components
+
+        from chmpy.util.num import cartesian_product
 
         if self.bonds is None:
             self.guess_bonds()
@@ -173,7 +173,7 @@ class Molecule:
         labels = []
         for el, _ in self:
             counts[el] += 1
-            labels.append("{}{}".format(el.symbol, counts[el]))
+            labels.append(f"{el.symbol}{counts[el]}")
         self.labels = np.asarray(labels)
 
     def distance_to(self, other, method="centroid"):
@@ -264,7 +264,7 @@ class Molecule:
         from chmpy.util.unit import BOHR_TO_ANGSTROM
 
         v_pot = np.zeros(positions.shape[0])
-        for charge, position in zip(self.partial_charges, self.positions):
+        for charge, position in zip(self.partial_charges, self.positions, strict=False):
             if charge == 0.0:
                 continue
             r = np.linalg.norm(positions - position[np.newaxis, :], axis=1)
@@ -282,9 +282,7 @@ class Molecule:
 
     def __repr__(self):
         x, y, z = self.center_of_mass
-        return "<{name} ({formula})[{x:.2f} {y:.2f} {z:.2f}]>".format(
-            name=self.name, formula=self.molecular_formula, x=x, y=y, z=z
-        )
+        return f"<{self.name} ({self.molecular_formula})[{x:.2f} {y:.2f} {z:.2f}]>"
 
     @classmethod
     def from_xyz_string(cls, contents, **kwargs):
@@ -380,7 +378,12 @@ class Molecule:
         N = len(elements)
 
         positions = np.array(
-            [tuple(p) for p in zip(atoms.pop("x"), atoms.pop("y"), atoms.pop("z"))]
+            [
+                tuple(p)
+                for p in zip(
+                    atoms.pop("x"), atoms.pop("y"), atoms.pop("z"), strict=False
+                )
+            ]
         )
 
         labels = None
@@ -391,7 +394,9 @@ class Molecule:
         if bonds != {}:
             bondlist = dok_matrix((N, N))
 
-            for a, b, t in zip(bonds["origin"], bonds["target"], bonds["type"]):
+            for a, b, t in zip(
+                bonds["origin"], bonds["target"], bonds["type"], strict=False
+            ):
                 bondlist[a - 1, b - 1] = int(t)
 
         return cls(
@@ -509,7 +514,7 @@ class Molecule:
             ]
         else:
             lines = []
-        for el, (x, y, z) in zip(self.elements, self.positions):
+        for el, (x, y, z) in zip(self.elements, self.positions, strict=False):
             lines.append(f"{el} {x: 20.12f} {y: 20.12f} {z: 20.12f}")
         return "\n".join(lines)
 
@@ -547,7 +552,7 @@ class Molecule:
         return extension_map[extension](filename, **kwargs)
 
     @property
-    def bbox_corners(self) -> Tuple:
+    def bbox_corners(self) -> tuple:
         "the lower, upper corners of a axis-aligned bounding box for this molecule"
         b_min = np.min(self.positions, axis=0)
         b_max = np.max(self.positions, axis=0)
@@ -570,13 +575,13 @@ class Molecule:
         """
 
         if hasattr(self, "_bond_graph"):
-            return getattr(self, "_bond_graph")
+            return self._bond_graph
         try:
             import graph_tool as gt
-        except ImportError:
+        except ImportError as e:
             raise RuntimeError(
                 "Please install the graph_tool library for graph operations"
-            )
+            ) from e
         if self.bonds is None:
             self.guess_bonds()
         g = gt.Graph(directed=False)
@@ -590,7 +595,7 @@ class Molecule:
         self._bond_graph = g
         return g
 
-    def functional_groups(self, kind=None) -> Union[dict, List]:
+    def functional_groups(self, kind=None) -> dict | list:
         """
         Find all indices of atom groups which constitute
         subgraph isomorphisms with stored functional group data
@@ -605,10 +610,11 @@ class Molecule:
         global _FUNCTIONAL_GROUP_SUBGRAPHS
         try:
             import graph_tool.topology as top  # noqa: F401
-        except ImportError:
+        except ImportError as e:
             raise RuntimeError(
                 "Please install the graph_tool library for graph operations"
-            )
+            ) from e
+
         if not _FUNCTIONAL_GROUP_SUBGRAPHS:
             from chmpy.subgraphs import load_data
 
@@ -618,14 +624,14 @@ class Molecule:
             sub = _FUNCTIONAL_GROUP_SUBGRAPHS[kind]
             matches = self.matching_subgraph(sub)
             if kind == "ring":
-                matches = list(set(tuple(sorted(x)) for x in matches))
+                matches = list({tuple(sorted(x)) for x in matches})
             return matches
 
         matches = {}
         for n, sub in _FUNCTIONAL_GROUP_SUBGRAPHS.items():
             m = self.matching_subgraph(sub)
             if n == "ring":
-                m = list(set(tuple(sorted(x)) for x in m))
+                m = list({tuple(sorted(x)) for x in m})
             matches[n] = m
         return matches
 
@@ -642,10 +648,10 @@ class Molecule:
 
         try:
             import graph_tool.topology as top
-        except ImportError:
+        except ImportError as e:
             raise RuntimeError(
                 "Please install the graph_tool library for graph operations"
-            )
+            ) from e
 
         g = self.bond_graph()
         matches = top.subgraph_isomorphism(
@@ -673,10 +679,10 @@ class Molecule:
         """
         try:
             import graph_tool.topology as top
-        except ImportError:
+        except ImportError as e:
             raise RuntimeError(
                 "Please install the graph_tool library for graph operations"
-            )
+            ) from e
 
         sub = fragment.bond_graph()
         g = self.bond_graph()
@@ -781,10 +787,11 @@ class Molecule:
                 weight isosurfaces
         """
 
+        import trimesh
+        from matplotlib.cm import get_cmap
+
         from chmpy import StockholderWeight
         from chmpy.surface import stockholder_weight_isosurface
-        from matplotlib.cm import get_cmap
-        import trimesh
         from chmpy.util.color import DEFAULT_COLORMAPS
 
         sep = kwargs.get("separation", kwargs.get("resolution", 0.2))
@@ -886,10 +893,11 @@ class Molecule:
         Returns:
             trimesh.Trimesh: A mesh representing the promolecule density isosurface
         """
+        import trimesh
+
         from chmpy import PromoleculeDensity
         from chmpy.surface import promolecule_density_isosurface
         from chmpy.util.color import property_to_color
-        import trimesh
 
         isovalue = kwargs.get("isovalue", 0.002)
         sep = kwargs.get("separation", kwargs.get("resolution", 0.2))
@@ -1043,7 +1051,7 @@ class Molecule:
         return np.sort(np.linalg.eig(t)[0])
 
     def rotational_constants(self, unit="MHz"):
-        from scipy.constants import Planck, speed_of_light, Avogadro
+        from scipy.constants import Avogadro, Planck, speed_of_light
 
         # convert amu angstrom^2 to g cm^2
         moments = self.principle_moments_of_inertia() / Avogadro / 1e16

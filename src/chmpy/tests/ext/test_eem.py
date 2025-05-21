@@ -1,8 +1,11 @@
+import unittest
+
+import numpy as np
+
 from chmpy import Molecule
 from chmpy.ext.charges import EEM
-import unittest
+
 from .. import TEST_FILES
-import numpy as np
 
 
 class EEMTestCase(unittest.TestCase):

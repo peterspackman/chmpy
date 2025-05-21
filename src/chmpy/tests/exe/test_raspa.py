@@ -1,10 +1,11 @@
-import unittest
-import os
 import json
-import tempfile
-from pathlib import Path
+import os
 import shutil
-from unittest.mock import patch, MagicMock
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
 from chmpy.exe import Raspa
 from chmpy.util.exe import which
 

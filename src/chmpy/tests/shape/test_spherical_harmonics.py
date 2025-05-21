@@ -1,5 +1,6 @@
-import unittest
 import math
+import unittest
+
 from chmpy.shape.spherical_harmonics import SphericalHarmonics
 
 

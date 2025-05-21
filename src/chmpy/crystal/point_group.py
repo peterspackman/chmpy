@@ -1,6 +1,8 @@
 from dataclasses import dataclass
-from chmpy.crystal.symmetry_operation import SymmetryOperation
+
 import numpy as np
+
+from chmpy.crystal.symmetry_operation import SymmetryOperation
 
 _PG_ROTATION_AXES = np.array(
     [

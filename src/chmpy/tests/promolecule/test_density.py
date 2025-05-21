@@ -1,6 +1,9 @@
 import unittest
+
 import numpy as np
+
 from chmpy import PromoleculeDensity, StockholderWeight
+
 from .. import TEST_FILES
 
 

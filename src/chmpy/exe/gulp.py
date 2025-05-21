@@ -1,10 +1,12 @@
-from .exe import AbstractExecutable, ReturnCodeError
+import copy
 import logging
 from os import environ
 from pathlib import Path
-from chmpy.util.exe import which
-import copy
 from tempfile import TemporaryFile
+
+from chmpy.util.exe import which
+
+from .exe import AbstractExecutable, ReturnCodeError
 
 GULP_EXEC = which("gulp")
 LOG = logging.getLogger("gulp")
@@ -78,8 +80,9 @@ class Gulp(AbstractExecutable):
                 tmp.seek(0)
                 self.error_contents = tmp.read().decode("utf-8")
         except ReturnCodeError as e:
-            from chmpy.util.path import list_directory
             from shutil import copytree
+
+            from chmpy.util.path import list_directory
 
             LOG.error("GULP execution failed: %s", e)
             self.post_process()

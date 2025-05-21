@@ -1,9 +1,9 @@
 import sys
 
 if sys.version_info.major == 3 and sys.version_info.minor >= 10:
-    from collections.abc import MutableMapping, Mapping
+    from collections.abc import Mapping, MutableMapping
 else:
-    from collections import MutableMapping, Mapping
+    from collections.abc import Mapping, MutableMapping
 
 
 def recursive_dict_update(dict_to, dict_from):
@@ -19,8 +19,8 @@ def recursive_dict_update(dict_to, dict_from):
         dict: the modified dict_to
 
     Examples:
-        >>> d1 = {'test': {'test_val': 3}}
-        >>> d2 = {'test': {'test_val': 5}, 'other': 3}
+        >>> d1 = {"test": {"test_val": 3}}
+        >>> d2 = {"test": {"test_val": 5}, "other": 3}
         >>> recursive_dict_update(d1, d2)
         {'test': {'test_val': 5}, 'other': 3}
     """
@@ -46,12 +46,12 @@ def nested_dict_delete(root, key, sep="."):
         dict: the modified dict_to
 
     Examples:
-        >>> d1 = {'test': {'test_val': 3}}
-        >>> d2 = {'test': {'test_val': 5, 'test_val_2': 7}, 'other': 3}
-        >>> nested_dict_delete(d1, 'test.test_val')
+        >>> d1 = {"test": {"test_val": 3}}
+        >>> d2 = {"test": {"test_val": 5, "test_val_2": 7}, "other": 3}
+        >>> nested_dict_delete(d1, "test.test_val")
         >>> d1
         {}
-        >>> nested_dict_delete(d2, 'test.test_val')
+        >>> nested_dict_delete(d2, "test.test_val")
         >>> d2
         {'test': {'test_val_2': 7}, 'other': 3}
     """

@@ -1,8 +1,10 @@
 import unittest
 from os.path import join
-from chmpy.crystal import Crystal
 from tempfile import TemporaryDirectory
+
+from chmpy.crystal import Crystal
 from chmpy.util.mesh import save_mesh
+
 from .. import TEST_FILES
 
 

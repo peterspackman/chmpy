@@ -1,6 +1,6 @@
 import logging
-from pathlib import Path
 import re
+from pathlib import Path
 
 LOG = logging.getLogger(__name__)
 NUM_ERR_REGEX = re.compile(r"([-+]?(\d+([.,]\d*)?|[.,]\d+)([eE][-+]?\d+)?)(\(\d+\))?")
@@ -228,7 +228,7 @@ class Cif:
 
         for value in values:
             vs = re.findall(VALUES_REGEX, value.strip())
-            for k, v in zip(keys, vs):
+            for k, v in zip(keys, vs, strict=False):
                 self.current_data_block[k].append(parse_value(v))
         LOG.debug("Parsed loop block")
 
@@ -306,18 +306,18 @@ class Cif:
                     vector_data_names.append(data_name)
             from itertools import groupby
 
-            for name_section, names in groupby(
+            for _name_section, names_top in groupby(
                 vector_data_names, key=lambda x: x.split("_")[0]
             ):
-                for section, names in groupby(
-                    names, key=lambda x: len(data_block_data[x])
+                for _section, names in groupby(
+                    names_top, key=lambda x: len(data_block_data[x])
                 ):
                     lines.append("loop_")
                     loop_values = []
                     for name in names:
                         lines.append(f"_{name}")
                         loop_values.append(data_block_data[name])
-                    for row in zip(*loop_values):
+                    for row in zip(*loop_values, strict=False):
                         lines.append(" ".join(format_field(x) for x in row))
 
         lines.append("#END")

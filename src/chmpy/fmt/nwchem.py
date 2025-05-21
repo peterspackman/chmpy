@@ -1,5 +1,6 @@
-from chmpy.templates import load_template
 import logging
+
+from chmpy.templates import load_template
 
 LOG = logging.getLogger(__name__)
 NWCHEM_INPUT_TEMPLATE = load_template("nwchem_input")

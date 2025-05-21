@@ -1,7 +1,8 @@
 """Module to store jinja2 templates for ccpy"""
 
-from os.path import dirname, abspath, split
 import logging
+from os.path import abspath, dirname, split
+
 from jinja2 import Environment, FileSystemLoader, Template
 
 LOG = logging.getLogger(__name__)

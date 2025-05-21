@@ -1,12 +1,14 @@
-from .exe import AbstractExecutable, ReturnCodeError
-import logging
-from os import environ
-from pathlib import Path
-from chmpy.util.exe import which
 import copy
 import json
-from tempfile import TemporaryFile
+import logging
 import shutil
+from os import environ
+from pathlib import Path
+from tempfile import TemporaryFile
+
+from chmpy.util.exe import which
+
+from .exe import AbstractExecutable, ReturnCodeError
 
 RASPA_EXEC = which("raspa3")
 LOG = logging.getLogger("raspa")
@@ -138,7 +140,7 @@ class Raspa(AbstractExecutable):
             if framework_dest:
                 # Handle both file paths and content strings
                 if (
-                    isinstance(self.framework_file, (str, Path))
+                    isinstance(self.framework_file, str | Path)
                     and Path(self.framework_file).exists()
                 ):
                     shutil.copy2(self.framework_file, framework_dest)
@@ -155,8 +157,7 @@ class Raspa(AbstractExecutable):
                 component_content = json.dumps(component_file, indent=2)
                 Path(component_dest).write_text(component_content)
             elif (
-                isinstance(component_file, (str, Path))
-                and Path(component_file).exists()
+                isinstance(component_file, str | Path) and Path(component_file).exists()
             ):
                 shutil.copy2(component_file, component_dest)
             else:
@@ -204,8 +205,9 @@ class Raspa(AbstractExecutable):
                 tmp.seek(0)
                 self.error_contents = tmp.read().decode("utf-8")
         except ReturnCodeError as e:
-            from chmpy.util.path import list_directory
             from shutil import copytree
+
+            from chmpy.util.path import list_directory
 
             LOG.error("RASPA3 execution failed: %s", e)
             self.post_process()

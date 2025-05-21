@@ -1,9 +1,11 @@
-from chmpy.templates import load_template
-from chmpy.crystal import SymmetryOperation
-from chmpy import Element
-from pathlib import Path
-import numpy as np
 import logging
+from pathlib import Path
+
+import numpy as np
+
+from chmpy import Element
+from chmpy.crystal import SymmetryOperation
+from chmpy.templates import load_template
 
 LOG = logging.getLogger(__name__)
 CRYSTAL17_TEMPLATE = load_template("crystal17")
@@ -36,7 +38,7 @@ def to_crystal17_input(crystal, **kwargs):
         title=crystal.titl,
         method=method,
         natoms=len(crystal.asym),
-        atoms=zip(crystal.asym.positions, crystal.asym.elements),
+        atoms=zip(crystal.asym.positions, crystal.asym.elements, strict=False),
         **parameters,
     )
 

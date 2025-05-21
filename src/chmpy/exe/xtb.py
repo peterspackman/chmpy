@@ -1,12 +1,15 @@
-from .exe import AbstractExecutable, ReturnCodeError
+import copy
 import logging
 from os import environ
 from os.path import exists, join
 from pathlib import Path
-from chmpy.util.exe import which
-import copy
 from tempfile import TemporaryFile
+
 import numpy as np
+
+from chmpy.util.exe import which
+
+from .exe import AbstractExecutable, ReturnCodeError
 
 XTB_EXEC = which("xtb")
 LOG = logging.getLogger("xtb")
@@ -99,10 +102,10 @@ class Xtb(AbstractExecutable):
                 LOG.debug("Reading %s: %s", k, loc)
                 setattr(self, k + "_contents", Path(loc).read_text())
         if exists(self.esp_file):
-            setattr(self, "esp", np.loadtxt(self.esp_file))
+            self.esp = np.loadtxt(self.esp_file)
 
         if exists(self.partial_charge_file):
-            setattr(self, "partial_charges", np.loadtxt(self.partial_charge_file))
+            self.partial_charges = np.loadtxt(self.partial_charge_file)
 
     def run(self, *args, **kwargs):
         LOG.debug("Running `xtb %s`", " ".join(self.args))
@@ -121,8 +124,9 @@ class Xtb(AbstractExecutable):
                 tmp.seek(0)
                 self.error_contents = tmp.read().decode("utf-8")
         except ReturnCodeError as e:
-            from chmpy.util.path import list_directory
             from shutil import copytree
+
+            from chmpy.util.path import list_directory
 
             LOG.error("XTB failed: %s", e)
             self.post_process()

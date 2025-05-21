@@ -43,8 +43,8 @@ import base64
 import numpy as np
 
 from . import lookup_tables
+from ._mc_lewiner import LutProvider, remove_degenerate_faces
 from ._mc_lewiner import marching_cubes as _marching_cubes
-from ._mc_lewiner import remove_degenerate_faces, LutProvider
 
 
 def marching_cubes(
@@ -183,8 +183,8 @@ def marching_cubes(
         faces = np.fliplr(faces)
     elif not gradient_direction == "ascent":
         raise ValueError(
-            "Incorrect input %s in `gradient_direction`, see "
-            "docstring." % (gradient_direction)
+            f"Incorrect input {gradient_direction} in `gradient_direction`, see "
+            "docstring."
         )
     if not np.array_equal(spacing, (1, 1, 1)):
         vertices = vertices * np.r_[spacing]

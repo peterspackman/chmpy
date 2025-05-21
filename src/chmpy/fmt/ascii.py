@@ -1,6 +1,7 @@
 import logging
-from pathlib import Path
 from io import StringIO
+from pathlib import Path
+
 import numpy as np
 
 LOG = logging.getLogger(__name__)

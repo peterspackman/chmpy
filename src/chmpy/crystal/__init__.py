@@ -7,10 +7,10 @@ fractional coordinates (`SymmetryOperation`) and more.
 
 from .asymmetric_unit import AsymmetricUnit
 from .crystal import Crystal
-from .symmetry_operation import SymmetryOperation
-from .space_group import SpaceGroup
-from .unit_cell import UnitCell
 from .point_group import PointGroup
+from .space_group import SpaceGroup
+from .symmetry_operation import SymmetryOperation
+from .unit_cell import UnitCell
 
 __all__ = [
     "AsymmetricUnit",

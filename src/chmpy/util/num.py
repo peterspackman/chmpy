@@ -1,5 +1,6 @@
-import numpy as np
 from numbers import Number
+
+import numpy as np
 
 
 def is_perfect_square(value: Number) -> bool:

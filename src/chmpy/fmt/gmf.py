@@ -1,5 +1,6 @@
-from pathlib import Path
 from dataclasses import dataclass
+from pathlib import Path
+
 import numpy as np
 
 
@@ -12,7 +13,9 @@ class GMF:
     @classmethod
     def from_file(cls, filename):
         lines = Path(filename).read_text().splitlines()
+        start_line = 0
         for i, line in enumerate(lines):
+            start_line = i
             if not line:
                 continue
             if "miller: " in line:
@@ -21,8 +24,8 @@ class GMF:
         hkls = []
         energies = []
         cuts = []
-        for i in range(i, len(lines), 2):
-            merged = lines[i] + lines[i + 1]
+        for j in range(start_line, len(lines), 2):
+            merged = lines[j] + lines[j + 1]
             tokens = merged.split()
             hkls.append(tuple(int(x) for x in tokens[1:4]))
             energies.append(float(tokens[7]))

@@ -14,12 +14,12 @@ def parse_grd_file(filename):
         f.readline()
         nobjects = int(f.readline())
         objects = []
-        for i in range(nobjects):
+        for _i in range(nobjects):
             objects.append(f.readline())
         f.readline()
         nconnections = int(f.readline())
         connections = []
-        for i in range(nconnections):
+        for _i in range(nconnections):
             connections.append(f.readline())
         f.readline()
         contents["data"] = np.loadtxt(f)

@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+
 from chmpy.crystal import SymmetryOperation
 
 LOG = logging.getLogger(__name__)

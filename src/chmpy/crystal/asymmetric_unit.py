@@ -1,6 +1,8 @@
 import logging
 from collections import defaultdict
+
 import numpy as np
+
 from chmpy.core.element import Element, chemical_formula
 
 LOG = logging.getLogger(__name__)
@@ -46,7 +48,7 @@ class AsymmetricUnit:
             label_index = defaultdict(int)
             for el in self.elements:
                 label_index[el] += 1
-                self.labels.append("{}{}".format(el, label_index[el]))
+                self.labels.append(f"{el}{label_index[el]}")
         else:
             self.labels = labels
         self.labels = np.array(self.labels)
@@ -60,7 +62,7 @@ class AsymmetricUnit:
         return len(self.elements)
 
     def __repr__(self):
-        return "<{}>".format(self.formula)
+        return f"<{self.formula}>"
 
     @classmethod
     def from_records(cls, records):

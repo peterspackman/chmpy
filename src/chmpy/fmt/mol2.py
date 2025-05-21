@@ -1,5 +1,5 @@
-from collections import defaultdict
 import logging
+from collections import defaultdict
 from pathlib import Path
 
 LOG = logging.getLogger(__name__)
@@ -79,7 +79,7 @@ _BOND_FIELDS = (
 def parse_atom_lines(lines):
     atom_data = defaultdict(list)
     for line in lines[1:]:
-        for (n, f), tok in zip(_ATOM_FIELDS, line.split()):
+        for (n, f), tok in zip(_ATOM_FIELDS, line.split(), strict=False):
             atom_data[n].append(f(tok))
     return atom_data
 
@@ -87,7 +87,7 @@ def parse_atom_lines(lines):
 def parse_bond_lines(lines):
     bond_data = defaultdict(list)
     for line in lines[1:]:
-        for (n, f), tok in zip(_BOND_FIELDS, line.split()):
+        for (n, f), tok in zip(_BOND_FIELDS, line.split(), strict=False):
             bond_data[n].append(f(tok))
     return bond_data
 

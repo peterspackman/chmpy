@@ -87,7 +87,7 @@ class ElasticTensor:
         try:
             self.s_voigt = np.linalg.inv(self.c_voigt)
         except np.linalg.LinalgError as e:
-            raise ValueError(f"Error inverting s_voigt: {e}")
+            raise ValueError(f"Error inverting s_voigt: {e}") from e
 
         vm = np.array(((0, 5, 4), (5, 1, 3), (4, 3, 2)))
 
@@ -128,7 +128,7 @@ class ElasticTensor:
             try:
                 mat = [[float(x) for x in line.split()] for line in lines]
             except ValueError as e:
-                raise ValueError(f"not all entries are numbers: {e}")
+                raise ValueError(f"not all entries are numbers: {e}") from e
         return cls(mat)
 
     def youngs_modulus_angular(self, theta, phi):

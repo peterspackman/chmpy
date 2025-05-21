@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
-from chmpy.crystal.sfac import LAMBDA_Cu
 import numpy as np
+
+from chmpy.crystal.sfac import LAMBDA_Cu
 
 
 class PowderPattern:

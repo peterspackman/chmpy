@@ -1,5 +1,5 @@
-from pathlib import Path
 import logging
+from pathlib import Path
 
 __all__ = ["load_data"]
 DIR = Path(__file__).parent

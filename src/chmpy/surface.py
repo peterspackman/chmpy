@@ -1,9 +1,11 @@
 """Isosurfaces for molecules in crystals or isolation."""
 
-import numpy as np
-from collections import namedtuple
-import time
 import logging
+import time
+from collections import namedtuple
+
+import numpy as np
+
 from chmpy.mc import marching_cubes
 
 IsosurfaceMesh = namedtuple("IsosurfaceMesh", "vertices faces normals vertex_prop")
@@ -12,8 +14,8 @@ LOG = logging.getLogger(__name__)
 
 def smooth_laplacian(vertices, faces, **kwargs):
     """Smooth vertices and faces using a Laplacian filter"""
-    from trimesh.smoothing import filter_humphrey
     from trimesh import Trimesh
+    from trimesh.smoothing import filter_humphrey
 
     kwargs.setdefault("iterations", 2)
     mesh = Trimesh(vertices, faces)

@@ -1,7 +1,9 @@
-from .exe import AbstractExecutable, run_subprocess, ReturnCodeError
-from chmpy.util.exe import which
-from pathlib import Path
 import logging
+from pathlib import Path
+
+from chmpy.util.exe import which
+
+from .exe import AbstractExecutable, ReturnCodeError, run_subprocess
 
 LOG = logging.getLogger("gaussian")
 
