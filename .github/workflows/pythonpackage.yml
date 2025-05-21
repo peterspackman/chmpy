@@ -48,18 +48,18 @@ jobs:
 
     - name: Install python build module 
       run: |
-        python -m pip install --upgrade pip build flake8 pytest
+        python -m pip install --upgrade pip build ruff pytest
 
     - name: Build the project
       run: |
         python -m pip install -e . -v
 
-    - name: Lint (flake8)
+    - name: Lint (ruff)
       run: |
-        # stop the build if there are Python syntax errors or undefined names
-        python -m flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        python -m flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        # Check for Python syntax errors or undefined names
+        python -m ruff check . --select=E9,F63,F7,F82 --output-format=github
+        # Run full linting with the configured rules (warnings only)
+        python -m ruff check . --output-format=github
 
     - name: Run tests
       run: |

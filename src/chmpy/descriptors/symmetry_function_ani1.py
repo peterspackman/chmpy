@@ -84,9 +84,9 @@ class SymmetryFunctionsANI1:
         args = SYMF_DEFAULT_PARAMETERS.copy()
         args.update(kwargs)
 
-        assert len(args["angular_rs"]) == len(
-            args["theta"]
-        ), "Angular R_s and Theta lists must be the same length."
+        assert len(args["angular_rs"]) == len(args["theta"]), (
+            "Angular R_s and Theta lists must be the same length."
+        )
 
         # Generate a finite cluster of molecules to the largest cutoff given
         # This is done by centroid-centroid distances and so should be sufficient

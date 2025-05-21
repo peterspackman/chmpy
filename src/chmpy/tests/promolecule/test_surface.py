@@ -14,12 +14,8 @@ class SurfaceTestCase(unittest.TestCase):
         _ = self.acetic_acid.promolecule_density_isosurfaces(separation=1.0)
 
     def test_hirshfeld_surfaces(self):
-        _ = self.acetic_acid.stockholder_weight_isosurfaces(
-            separation=1.0, radius=3.8
-        )
-        _ = self.acetic_acid.hirshfeld_surfaces(
-            separation=1.0, radius=3.8, kind="atom"
-        )
+        _ = self.acetic_acid.stockholder_weight_isosurfaces(separation=1.0, radius=3.8)
+        _ = self.acetic_acid.hirshfeld_surfaces(separation=1.0, radius=3.8, kind="atom")
 
     def test_save(self):
         with TemporaryDirectory() as tmpdirname:

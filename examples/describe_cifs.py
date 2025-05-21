@@ -34,7 +34,7 @@ def main():
     for path in tqdm(cifs, desc="Loading crystals"):
         try:
             crystals.append((str(path), Crystal.load(str(path))))
-        except Exception as e:
+        except Exception:
             LOG.error("Error reading %s, skipping", path.name)
 
     natoms = sum(len(x[1].asymmetric_unit) for x in crystals)

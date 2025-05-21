@@ -519,7 +519,7 @@ class Crystal:
         their information and caches it.
 
         Args:
-            bounds (Tuple, optional): Tuple of upper and lower corners (hkl) 
+            bounds (Tuple, optional): Tuple of upper and lower corners (hkl)
                 describing the bounds of the slab.
 
         Returns:
@@ -769,7 +769,7 @@ class Crystal:
         Returns:
             A list of tuples of (func_el, func_pos, neigh_el, neigh_pos)
             where `func_el` and `neigh_el` are `np.ndarray` of atomic numbers,
-            and `func_pos` and `neigh_pos` are `np.ndarray` of 
+            and `func_pos` and `neigh_pos` are `np.ndarray` of
             Cartesian atomic positions
         """
         results = []
@@ -889,7 +889,7 @@ class Crystal:
 
                 Options are:
                 ```
-                isovalue (float, optional): level set value for the 
+                isovalue (float, optional): level set value for the
                     isosurface (default=0.002) in au.
                 separation (float, optional): separation between density grid
                     used in the surface calculation (default 0.2) in Angstroms.
@@ -1023,7 +1023,7 @@ class Crystal:
                     surface property to use for vertex coloring, one of ('d_norm_i',
                     'd_i', 'd_norm_e', 'd_e', 'd_norm', 'fragment_patch')
                 colormap: str, optional
-                    matplotlib colormap to use for surface coloring 
+                    matplotlib colormap to use for surface coloring
                     (default 'viridis_r')
                 midpoint: float, optional, default 0.0 if using d_norm
                     use the midpoint norm (as is used in CrystalExplorer)
@@ -1106,7 +1106,7 @@ class Crystal:
         self, l_max=5, radius=6.0, kind="carboxylic_acid"
     ) -> np.ndarray:
         """
-        Calculate the shape descriptors `[1,2]` for the all atoms in 
+        Calculate the shape descriptors `[1,2]` for the all atoms in
         the functional group given for all symmetry unique molecules in this crystal.
 
         Args:
@@ -1115,7 +1115,7 @@ class Crystal:
                 (default: 5)
             radius (float, optional): maximum distance (Angstroms) of neighbouring
                 atoms to include in stockholder weight calculation (default: 5)
-            kind (str, optional): Identifier for the functional group 
+            kind (str, optional): Identifier for the functional group
                 type (default: 'carboxylic_acid')
 
         Returns:
@@ -1169,7 +1169,7 @@ class Crystal:
             l_max (int, optional): maximum level of angular momenta to include
                 in the spherical harmonic
                 transform of the molecular shape function.
-            radius (float, optional): maximum distance (Angstroms) to include 
+            radius (float, optional): maximum distance (Angstroms) to include
                 surroundings in the shape description
             with_property (str, optional): name of the surface property to include
                 in the shape description
@@ -1280,7 +1280,7 @@ class Crystal:
                 surroundings in the shape description
             with_property (str, optional): name of the surface property to include
                 in the shape description
-            return_coefficients (bool, optional): also return the spherical 
+            return_coefficients (bool, optional): also return the spherical
                 harmonic coefficients
 
         Returns:
@@ -1331,7 +1331,7 @@ class Crystal:
         group in this crystal.
 
         Args:
-            atoms (Tuple): atoms to include in the as the 'inside' 
+            atoms (Tuple): atoms to include in the as the 'inside'
                 of the shape description.
             l_max (int, optional): maximum level of angular momenta to include
                 in the spherical harmonic transform of the molecular shape function.
@@ -1960,7 +1960,7 @@ class Crystal:
             dimers_a = []
             for mol_b in self.unit_cell_molecules():
                 for shift, shift_frac in zip(shifts, shifts_frac):
-                    # shift_frac assumes the molecule is generated from 
+                    # shift_frac assumes the molecule is generated from
                     # the [0, 0, 0] cell, it's not
                     mol_bt = mol_b.translated(shift)
                     r = mol_a.distance_to(mol_bt, method=distance_method)

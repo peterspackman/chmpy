@@ -15,13 +15,13 @@ class Dimer:
     Args:
             mol_a (Molecule):
                 one of the molecules in the pair (symmetry unique)
-            mol_b (Molecule): the neighbouring molecule (may be symmetry 
+            mol_b (Molecule): the neighbouring molecule (may be symmetry
                 related to mol_a)
-            separation (float, optional): set the separation of the molecules 
+            separation (float, optional): set the separation of the molecules
                 (otherwise it will be calculated)
-            transform_ab (np.ndarray, optional): specify the transform from mol_a 
+            transform_ab (np.ndarray, optional): specify the transform from mol_a
                 to mol_b (otherwise it will be calculated)
-            frac_shift (np.ndarray, optional): specify the offset in fractions 
+            frac_shift (np.ndarray, optional): specify the offset in fractions
                 of a unit cell, which combined with transform_ab will yield mol_b
     """
 

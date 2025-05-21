@@ -284,7 +284,7 @@ class Element(metaclass=_ElementMeta):
             s (str): a string representation of an element in the periodic table
 
         Returns:
-            Element: an Element object if the conversion was successful, 
+            Element: an Element object if the conversion was successful,
                 otherwise an exception is raised
 
         Examples:
@@ -316,7 +316,7 @@ class Element(metaclass=_ElementMeta):
             l (str): a string representation of an element in the periodic table
 
         Returns:
-            Element: an Element object if the conversion was successful, 
+            Element: an Element object if the conversion was successful,
                 otherwise an exception is raised
 
         Examples:
@@ -347,7 +347,7 @@ class Element(metaclass=_ElementMeta):
             n (int): the atomic number of the element
 
         Returns:
-            Element: an Element object if atomic number was valid, 
+            Element: an Element object if atomic number was valid,
                 otherwise an exception is raised
 
         Examples:
@@ -398,7 +398,7 @@ class Element(metaclass=_ElementMeta):
         return self.atomic_number == other.atomic_number
 
     def __lt__(self, other):
-        "Check which element comes before the other in chemical formulae "
+        "Check which element comes before the other in chemical formulae"
         "(C first, then order of atomic number)."
         if not self._is_valid_operand(other):
             raise NotImplementedError
@@ -426,7 +426,7 @@ def chemical_formula(elements, subscript=False):
         elements (List[Element or str]): a list of elements or element symbols.
             Note that if a list of strings are provided the order of chemical
             symbols may not match convention.
-        subscript (bool, optional): toggle to use unicode subscripts for the 
+        subscript (bool, optional): toggle to use unicode subscripts for the
             chemical formula string
 
     Returns:

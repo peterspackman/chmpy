@@ -125,6 +125,7 @@ def parse_sdf_contents(contents, limit=None, progress=False, keep_sdf_text=False
     results = []
     if limit is None:
         limit = len(compounds)
+
     def update(x):
         return None
 

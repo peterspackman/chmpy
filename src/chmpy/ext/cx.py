@@ -106,9 +106,7 @@ def interaction_energies(c, model="CE-B3LYP", radius=3.8, nthreads=1):
         wavefunctions = (wfn_a, wfn_b)
         mol_fchk_a = Molecule.from_fchk_string(wfn_a)
         mol_fchk_b = Molecule.from_fchk_string(wfn_b)
-        SymmetryOperation.from_integer_code(
-            d.b.properties["generator_symop"][0]
-        )
+        SymmetryOperation.from_integer_code(d.b.properties["generator_symop"][0])
         shift_a = d.a.centroid
         rot_a = kabsch_rotation_matrix(mol_fchk_a.positions, d.a.positions)
         rot_b = kabsch_rotation_matrix(mol_fchk_b.positions, d.b.positions)

@@ -263,7 +263,7 @@ class UnitCell:
 
     @property
     def is_hexagonal(self) -> bool:
-        "Returns true if lengths a == b, a != c, "
+        "Returns true if lengths a == b, a != c,"
         "alpha and beta == 90 and gamma == 120"
         return (
             close(self.a, self.b)
@@ -479,9 +479,9 @@ class UnitCell:
             UnitCell: A new unit cell object representing the provided lattice.
         """
 
-        assert (
-            len(params) == 4
-        ), "Requre three lengths and one angle for Monoclinic cell"
+        assert len(params) == 4, (
+            "Requre three lengths and one angle for Monoclinic cell"
+        )
         unit = kwargs.get("unit", "radians")
         if unit != "radians":
             alpha, gamma = 90, 90

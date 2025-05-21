@@ -35,7 +35,7 @@ def run_subprocess(
     if capture_output:
         if ("stdout" in kwargs) or ("stderr" in kwargs):
             raise ValueError(
-                "stdout and stderr arguments may not be used " "with capture_output."
+                "stdout and stderr arguments may not be used with capture_output."
             )
         kwargs["stdout"] = PIPE
         kwargs["stderr"] = PIPE
@@ -98,9 +98,9 @@ class AbstractExecutable(ABC):
     @working_directory.setter
     def working_directory(self, dirname):
         """ "Set the working directory for this job"""
-        assert dir_exists_or_is_creatable(
-            dirname
-        ), f"{dirname} either cannot be found or is not createable"
+        assert dir_exists_or_is_creatable(dirname), (
+            f"{dirname} either cannot be found or is not createable"
+        )
         self._working_directory = dirname
 
     @abc.abstractmethod

@@ -85,9 +85,7 @@ def reflections(crystal, wavelength=LAMBDA_Cu, dmin=LAMBDA_Cu / 2, sort=True):
     h_max, k_max, l_max = hklmax(crystal.unit_cell, dmin)
     recip = crystal.unit_cell.reciprocal_lattice.copy()
     system = crystal.space_group.crystal_system
-    (
-        "*" if system != "monoclinic" else crystal.space_group.choice[0] + "face"
-    )
+    ("*" if system != "monoclinic" else crystal.space_group.choice[0] + "face")
     if (
         crystal.space_group.has_hexagonal_rhombohedral_choices()
         and crystal.unit_cell.is_rhombohedral

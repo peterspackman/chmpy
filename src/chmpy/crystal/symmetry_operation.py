@@ -255,7 +255,7 @@ class SymmetryOperation:
         Add a vector to this symmetry operation's translation vector.
 
         Returns:
-            SymmetryOperation: a copy of this symmetry operation under 
+            SymmetryOperation: a copy of this symmetry operation under
                 additional translation"
         """
         return SymmetryOperation(self.rotation, self.translation + value)

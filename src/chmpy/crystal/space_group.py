@@ -322,7 +322,7 @@ class SpaceGroup:
         return reduced_symmetry_list(self.symmetry_operations, self.latt)
 
     def has_hexagonal_rhombohedral_choices(self) -> bool:
-        "returns true if this space group could be "
+        "returns true if this space group could be"
         "represented as hexagonal or rhombohedral"
         return self.international_tables_number in (146, 148, 155, 160, 161, 166, 167)
 

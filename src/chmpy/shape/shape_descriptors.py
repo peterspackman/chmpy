@@ -137,6 +137,7 @@ def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
     real = True
     if property_function is not None:
         if property_function == "d_norm":
+
             def property_function(x):
                 return s.d_norm(x)[3]
         elif property_function == "esp":
@@ -203,6 +204,7 @@ def promolecule_density_descriptor(sht, n_i, p_i, **kwargs):
     real = True
     if property_function is not None:
         if property_function == "d_norm":
+
             def property_function(x):
                 return pro.d_norm(x)[1]
         elif property_function == "esp":
