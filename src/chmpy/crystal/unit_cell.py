@@ -78,6 +78,20 @@ class UnitCell:
         """
         return np.dot(coords, self.inverse)
 
+    def to_reciprocal(self, coords: np.ndarray) -> np.ndarray:
+        """
+        Transform coordinates from fractional space (x, y, z)
+        to reciprocal space (a*, b*, c*). The x-direction will is assumed
+        be aligned along lattice vector a*.
+
+        Args:
+            coords (array_like): an (N, 3) array of fractional coordinates
+
+        Returns:
+            np.ndarray: (N, 3) array of reciprocalcoordinates
+        """
+        return np.dot(coords, self.inverse.T)
+
     def set_lengths_and_angles(self, lengths, angles):
         """
         Modify this unit cell by setting the lattice vectors

@@ -7,7 +7,8 @@ description = "Molecules, crystals, promolecule and Hirshfeld surfaces using pyt
 authors = [
     { name = "Peter Spackman", email = "peterspackman@fastmail.com"}
 ]
-license = { file="LICENSE.txt" }
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE.txt"]
 dependencies = [
     "numpy>=2.1.2",
     "scipy>=1.14.1",

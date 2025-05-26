@@ -217,15 +217,60 @@ class Molecule:
         return np.zeros(3)
 
     @property
+    def coordination_numbers(self) -> np.ndarray:
+        """The coordination numbers associated with atoms in this molecule.
+        If `self._coordination_numbers` is not set, the coordination numbers will be
+        calculated based on the EEQ method."""
+        assert len(self) > 0, (
+            "Must have at least one atom to calculate coordination numbers"
+        )
+        if not hasattr(self, "_coordination_numbers"):
+            from chmpy.core.eeq import calculate_coordination_numbers
+
+            atomic_numbers = self.atomic_numbers
+            coords = self.positions
+            cn = calculate_coordination_numbers(atomic_numbers, coords)
+            self._coordination_numbers = cn.astype(np.float32)
+        return self._coordination_numbers
+
+    @coordination_numbers.setter
+    def coordination_numbers(self, cn):
+        self._coordination_numbers = cn
+
+    @coordination_numbers.deleter
+    def coordination_numbers(self):
+        del self._coordination_numbers
+
+    @property
     def partial_charges(self) -> np.ndarray:
         """The partial charges associated with atoms in this molecule.
         If `self._partial_charges` is not set, the charges will be
-        assigned based on EEM method."""
+        calculated based on the requested method (default: EEM).
+
+        The available methods are:
+        - 'eem': Electronegativity Equalization Method (default)
+        - 'eeq': Electronegativity Equilibration Charge model
+
+        To specify a method, set the 'charge_method' property on the molecule:
+        molecule.properties['charge_method'] = 'eeq'
+        """
         assert len(self) > 0, "Must have at least one atom to calculate partial charges"
         if not hasattr(self, "_partial_charges"):
-            from chmpy.ext.charges import EEM
+            # Check which method to use
+            method = self.properties.get("charge_method", "eem").lower()
 
-            charges = EEM.calculate_charges(self)
+            if method == "eeq":
+                from chmpy.core.eeq import calculate_eeq_charges
+
+                atomic_numbers = self.atomic_numbers
+                coords = self.positions
+                charge = self.charge
+                charges = calculate_eeq_charges(atomic_numbers, coords, charge)
+            else:  # default to EEM
+                from chmpy.ext.charges import EEM
+
+                charges = EEM.calculate_charges(self)
+
             self._partial_charges = charges.astype(np.float32)
         return self._partial_charges
 

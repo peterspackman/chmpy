@@ -162,6 +162,21 @@ class Crystal:
 
         return self.unit_cell.to_fractional(coords)
 
+    def to_reciprocal(self, coords) -> np.ndarray:
+        """
+        Convert coordinates (row major) from fractional to
+        reciprocal space coordinates.
+
+        Arguments:
+            coords (np.ndarray): (N, 3) array of positions assumed to be in
+                fractional coordinates
+
+        Returns:
+            (N, 3) array of positions transformed to reciprocal (orthogonal)
+                coordinates by the unit cell of this crystal.
+        """
+        return self.unit_cell.to_reciprocal(coords)
+
     def unit_cell_atoms(self, tolerance=1e-2) -> dict:
         """
         Generate all atoms in the unit cell (i.e. with
@@ -864,24 +879,151 @@ class Crystal:
             ]
         return surfaces
 
-    def asymmetric_unit_partial_charges(self) -> np.ndarray:
+    def unit_cell_coordination_numbers(self) -> np.ndarray:
+        """
+        Calculate the coordination numbers for the unit cell atoms of this
+        crystal using the EEQ method with periodic boundary conditions.
+
+        Returns:
+            an `ndarray` of coordination numbers for the unit cell atoms.
+        """
+        if hasattr(self, "_unit_cell_coordination_numbers"):
+            return self._unit_cell_coordination_numbers
+
+        from chmpy.core.eeq_pbc import calculate_coordination_numbers_pbc
+
+        # Get unit cell atoms
+        uc_atoms = self.unit_cell_atoms()
+        positions = uc_atoms["cart_pos"]
+        atomic_numbers = uc_atoms["element"]
+
+        # Get cell vectors
+        cell_vectors = self.unit_cell.lattice
+
+        # Calculate coordination numbers with PBC
+        cn = calculate_coordination_numbers_pbc(atomic_numbers, positions, cell_vectors)
+        self._unit_cell_coordination_numbers = cn.astype(np.float32)
+
+        return self._unit_cell_coordination_numbers
+
+    def asymmetric_unit_coordination_numbers(self) -> np.ndarray:
+        """
+        Calculate the coordination numbers for the asymmetric unit of this
+        crystal using the EEQ method with periodic boundary conditions.
+
+        Returns:
+            an `ndarray` of coordination numbers for the asymmetric unit atoms.
+        """
+        if hasattr(self, "_asymmetric_unit_coordination_numbers"):
+            return self._asymmetric_unit_coordination_numbers
+
+        # Get unit cell coordination numbers
+        uc_cn = self.unit_cell_coordination_numbers()
+        uc_atoms = self.unit_cell_atoms()
+
+        # Map back to asymmetric unit
+        asym_cn = np.empty(len(self.asymmetric_unit), dtype=np.float32)
+        for i, cn in enumerate(uc_cn):
+            asym_idx = uc_atoms["asym_atom"][i]
+            asym_cn[asym_idx] = cn
+
+        self._asymmetric_unit_coordination_numbers = asym_cn
+        return asym_cn
+
+    def unit_cell_partial_charges(self, method="eeq") -> np.ndarray:
+        """
+        Calculate the partial charges for the unit cell atoms of this
+        crystal using the specified method with periodic boundary conditions.
+
+        Args:
+            method (str): Charge method to use ('eeq' or 'eem')
+
+        Returns:
+            an `ndarray` of partial charges for the unit cell atoms.
+        """
+        if hasattr(self, "_unit_cell_partial_charges"):
+            return self._unit_cell_partial_charges
+
+        method = method.lower()
+
+        if method == "eeq":
+            from chmpy.core.eeq_pbc import calculate_eeq_charges_pbc
+
+            # Get unit cell atoms
+            uc_atoms = self.unit_cell_atoms()
+            positions = uc_atoms["cart_pos"]
+            atomic_numbers = uc_atoms["element"]
+
+            # Get cell vectors
+            cell_vectors = self.unit_cell.lattice
+
+            # Calculate net charge (usually 0 for crystals)
+            charge = 0.0
+
+            # Calculate charges with PBC
+            charges = calculate_eeq_charges_pbc(
+                atomic_numbers, positions, cell_vectors, charge
+            )
+        else:
+            # Use molecular approach for EEM (less accurate for crystals)
+            mols = self.unit_cell_molecules()
+            charges = np.empty(len(self.unit_cell_atoms()["element"]), dtype=np.float32)
+
+            # Set charge method for molecules
+            for mol in mols:
+                mol.properties["charge_method"] = method
+
+            # Get charges from molecules
+            for mol in mols:
+                uc_indices = mol.properties.get("unit_cell_atoms", [])
+                for i, charge in enumerate(mol.partial_charges):
+                    if i < len(uc_indices):
+                        charges[uc_indices[i]] = charge
+
+        self._unit_cell_partial_charges = charges.astype(np.float32)
+        return charges
+
+    def asymmetric_unit_partial_charges(self, method="eeq") -> np.ndarray:
         """
         Calculate the partial charges for the asymmetric unit of this
-        crystal using the EEM method.
+        crystal using the specified method.
+
+        Args:
+            method (str): Charge method to use ('eeq' or 'eem')
 
         Returns:
             an `ndarray` of atomic partial charges.
         """
-        mols = self.symmetry_unique_molecules()
-        charges = np.empty(len(self.asymmetric_unit), dtype=np.float32)
-        for mol in mols:
-            for idx, charge in zip(
-                mol.properties["asymmetric_unit_atoms"],
-                mol.partial_charges,
-                strict=False,
-            ):
-                charges[idx] = charge
-        return charges
+        if method.lower() == "eeq":
+            # Get unit cell charges using EEQ with PBC
+            uc_charges = self.unit_cell_partial_charges(method="eeq")
+            uc_atoms = self.unit_cell_atoms()
+
+            # Map back to asymmetric unit
+            charges = np.empty(len(self.asymmetric_unit), dtype=np.float32)
+            for i, charge in enumerate(uc_charges):
+                asym_idx = uc_atoms["asym_atom"][i]
+                charges[asym_idx] = charge
+
+            return charges
+        else:
+            # Use the molecular approach for other methods
+            mols = self.symmetry_unique_molecules()
+            charges = np.empty(len(self.asymmetric_unit), dtype=np.float32)
+
+            # Set charge method for molecules
+            for mol in mols:
+                mol.properties["charge_method"] = method
+
+            for mol in mols:
+                for idx, charge in zip(
+                    mol.properties["asymmetric_unit_atoms"],
+                    mol.partial_charges,
+                    strict=False,
+                ):
+                    charges[idx] = charge
+
+            return charges
 
     def void_surface(self, *args, **kwargs) -> Trimesh:
         """
@@ -1634,7 +1776,11 @@ class Crystal:
             labels=molecule.labels,
         )
         space_group = SpaceGroup(1)
-        return cls(unit_cell, space_group, asym)
+        x = cls(unit_cell, space_group, asym)
+        uc_atoms = x.unit_cell_atoms(
+            tolerance=1e-12
+        )  # need to workaround default tolerance as we have a massive cell
+        return x
 
     @classmethod
     def from_gen_string(cls, contents, **kwargs):
