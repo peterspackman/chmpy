@@ -3,14 +3,13 @@ Simple UFF parameter assignment for chmpy Crystal and Molecule objects using EEQ
 """
 
 import json
-import numpy as np
 from pathlib import Path
 
 
 def load_lj_params():
     """Load Lennard-Jones parameters from JSON file."""
     params_file = Path(__file__).parent / "lj_params.json"
-    with open(params_file, "r") as f:
+    with open(params_file) as f:
         return json.load(f)
 
 
@@ -148,7 +147,7 @@ def get_uff_parameters(obj, force_field="uff"):
     atom_types = {}
     parameters = {}
 
-    for i, (atomic_num, coord_num) in enumerate(zip(atomic_nums, coord_nums)):
+    for i, (atomic_num, coord_num) in enumerate(zip(atomic_nums, coord_nums, strict=False)):
         # Assign UFF type based on coordination
         uff_type = assign_uff_type_from_coordination(atomic_num, coord_num)
         atom_types[i] = uff_type
@@ -195,10 +194,7 @@ def print_uff_summary(obj, force_field="uff"):
     )
     print("-" * 70)
 
-    for i, (atomic_num, coord_num) in enumerate(zip(atomic_nums, coord_nums)):
-        from chmpy.core.element import Element
-
-        symbol = Element.from_atomic_number(atomic_num).symbol
+    for i, (atomic_num, coord_num) in enumerate(zip(atomic_nums, coord_nums, strict=False)):
         uff_type = atom_types[i]
         params = parameters[i]
 

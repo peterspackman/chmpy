@@ -1,5 +1,5 @@
 from chmpy.core import Element, Molecule
-from chmpy.crystal import UnitCell, SpaceGroup, AsymmetricUnit, Crystal
+from chmpy.crystal import AsymmetricUnit, Crystal, SpaceGroup, UnitCell
 
 
 def molecule_to_ase(mol, **kwargs):
@@ -25,7 +25,7 @@ def molecule_to_ase(mol, **kwargs):
 
     if hasattr(mol, "properties") and mol.properties:
         for key, value in mol.properties.items():
-            if isinstance(value, (int, float, str, bool)):
+            if isinstance(value, int | float | str | bool):
                 atoms.info[f"molecule_{key}"] = value
     return atoms
 
@@ -41,11 +41,10 @@ def ase_to_molecule(atoms, **kwargs):
         Molecule: Molecule object atoms and position information
     """
     try:
-        from ase import Atoms
+        import ase  # noqa: F401
     except ImportError as e:
         raise ImportError("ASE library is required") from e
 
-    import numpy as np
 
     if atoms.pbc.any():
         raise ValueError("Atoms object must not have periodic boundary conditions")
@@ -96,7 +95,7 @@ def crystal_to_ase(crystal, **kwargs):
 
     if hasattr(crystal, "properties") and crystal.properties:
         for key, value in crystal.properties.items():
-            if isinstance(value, (int, float, str, bool)):
+            if isinstance(value, int | float | str | bool):
                 atoms.info[f"crystal_{key}"] = value
 
     return atoms
@@ -113,11 +112,10 @@ def ase_to_crystal(atoms, **kwargs):
         Crystal: Crystal object with unit_cell, space_group, and asymmetric_unit
     """
     try:
-        from ase import Atoms
+        import ase  # noqa: F401
     except ImportError as e:
         raise ImportError("ASE library is required") from e
 
-    import numpy as np
 
     if not atoms.pbc.all():
         raise ValueError("Atoms object must have 3D periodic boundary conditions")

@@ -1,15 +1,13 @@
 import logging
 import unittest
-import numpy as np
 
 from chmpy.crystal import Crystal
 from chmpy.ff.params import (
-    get_uff_parameters,
     assign_uff_type_from_coordination,
-    load_lj_params,
     crystal_uff_params,
+    get_uff_parameters,
+    load_lj_params,
     molecule_uff_params,
-    print_uff_summary,
 )
 
 from .. import TEST_FILES
@@ -89,7 +87,7 @@ class UFFParamsTestCase(unittest.TestCase):
         coord_nums = mol.coordination_numbers
 
         for i, (atomic_num, coord_num) in enumerate(
-            zip(mol.atomic_numbers, coord_nums)
+            zip(mol.atomic_numbers, coord_nums, strict=False)
         ):
             from chmpy.core.element import Element
 

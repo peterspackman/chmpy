@@ -1,7 +1,8 @@
 import numpy as np
-from chmpy.util.unit import ANGSTROM_TO_BOHR, BOHR_TO_ANGSTROM
-from scipy.spatial.distance import pdist, squareform
+from scipy.spatial.distance import pdist
 from scipy.special import erf
+
+from chmpy.util.unit import ANGSTROM_TO_BOHR
 
 # Constants for EEQ method
 # Copied from the C++ implementation (eeq.cpp)

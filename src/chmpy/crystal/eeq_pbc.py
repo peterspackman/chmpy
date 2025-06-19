@@ -1,10 +1,9 @@
 import numpy as np
-from scipy.special import erf, erfc
 from scipy.spatial import cKDTree as KDTree
-from scipy.spatial.distance import pdist, cdist
-from chmpy.util.unit import ANGSTROM_TO_BOHR
+from scipy.special import erf, erfc
 
-from chmpy.core.eeq import CHI, ETA, KCN_PARAM, WIDTH, COVALENT_D3
+from chmpy.core.eeq import CHI, COVALENT_D3, ETA, KCN_PARAM, WIDTH
+from chmpy.util.unit import ANGSTROM_TO_BOHR
 
 
 def find_neighbors_pbc(crystal, cutoff=6.0):
@@ -33,7 +32,6 @@ def find_neighbors_pbc(crystal, cutoff=6.0):
     uc_pos = crystal.to_cartesian(slab["frac_pos"][:n_uc])
     nums = slab["element"]
     neighbour_pos = crystal.to_cartesian(slab["frac_pos"][n_uc:])
-    cells = slab["cell"][n_uc:]
 
     tree_uc = KDTree(uc_pos)
 

@@ -1,21 +1,16 @@
 import logging
 import unittest
-from copy import deepcopy
-from pathlib import Path
-from tempfile import TemporaryDirectory
 
 import numpy as np
 
-from chmpy.crystal import Crystal, SpaceGroup, UnitCell, AsymmetricUnit
-from chmpy.core import Molecule, Element
+from chmpy.core import Element, Molecule
 from chmpy.core.eeq import calculate_eeq_charges
+from chmpy.crystal import AsymmetricUnit, Crystal, SpaceGroup, UnitCell
 from chmpy.crystal.eeq_pbc import (
-    find_neighbors_pbc,
     calculate_coordination_numbers_crystal,
     calculate_eeq_charges_crystal,
 )
 
-from .. import TEST_FILES
 from .test_asymmetric_unit import ice_ii_asym
 
 LOG = logging.getLogger(__name__)
@@ -83,7 +78,7 @@ class CrystalTestCase(unittest.TestCase):
         )
 
     def test_eeq_charges(self):
-        qmol = calculate_eeq_charges(
+        calculate_eeq_charges(
             self.water_molecule.atomic_numbers, self.water_molecule.positions
         )
         q = calculate_eeq_charges_crystal(self.water_isolated, cutoff=12.0)

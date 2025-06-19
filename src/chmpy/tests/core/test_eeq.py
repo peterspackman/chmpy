@@ -3,17 +3,18 @@ Tests for the EEQ (Electronegativity Equilibration Charge) implementation.
 """
 
 import unittest
+
 import numpy as np
 
-from chmpy.core.molecule import Molecule
-from chmpy.core.element import Element
-from chmpy.util.unit import BOHR_TO_ANGSTROM
 from chmpy.core.eeq import (
-    calculate_coordination_numbers,
     build_a_matrix,
     build_x_vector,
+    calculate_coordination_numbers,
     calculate_eeq_charges,
 )
+from chmpy.core.element import Element
+from chmpy.core.molecule import Molecule
+from chmpy.util.unit import BOHR_TO_ANGSTROM
 
 
 class TestEEQ(unittest.TestCase):
