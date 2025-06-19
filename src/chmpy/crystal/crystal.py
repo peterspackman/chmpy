@@ -890,18 +890,10 @@ class Crystal:
         if hasattr(self, "_unit_cell_coordination_numbers"):
             return self._unit_cell_coordination_numbers
 
-        from chmpy.core.eeq_pbc import calculate_coordination_numbers_pbc
-
-        # Get unit cell atoms
-        uc_atoms = self.unit_cell_atoms()
-        positions = uc_atoms["cart_pos"]
-        atomic_numbers = uc_atoms["element"]
-
-        # Get cell vectors
-        cell_vectors = self.unit_cell.lattice
+        from chmpy.crystal.eeq_pbc import calculate_coordination_numbers_crystal
 
         # Calculate coordination numbers with PBC
-        cn = calculate_coordination_numbers_pbc(atomic_numbers, positions, cell_vectors)
+        cn = calculate_coordination_numbers_crystal(self)
         self._unit_cell_coordination_numbers = cn.astype(np.float32)
 
         return self._unit_cell_coordination_numbers
@@ -947,7 +939,7 @@ class Crystal:
         method = method.lower()
 
         if method == "eeq":
-            from chmpy.core.eeq_pbc import calculate_eeq_charges_pbc
+            from chmpy.crystal.eeq_pbc import calculate_eeq_charges_pbc
 
             # Get unit cell atoms
             uc_atoms = self.unit_cell_atoms()
@@ -1615,6 +1607,12 @@ class Crystal:
         return cls.from_vasp_string(Path(filename).read_text(), **kwargs)
 
     @classmethod
+    def from_ase_atoms(cls, atoms, **kwargs):
+        from chmpy.ext.ase import ase_to_crystal
+
+        return ase_to_crystal(atoms, **kwargs)
+
+    @classmethod
     def from_cif_data(cls, cif_data, titl=None):
         """Initialize a crystal structure from a dictionary
         of CIF data"""
@@ -1817,6 +1815,11 @@ class Crystal:
         if "titl" in self.properties:
             return self.properties["titl"]
         return self.asymmetric_unit.formula
+
+    def to_ase_atoms(self, **kwargs):
+        from chmpy.ext.ase import crystal_to_ase
+
+        return crystal_to_ase(self)
 
     def to_cif_data(self, data_block_name=None) -> dict:
         "Convert this crystal structure to cif data dict"
@@ -2201,3 +2204,307 @@ class Crystal:
                 v_xh = BONDLENGTHS[el] * v_xh / norm
                 pos_cart[h, :] = pos_cart[at, :] + v_xh
         self.asymmetric_unit.positions = self.to_fractional(pos_cart)
+
+    def assign_atom_types(self, force_field="UFF", **kwargs):
+        """
+        Assign atom types and force field parameters to this crystal structure.
+
+        Args:
+            force_field (str or ForceFieldType): Force field to use for typing.
+                Options: "UFF", "UFF4MOF", "DREIDING", "COMPASS"
+            **kwargs: Additional arguments passed to the atom typing system
+
+        Returns:
+            dict: Dictionary with typing results containing:
+                - atom_types: mapping of atom indices to (ff_type, descriptor) tuples
+                - parameters: mapping of atom indices to ForceFieldParameters objects
+                - force_field: name of the force field used
+                - unique_types: set of unique atom types found
+
+        Example:
+            >>> crystal = Crystal.load("MOF.cif")
+            >>> results = crystal.assign_atom_types("UFF")
+            >>> print(f"Found {len(results['unique_types'])} unique atom types")
+            >>> for i, params in results["parameters"].items():
+            ...     print(f"Atom {i}: {params.ff_type} (ε={params.epsilon:.3f})")
+        """
+        from chmpy.ff.params import type_crystal_structure, ForceFieldType
+
+        # Convert string to enum if needed
+        if isinstance(force_field, str):
+            ff_enum = ForceFieldType(force_field.upper())
+        else:
+            ff_enum = force_field
+
+        results = type_crystal_structure(self, ff_enum, **kwargs)
+
+        # Cache results on the crystal object for future access
+        self._atom_typing_results = results
+
+        return results
+
+    def get_atom_types(self, force_field="UFF", use_cached=True, **kwargs):
+        """
+        Get atom type assignments for this crystal structure.
+
+        Args:
+            force_field (str or ForceFieldType): Force field to use
+            use_cached (bool): Whether to use cached results if available
+            **kwargs: Additional arguments for atom typing
+
+        Returns:
+            dict: Mapping of atom indices to (force_field_type, AtomTypeDescriptor) tuples
+        """
+        if use_cached and hasattr(self, "_atom_typing_results"):
+            cached_ff = self._atom_typing_results.get("force_field", "").upper()
+            if cached_ff == str(force_field).upper():
+                return self._atom_typing_results["atom_types"]
+
+        results = self.assign_atom_types(force_field, **kwargs)
+        return results["atom_types"]
+
+    def get_ff_parameters(self, force_field="UFF", use_cached=True, **kwargs):
+        """
+        Get force field parameters for this crystal structure.
+
+        Args:
+            force_field (str or ForceFieldType): Force field to use
+            use_cached (bool): Whether to use cached results if available
+            **kwargs: Additional arguments for atom typing
+
+        Returns:
+            dict: Mapping of atom indices to ForceFieldParameters objects
+        """
+        if use_cached and hasattr(self, "_atom_typing_results"):
+            cached_ff = self._atom_typing_results.get("force_field", "").upper()
+            if cached_ff == str(force_field).upper():
+                return self._atom_typing_results["parameters"]
+
+        results = self.assign_atom_types(force_field, **kwargs)
+        return results["parameters"]
+
+    def get_unique_atom_types(self, force_field="UFF", use_cached=True, **kwargs):
+        """
+        Get the set of unique atom types in this crystal structure.
+
+        Args:
+            force_field (str or ForceFieldType): Force field to use
+            use_cached (bool): Whether to use cached results if available
+            **kwargs: Additional arguments for atom typing
+
+        Returns:
+            set: Set of unique force field atom type strings
+        """
+        if use_cached and hasattr(self, "_atom_typing_results"):
+            cached_ff = self._atom_typing_results.get("force_field", "").upper()
+            if cached_ff == str(force_field).upper():
+                return self._atom_typing_results["unique_types"]
+
+        results = self.assign_atom_types(force_field, **kwargs)
+        return results["unique_types"]
+
+    def get_lj_parameters_array(self, force_field="UFF", use_cached=True, **kwargs):
+        """
+        Get Lennard-Jones parameters as structured arrays for simulation input.
+
+        Args:
+            force_field (str or ForceFieldType): Force field to use
+            use_cached (bool): Whether to use cached results if available
+            **kwargs: Additional arguments for atom typing
+
+        Returns:
+            tuple: (atom_types_array, epsilon_array, sigma_array, mass_array, charges_array)
+                where each array is ordered by atom index
+        """
+        parameters = self.get_ff_parameters(force_field, use_cached, **kwargs)
+        uc_atoms = self.unit_cell_atoms()
+        n_atoms = len(uc_atoms["element"])
+
+        # Initialize arrays
+        atom_types = []
+        epsilons = np.zeros(n_atoms)
+        sigmas = np.zeros(n_atoms)
+        masses = np.zeros(n_atoms)
+        charges = np.zeros(n_atoms)
+
+        # Fill arrays in atom index order
+        for i in range(n_atoms):
+            if i in parameters:
+                params = parameters[i]
+                atom_types.append(params.ff_type)
+                epsilons[i] = params.epsilon
+                sigmas[i] = params.sigma
+                masses[i] = params.mass if params.mass is not None else 0.0
+                charges[i] = params.charge
+            else:
+                # Fallback for missing parameters
+                element = Element[uc_atoms["element"][i]].symbol
+                atom_types.append(f"{element}_generic")
+                masses[i] = Element[uc_atoms["element"][i]].mass
+
+        return atom_types, epsilons, sigmas, masses, charges
+
+    def export_lammps_data(self, filename, force_field="UFF", **kwargs):
+        """
+        Export crystal structure with atom types in LAMMPS data format.
+
+        Args:
+            filename (str): Output filename for LAMMPS data file
+            force_field (str or ForceFieldType): Force field to use
+            **kwargs: Additional arguments for atom typing and export
+
+        Note:
+            This is a placeholder - would need integration with LAMMPS export functionality
+        """
+        results = self.assign_atom_types(force_field, **kwargs)
+        atom_types, epsilons, sigmas, masses, charges = self.get_lj_parameters_array(
+            force_field, **kwargs
+        )
+
+        # This would integrate with existing LAMMPS export functionality
+        # For now, just store the information
+        lammps_data = {
+            "atom_types": atom_types,
+            "epsilons": epsilons,
+            "sigmas": sigmas,
+            "masses": masses,
+            "charges": charges,
+            "positions": self.unit_cell_atoms()["cart_pos"],
+            "cell_parameters": self.unit_cell.parameters,
+        }
+
+        print(f"LAMMPS export functionality would write to {filename}")
+        print(f"Found {len(results['unique_types'])} unique atom types:")
+        for atom_type in sorted(results["unique_types"]):
+            count = atom_types.count(atom_type)
+            print(f"  {atom_type}: {count} atoms")
+
+        return lammps_data
+
+    def export_raspa_files(self, force_field="UFF", output_dir=".", **kwargs):
+        """
+        Export force field parameters in RASPA format.
+
+        Args:
+            force_field (str or ForceFieldType): Force field to use
+            output_dir (str): Directory to write RASPA files
+            **kwargs: Additional arguments for atom typing
+
+        Returns:
+            dict: Paths to created RASPA files
+        """
+        from pathlib import Path
+
+        results = self.assign_atom_types(force_field, **kwargs)
+        output_path = Path(output_dir)
+        output_path.mkdir(exist_ok=True)
+
+        # Get arrays for RASPA format
+        atom_types, epsilons, sigmas, masses, charges = self.get_lj_parameters_array(
+            force_field, **kwargs
+        )
+
+        # Create pseudo_atoms.def file
+        pseudo_atoms_file = output_path / "pseudo_atoms.def"
+        ff_mixing_file = output_path / "force_field_mixing_rules.def"
+
+        # Write pseudo_atoms.def
+        with open(pseudo_atoms_file, "w") as f:
+            f.write("# Pseudo atoms definition file\n")
+            f.write("# Generated by chmpy for crystal: {}\n".format(self.titl))
+            f.write("# Force field: {}\n\n".format(force_field))
+
+            unique_params = {}
+            for i, ff_type in enumerate(atom_types):
+                if ff_type not in unique_params:
+                    unique_params[ff_type] = {
+                        "epsilon": epsilons[i],
+                        "sigma": sigmas[i],
+                        "mass": masses[i],
+                        "charge": charges[i],
+                        "element": Element[self.unit_cell_atoms()["element"][i]].symbol,
+                    }
+
+            f.write(f"{len(unique_params)}\n")
+            for ff_type, params in unique_params.items():
+                f.write(
+                    f"{ff_type:12s} yes {params['element']:2s} {params['element']:2s} "
+                )
+                f.write(f"0 {params['mass']:8.3f} {params['charge']:8.3f} ")
+                f.write(f"0.0 1.0 {params['sigma']:8.3f} 0 0 relative 0\n")
+
+        # Write force_field_mixing_rules.def
+        with open(ff_mixing_file, "w") as f:
+            f.write("# Force field mixing rules\n")
+            f.write("# Generated by chmpy for crystal: {}\n".format(self.titl))
+            f.write("# Force field: {}\n\n".format(force_field))
+
+            f.write("# general rule for Lorentz-Berthelot mixing\n")
+            f.write("# LJ potential\n")
+            f.write(f"{len(unique_params)}\n")
+
+            for ff_type, params in unique_params.items():
+                f.write(
+                    f"{ff_type:12s} lennard-jones {params['epsilon']:10.6f} {params['sigma']:10.6f}\n"
+                )
+
+            f.write("# general mixing rule\n")
+            f.write("lorentz-berthelot\n")
+
+        return {
+            "pseudo_atoms": str(pseudo_atoms_file),
+            "mixing_rules": str(ff_mixing_file),
+        }
+
+    def atom_typing_summary(self, force_field="UFF", **kwargs):
+        """
+        Print a summary of atom typing results for this crystal.
+
+        Args:
+            force_field (str or ForceFieldType): Force field to use
+            **kwargs: Additional arguments for atom typing
+        """
+        results = self.assign_atom_types(force_field, **kwargs)
+
+        print(f"\nAtom Typing Summary for {self.titl}")
+        print(f"Force Field: {results['force_field']}")
+        print(f"Total atoms: {len(results['atom_types'])}")
+        print(f"Unique types: {len(results['unique_types'])}")
+        print("-" * 50)
+
+        # Count atoms by type
+        type_counts = {}
+        for ff_type, descriptor in results["atom_types"].values():
+            type_counts[ff_type] = type_counts.get(ff_type, 0) + 1
+
+        # Print sorted by count
+        for ff_type, count in sorted(
+            type_counts.items(), key=lambda x: x[1], reverse=True
+        ):
+            # Get example parameters
+            example_params = None
+            for params in results["parameters"].values():
+                if params.ff_type == ff_type:
+                    example_params = params
+                    break
+
+            if example_params:
+                print(
+                    f"{ff_type:12s}: {count:3d} atoms  "
+                    f"(ε={example_params.epsilon:6.3f}, σ={example_params.sigma:6.3f})"
+                )
+            else:
+                print(f"{ff_type:12s}: {count:3d} atoms")
+
+        print("-" * 50)
+
+        # Show any special environments
+        special_envs = set()
+        for ff_type, descriptor in results["atom_types"].values():
+            if descriptor.special_environment:
+                special_envs.add(descriptor.special_environment)
+
+        if special_envs:
+            print(f"Special environments detected: {', '.join(special_envs)}")
+
+        print()

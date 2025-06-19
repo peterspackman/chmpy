@@ -330,6 +330,12 @@ class Molecule:
         return f"<{self.name} ({self.molecular_formula})[{x:.2f} {y:.2f} {z:.2f}]>"
 
     @classmethod
+    def from_ase_atoms(cls, atoms, **kwargs):
+        from chmpy.ext.ase import ase_to_molecule
+
+        return ase_to_molecule(atoms, **kwargs)
+
+    @classmethod
     def from_xyz_string(cls, contents, **kwargs):
         """
         Construct a molecule from the provided xmol .xyz file. kwargs
@@ -575,6 +581,11 @@ class Molecule:
         """
 
         Path(filename).write_text(self.to_xyz_string(**kwargs))
+
+    def to_ase_atoms(self, **kwargs):
+        from chmpy.ext.ase import molecule_to_ase
+
+        return molecule_to_ase(self, **kwargs)
 
     def save(self, filename, **kwargs):
         """
