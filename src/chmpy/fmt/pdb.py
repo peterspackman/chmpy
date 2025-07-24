@@ -32,7 +32,9 @@ class Pdb:
             self.space_group = line[55 : min(line_length, 65)].strip()
         self.z = 1  # default
         if line_length > 66:
-            self.z = int(line[66 : min(line_length, 69)])
+            z_str = line[66 : min(line_length, 69)].strip()
+            if z_str:
+                self.z = int(z_str)
 
     def parse_atom_lines(self):
         """Parse ATOM and HETATM records."""
@@ -141,6 +143,147 @@ class Pdb:
             self.line_index += 1
 
         return self.data
+
+    def format_crystal_line(self):
+        """Format CRYST1 record from unit cell parameters."""
+        if not self.unit_cell:
+            return None
+        
+        space_group = self.space_group or "P 1"
+        z = self.z or 1
+        
+        return (
+            f"CRYST1{self.unit_cell['a']:9.3f}{self.unit_cell['b']:9.3f}"
+            f"{self.unit_cell['c']:9.3f}{self.unit_cell['alpha']:7.2f}"
+            f"{self.unit_cell['beta']:7.2f}{self.unit_cell['gamma']:7.2f} "
+            f"{space_group:<11}{z:4d}"
+        )
+
+    def format_atom_line(self, idx, record_type="ATOM"):
+        """Format an ATOM or HETATM record."""
+        if not self.atoms or idx >= len(self.atoms["serial"]):
+            return None
+        
+        # Get atom data with defaults
+        serial = self.atoms["serial"][idx]
+        name = self.atoms["name"][idx]
+        alt_loc = self.atoms["alt_loc"][idx] if self.atoms["alt_loc"][idx] else " "
+        res_name = self.atoms["res_name"][idx]
+        chain_id = self.atoms["chain_id"][idx] if self.atoms["chain_id"][idx] else " "
+        res_seq = self.atoms["res_seq"][idx]
+        icode = self.atoms["icode"][idx] if self.atoms["icode"][idx] else " "
+        x = self.atoms["x"][idx]
+        y = self.atoms["y"][idx]
+        z = self.atoms["z"][idx]
+        occupancy = self.atoms["occupancy"][idx] if self.atoms["occupancy"][idx] else 1.00
+        temp_factor = self.atoms["temp_factor"][idx] if self.atoms["temp_factor"][idx] else 0.00
+        element = self.atoms["element"][idx] if self.atoms["element"][idx] else ""
+        charge = self.atoms["charge"][idx] if self.atoms["charge"][idx] else 0.0
+        
+        # Format charge
+        charge_str = ""
+        if charge != 0.0:
+            charge_str = f"{abs(charge):.0f}{'+' if charge > 0 else '-'}"
+        
+        return (
+            f"{record_type:<6}{serial:5d} {name:<4}{alt_loc}{res_name:>3} "
+            f"{chain_id}{res_seq:4d}{icode}   {x:8.3f}{y:8.3f}{z:8.3f}"
+            f"{occupancy:6.2f}{temp_factor:6.2f}          {element:>2}{charge_str:>2}"
+        )
+
+    def to_string(self):
+        """Convert the parsed PDB data back to a PDB format string."""
+        lines = []
+        
+        # Add header if present
+        if self.header:
+            lines.append(f"HEADER    {self.header}")
+        
+        # Add crystal information
+        cryst_line = self.format_crystal_line()
+        if cryst_line:
+            lines.append(cryst_line)
+        
+        # Add atom records
+        if self.atoms and self.atoms["serial"]:
+            for i in range(len(self.atoms["serial"])):
+                atom_line = self.format_atom_line(i)
+                if atom_line:
+                    lines.append(atom_line)
+        
+        lines.append("END")
+        return "\n".join(lines)
+
+    def to_file(self, filename):
+        """Write the PDB data to a file."""
+        Path(filename).write_text(self.to_string())
+
+    @classmethod
+    def from_crystal(cls, crystal, header=None):
+        """Initialize a PDB from a Crystal object."""
+        pdb = cls({})
+        
+        # Set header
+        pdb.header = header or "Crystal structure"
+        
+        # Set unit cell parameters
+        import numpy as np
+        pdb.unit_cell = {
+            'a': crystal.unit_cell.a,
+            'b': crystal.unit_cell.b,
+            'c': crystal.unit_cell.c,
+            'alpha': np.degrees(crystal.unit_cell.alpha),
+            'beta': np.degrees(crystal.unit_cell.beta),
+            'gamma': np.degrees(crystal.unit_cell.gamma),
+        }
+        
+        # Keep the original space group and Z
+        pdb.space_group = crystal.space_group.crystal17_spacegroup_symbol()
+        pdb.z = 1  # Default for now
+        
+        # Use asymmetric unit atoms (not full unit cell)
+        positions = crystal.to_cartesian(crystal.site_positions)
+        atomic_numbers = crystal.site_atoms
+        
+        # Initialize atom data structure
+        pdb.atoms = {
+            "serial": [],
+            "name": [],
+            "alt_loc": [],
+            "res_name": [],
+            "chain_id": [],
+            "res_seq": [],
+            "icode": [],
+            "x": [],
+            "y": [],
+            "z": [],
+            "occupancy": [],
+            "temp_factor": [],
+            "element": [],
+            "charge": [],
+        }
+        
+        # Populate atom data
+        for i, (pos, atomic_num) in enumerate(zip(positions, atomic_numbers)):
+            from chmpy.core.element import Element
+            element = Element.from_atomic_number(atomic_num)
+            
+            pdb.atoms["serial"].append(i + 1)
+            pdb.atoms["name"].append(element.symbol)
+            pdb.atoms["alt_loc"].append(" ")
+            pdb.atoms["res_name"].append("UNL")  # Unknown ligand
+            pdb.atoms["chain_id"].append("A")
+            pdb.atoms["res_seq"].append(1)
+            pdb.atoms["icode"].append(" ")
+            pdb.atoms["x"].append(float(pos[0]))
+            pdb.atoms["y"].append(float(pos[1]))
+            pdb.atoms["z"].append(float(pos[2]))
+            pdb.atoms["occupancy"].append(1.00)
+            pdb.atoms["temp_factor"].append(0.00)
+            pdb.atoms["element"].append(element.symbol)
+            pdb.atoms["charge"].append(0.0)
+        
+        return pdb
 
     @classmethod
     def from_file(cls, filename):

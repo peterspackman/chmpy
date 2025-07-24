@@ -1651,32 +1651,84 @@ class Crystal:
                 number = cif_data[k]
                 break
 
-        for symop_data_block in symop_data_names:
-            if symop_data_block in cif_data:
-                symops = [
-                    SymmetryOperation.from_string_code(x)
-                    for x in cif_data[symop_data_block]
-                ]
-                try:
-                    new_sg = SpaceGroup.from_symmetry_operations(symops)
-                    space_group = new_sg
-                except ValueError:
-                    space_group.symmetry_operations = symops
-                    symbol = cif_data.get("symmetry_space_group_name_H-M", "Unknown")
-                    space_group.international_tables_number = number
-                    space_group.symbol = symbol
-                    space_group.full_symbol = symbol
-                    LOG.warn(
-                        "Initializing non-standard spacegroup setting %s, "
-                        "some SG data may be missing",
-                        symbol,
-                    )
-                break
-        else:
-            # fall back to international tables number
-            space_group = SpaceGroup(number)
+        # Try to parse the Hermann-Mauguin symbol first
+        hm_parsed = False
+        hm_symbol = cif_data.get("symmetry_space_group_name_H-M", "").strip()
+        if hm_symbol:
+            try:
+                # Convert CIF Hermann-Mauguin notation to correct SpaceGroup
+                space_group = cls._parse_hermann_mauguin_symbol(hm_symbol, number)
+                hm_parsed = True
+            except (ValueError, KeyError):
+                # Fall back to symmetry operations if HM symbol parsing fails
+                pass
+
+        # Only try symmetry operations if HM parsing failed
+        if not hm_parsed:
+            for symop_data_block in symop_data_names:
+                if symop_data_block in cif_data:
+                    symops = [
+                        SymmetryOperation.from_string_code(x)
+                        for x in cif_data[symop_data_block]
+                    ]
+                    try:
+                        new_sg = SpaceGroup.from_symmetry_operations(symops)
+                        space_group = new_sg
+                    except ValueError:
+                        space_group.symmetry_operations = symops
+                        symbol = cif_data.get("symmetry_space_group_name_H-M", "Unknown")
+                        space_group.international_tables_number = number
+                        space_group.symbol = symbol
+                        space_group.full_symbol = symbol
+                        LOG.warn(
+                            "Initializing non-standard spacegroup setting %s, "
+                            "some SG data may be missing",
+                            symbol,
+                        )
+                    break
+            else:
+                # fall back to international tables number
+                space_group = SpaceGroup(number)
 
         return Crystal(unit_cell, space_group, asym, cif_data=cif_data, titl=titl)
+
+    @classmethod
+    def _parse_hermann_mauguin_symbol(cls, hm_symbol, sg_number):
+        """
+        Parse Hermann-Mauguin symbol from CIF and find matching SpaceGroup.
+        
+        Args:
+            hm_symbol (str): Hermann-Mauguin symbol from CIF (e.g. 'P C M 21')
+            sg_number (int): Space group number from CIF
+            
+        Returns:
+            SpaceGroup: Matching space group object
+        """
+        from .space_group import SG_FROM_NUMBER
+        
+        # Clean up the symbol - remove extra spaces, normalize
+        clean_symbol = ' '.join(hm_symbol.upper().split())
+        
+        # Get all possible settings for this space group number
+        if str(sg_number) not in SG_FROM_NUMBER:
+            raise ValueError(f"Space group number {sg_number} not found")
+            
+        sg_settings = SG_FROM_NUMBER[str(sg_number)]
+        
+        # Try each setting and check if crystal17_spacegroup_symbol matches
+        for sg_data in sg_settings:
+            try:
+                sg = SpaceGroup(sg_number, choice=sg_data.choice)
+                crystal17_symbol = sg.crystal17_spacegroup_symbol().upper()
+                
+                if clean_symbol == crystal17_symbol:
+                    return sg
+            except:
+                continue
+        
+        # If no match found, raise error
+        raise ValueError(f"Could not match Hermann-Mauguin symbol '{hm_symbol}' "
+                        f"to any setting of space group #{sg_number}")
 
     @classmethod
     def from_cif_file(cls, filename, data_block_name=None):
@@ -1971,6 +2023,16 @@ class Crystal:
             ],
         }
         return to_res_contents(shelx_data)
+
+    def to_pdb_string(self, header=None):
+        """Represent this crystal structure as a PDB formatted string."""
+        from chmpy.fmt.pdb import Pdb
+        pdb = Pdb.from_crystal(self, header=header)
+        return pdb.to_string()
+
+    def to_pdb_file(self, filename, header=None):
+        """Write this crystal structure as a PDB formatted file."""
+        Path(filename).write_text(self.to_pdb_string(header=header))
 
     def save(self, filename, **kwargs):
         """Save this crystal structure to file (.cif, .res, POSCAR)"""
