@@ -1,8 +1,10 @@
 import copy
 import logging
+import numpy as np
 from os import environ
 from pathlib import Path
 from tempfile import TemporaryFile
+from typing import Tuple, Optional
 
 from chmpy.util.exe import which
 
@@ -59,10 +61,19 @@ class Gulp(AbstractExecutable):
 
     def post_process(self):
         self.output_contents = Path(self.output_file).read_text()
-        if Path(self.drv_file).exists():
-            self.drv_contents = Path(self.drv_file).read_text()
+        if self.drv_file.exists():
+            self.drv_contents = self.drv_file.read_text()
+            # Parse the .drv file for structured data
+            from chmpy.fmt.gulp import parse_drv_file
+
+            try:
+                self.drv_data = parse_drv_file(self.drv_file)
+            except Exception as e:
+                LOG.warning(f"Failed to parse .drv file: {e}")
+                self.drv_data = None
         else:
             self.drv_contents = ""
+            self.drv_data = None
 
     def run(self, *args, **kwargs):
         LOG.debug("Running %s %s", self._executable_location, self.arg)
@@ -90,3 +101,48 @@ class Gulp(AbstractExecutable):
             LOG.error("Directory contents\n%s", list_directory(self.working_directory))
             copytree(self.working_directory, "failed_job")
             raise e
+
+    def cleanup(self):
+        """Clean up temporary files created during GULP calculation."""
+        files_to_clean = [
+            self.input_file,
+            self.output_file,
+            self.drv_file,
+            Path(self.working_directory) / self._res_file,
+        ]
+
+        for file_path in files_to_clean:
+            if file_path.exists():
+                try:
+                    file_path.unlink()
+                    LOG.debug(f"Cleaned up: {file_path}")
+                except Exception as e:
+                    LOG.warning(f"Failed to clean up {file_path}: {e}")
+
+    @property
+    def energy(self) -> Optional[float]:
+        """Energy from parsed .drv data."""
+        if self.drv_data:
+            return self.drv_data.get("energy")
+        return None
+
+    @property
+    def gradients(self) -> Optional[np.ndarray]:
+        """Gradients from parsed .drv data."""
+        if self.drv_data:
+            return self.drv_data.get("gradients")
+        return None
+
+    @property
+    def stress_raw(self) -> Optional[np.ndarray]:
+        """Raw stress gradients from parsed .drv data."""
+        if self.drv_data:
+            return self.drv_data.get("stress_raw")
+        return None
+
+    def calculate_stress(self, volume: float) -> Optional[np.ndarray]:
+        """Calculate stress tensor from strain gradients and volume."""
+        if self.stress_raw is not None and volume > 0:
+            # Convert strain gradients to stress: stress = (1/V) * dE/d_strain
+            return self.stress_raw / volume
+        return None

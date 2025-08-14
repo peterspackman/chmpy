@@ -4,13 +4,27 @@ cell
 {{cell}}
 {% endif %}
 {% if frac %}frac{% else %}cart{% endif %}
-{% for e, (x, y, z) in atoms -%}
-{{e}} core {{"%10.6f" | format(x)}} {{"%10.6f" | format(y)}} {{"%10.6f" | format(z)}}
+{% for atom_data in atoms -%}
+{% if atom_data|length == 3 -%}
+{% set e, (x, y, z), charge = atom_data[0], atom_data[1], atom_data[2] -%}
+{{e}} core {{"%10.6f" | format(x)}} {{"%10.6f" | format(y)}} {{"%10.6f" | format(z)}} {{"%8.6f" | format(charge)}}
+{% else -%}
+{% set e, (x, y, z) = atom_data[0], atom_data[1] -%}
+{{e}} core {{"%10.6f" | format(x)}} {{"%10.6f" | format(y)}} {{"%10.6f" | format(z)}} 0.0
+{% endif -%}
 {% endfor -%}
 {% if spacegroup %}
 space
 {{spacegroup}}
+{% if origin_choice and origin_choice != 1 %}
+origin {{origin_choice}}
+{% endif %}
 {% endif %}
 {% for keyword, argument in additional_keywords.items() %}
+{% if keyword == "species" %}
+{{keyword}}
+{{argument}}
+{% else %}
 {{keyword}} {{argument}}
+{% endif %}
 {% endfor %}
