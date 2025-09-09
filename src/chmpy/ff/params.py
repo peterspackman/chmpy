@@ -13,51 +13,53 @@ def load_lj_params():
         return json.load(f)
 
 
-def assign_fit_lj_type_from_connectivity(atomic_num, neighbours_list, all_atomic_numbers):
+def assign_fit_lj_type_from_connectivity(
+    atomic_num, neighbours_list, all_atomic_numbers
+):
     """
     Assign fit_lj atom type based on connectivity, following neighcrys FIT potential rules.
-    
+
     This follows the exact logic from neighcrys_axis.py for FIT potential labeling.
-    
+
     Args:
         atomic_num: Atomic number of the atom to label
         neighbours_list: List of neighbor indices for each atom
         all_atomic_numbers: Array of atomic numbers for all atoms
-    
+
     Returns:
         fit_lj atom type string
     """
-    
+
     # Note: This requires full connectivity information, not just coordination number
     # For now, implementing a simplified version that can work with coordination numbers
     # A full implementation would need the molecule's bond connectivity
-    
+
     if atomic_num == 1:  # Hydrogen
         # Without full connectivity, default to H_F1 for C-H and H_F2 for others
         # This is a simplification - full implementation would check what H is bonded to
         return "H_F1"  # Most common case
-    
+
     elif atomic_num == 6:  # Carbon
         # All carbons map to C_F1 in FIT potential
         return "C_F1"
-    
+
     elif atomic_num == 7:  # Nitrogen
         # All nitrogens map to N_F1 in FIT potential
         return "N_F1"
-    
+
     elif atomic_num == 8:  # Oxygen
         # All oxygens map to O_F1 in FIT potential (except water which is O_Wa)
         return "O_F1"
-    
+
     elif atomic_num == 9:  # Fluorine
         return "F_F1"
-    
+
     elif atomic_num == 16:  # Sulfur
         return "S_F1"
-    
+
     elif atomic_num == 17:  # Chlorine
         return "ClF1"
-    
+
     else:
         # For unsupported elements, return None
         return None
@@ -66,19 +68,19 @@ def assign_fit_lj_type_from_connectivity(atomic_num, neighbours_list, all_atomic
 def assign_fit_lj_type(atomic_num, coord_num, bonded_to=None):
     """
     Assign fit_lj atom type based on atomic number and coordination.
-    
+
     Simplified version that uses coordination numbers when full connectivity
     is not available.
-    
+
     Args:
         atomic_num: Atomic number
         coord_num: EEQ coordination number (float)
         bonded_to: Optional list of atomic numbers this atom is bonded to
-    
+
     Returns:
         fit_lj atom type string
     """
-    
+
     if atomic_num == 1:  # Hydrogen
         # H_F1 for C-H, H_F2 for O-H and N-H
         # Without bonding info, use coordination as proxy
@@ -87,25 +89,25 @@ def assign_fit_lj_type(atomic_num, coord_num, bonded_to=None):
             return "H_F2"
         else:
             return "H_F1"
-    
+
     elif atomic_num == 6:  # Carbon
         return "C_F1"
-    
+
     elif atomic_num == 7:  # Nitrogen
         return "N_F1"
-    
+
     elif atomic_num == 8:  # Oxygen
         return "O_F1"
-    
+
     elif atomic_num == 9:  # Fluorine
         return "F_F1"
-    
+
     elif atomic_num == 16:  # Sulfur
         return "S_F1"
-    
+
     elif atomic_num == 17:  # Chlorine
         return "ClF1"
-    
+
     else:
         # For unsupported elements, return None
         return None
@@ -245,14 +247,16 @@ def get_lj_parameters(obj, force_field="uff"):
     atom_types = {}
     parameters = {}
 
-    for i, (atomic_num, coord_num) in enumerate(zip(atomic_nums, coord_nums, strict=False)):
+    for i, (atomic_num, coord_num) in enumerate(
+        zip(atomic_nums, coord_nums, strict=False)
+    ):
         # Assign atom type based on force field and coordination
         if force_field.lower() == "fit_lj":
             atom_type = assign_fit_lj_type(atomic_num, coord_num)
         else:
             # UFF or UFF4MOF
             atom_type = assign_uff_type_from_coordination(atomic_num, coord_num)
-        
+
         atom_types[i] = atom_type
 
         # Get parameters
@@ -275,7 +279,7 @@ def get_lj_parameters(obj, force_field="uff"):
 def get_uff_parameters(obj, force_field="uff"):
     """
     Deprecated: Use get_lj_parameters instead.
-    
+
     Get UFF atom types and parameters for Crystal or Molecule object.
 
     Args:
@@ -320,10 +324,12 @@ def print_lj_summary(obj, force_field="uff"):
     )
     print("-" * 70)
 
-    for i, (atomic_num, coord_num) in enumerate(zip(atomic_nums, coord_nums, strict=False)):
+    for i, (atomic_num, coord_num) in enumerate(
+        zip(atomic_nums, coord_nums, strict=False)
+    ):
         atom_type = atom_types[i]
         params = parameters[i]
-        
+
         if atom_type and params:
             print(
                 f"{i + 1:4d} {atomic_num:7d} {coord_num:6.2f} {atom_type:>10s} {params['sigma']:8.3f} {params['epsilon']:12.6f}"
@@ -334,7 +340,7 @@ def print_lj_summary(obj, force_field="uff"):
             )
 
     # Summary
-    unique_types = set(t for t in atom_types.values() if t is not None)
+    unique_types = {t for t in atom_types.values() if t is not None}
     print(f"\nUnique types: {len(unique_types)}")
     print(f"Types found: {sorted(unique_types)}")
 

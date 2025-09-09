@@ -49,7 +49,9 @@ def run_subprocess(
             else:
                 process.send_signal(signal)
             stdout, stderr = process.communicate()
-            raise TimeoutExpired(process.args, timeout, output=stdout, stderr=stderr) from e
+            raise TimeoutExpired(
+                process.args, timeout, output=stdout, stderr=stderr
+            ) from e
         except:
             if signal is None:
                 os.kill(process.pid)

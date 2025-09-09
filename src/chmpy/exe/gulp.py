@@ -1,10 +1,10 @@
 import copy
 import logging
-import numpy as np
 from os import environ
 from pathlib import Path
 from tempfile import TemporaryFile
-from typing import Tuple, Optional
+
+import numpy as np
 
 from chmpy.util.exe import which
 
@@ -120,27 +120,27 @@ class Gulp(AbstractExecutable):
                     LOG.warning(f"Failed to clean up {file_path}: {e}")
 
     @property
-    def energy(self) -> Optional[float]:
+    def energy(self) -> float | None:
         """Energy from parsed .drv data."""
         if self.drv_data:
             return self.drv_data.get("energy")
         return None
 
     @property
-    def gradients(self) -> Optional[np.ndarray]:
+    def gradients(self) -> np.ndarray | None:
         """Gradients from parsed .drv data."""
         if self.drv_data:
             return self.drv_data.get("gradients")
         return None
 
     @property
-    def stress_raw(self) -> Optional[np.ndarray]:
+    def stress_raw(self) -> np.ndarray | None:
         """Raw stress gradients from parsed .drv data."""
         if self.drv_data:
             return self.drv_data.get("stress_raw")
         return None
 
-    def calculate_stress(self, volume: float) -> Optional[np.ndarray]:
+    def calculate_stress(self, volume: float) -> np.ndarray | None:
         """Calculate stress tensor from strain gradients and volume."""
         if self.stress_raw is not None and volume > 0:
             # Convert strain gradients to stress: stress = (1/V) * dE/d_strain

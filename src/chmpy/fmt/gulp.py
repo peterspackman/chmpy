@@ -2,7 +2,8 @@ import logging
 import re
 from collections import namedtuple
 from pathlib import Path
-from typing import Tuple, Optional, Dict, Any
+from typing import Any
+
 import numpy as np
 
 from chmpy.templates import load_template
@@ -61,27 +62,34 @@ def parse_value(string, with_units=False):
     return string
 
 
-def crystal_to_gulp_input(crystal, keywords=None, additional_keywords=None, charges=None):
+def crystal_to_gulp_input(
+    crystal, keywords=None, additional_keywords=None, charges=None
+):
     if additional_keywords is None:
         additional_keywords = {}
     if keywords is None:
         keywords = []
-    pos = crystal.asymmetric_unit.positions  
+    pos = crystal.asymmetric_unit.positions
     el = crystal.asymmetric_unit.elements
-    
+
     # Prepare atom data - always include charges (default to 0.0)
     if charges is not None:
-        atoms = [(element, position, charge) for element, position, charge in zip(el, pos, charges)]
+        atoms = [
+            (element, position, charge)
+            for element, position, charge in zip(el, pos, charges, strict=False)
+        ]
     else:
-        atoms = [(element, position) for element, position in zip(el, pos)]
-    
+        atoms = [
+            (element, position) for element, position in zip(el, pos, strict=False)
+        ]
+
     return GULP_TEMPLATE.render(
         keywords=keywords,
         frac=True,
         cell=" ".join(f"{x:10.6f}" for x in crystal.unit_cell.parameters),
         atoms=atoms,
         spacegroup=crystal.space_group.crystal17_spacegroup_symbol(),
-        origin_choice=getattr(crystal.space_group, 'choice', 1),
+        origin_choice=getattr(crystal.space_group, "choice", 1),
         additional_keywords=additional_keywords,
     )
 
@@ -120,10 +128,10 @@ def parse_gulp_output(contents):
     return outputs
 
 
-def parse_drv_file(drv_path: Path) -> Dict[str, Any]:
+def parse_drv_file(drv_path: Path) -> dict[str, Any]:
     """
     Parse GULP .drv file to extract energy, gradients, and stress.
-    
+
     The .drv file format:
     Line 1: energy <value> eV
     Line 2: coordinates cartesian Angstroms <natoms>
@@ -132,12 +140,12 @@ def parse_drv_file(drv_path: Path) -> Dict[str, Any]:
     Lines 4+natoms to 3+2*natoms: atom_id gx gy gz
     Line 4+2*natoms: gradients strain eV
     Remaining lines: strain gradients
-    
+
     Parameters
     ----------
     drv_path : Path
         Path to the .drv file
-        
+
     Returns
     -------
     Dict[str, Any]
@@ -145,44 +153,48 @@ def parse_drv_file(drv_path: Path) -> Dict[str, Any]:
     """
     if not drv_path.exists():
         raise FileNotFoundError(f"GULP .drv file not found: {drv_path}")
-    
+
     lines = drv_path.read_text().splitlines()
     if not lines:
         raise ValueError("Empty .drv file")
-    
+
     line_idx = 0
-    
+
     # Parse energy from first line: "energy                  -0.7783918216 eV"
     if line_idx >= len(lines):
-        raise ValueError(f"Expected energy line at index {line_idx}, but file only has {len(lines)} lines")
-    
+        raise ValueError(
+            f"Expected energy line at index {line_idx}, but file only has {len(lines)} lines"
+        )
+
     energy_line = lines[line_idx].strip()
     if not energy_line:
         raise ValueError(f"Empty energy line at index {line_idx}")
-    
+
     energy_parts = energy_line.split()
     if len(energy_parts) < 2:
-        raise ValueError(f"Invalid energy line format: '{energy_line}' - expected at least 2 parts")
-    
+        raise ValueError(
+            f"Invalid energy line format: '{energy_line}' - expected at least 2 parts"
+        )
+
     try:
         energy = float(energy_parts[1])
     except (ValueError, IndexError) as e:
         raise ValueError(f"Could not parse energy from line '{energy_line}': {e}")
-    
+
     line_idx += 1
-    
+
     # Parse coordinates header: "coordinates cartesian Angstroms     48"
     coord_header = lines[line_idx].strip()
     natoms = int(coord_header.split()[-1])
     line_idx += 1
-    
+
     # Skip coordinate lines
     line_idx += natoms
-    
+
     # Parse gradients header: "gradients cartesian eV/Ang     48"
-    grad_header = lines[line_idx].strip()
+    lines[line_idx].strip()
     line_idx += 1
-    
+
     # Parse gradients (GULP outputs gradients directly)
     gradients = np.zeros((natoms, 3))
     for i in range(natoms):
@@ -193,37 +205,39 @@ def parse_drv_file(drv_path: Path) -> Dict[str, Any]:
             gradients[i] = [float(parts[1]), float(parts[2]), float(parts[3])]
         except ValueError:
             # Handle overflow case - set to large value
-            gradients[i] = [1e10 if '*' in parts[1] else float(parts[1]),
-                           1e10 if '*' in parts[2] else float(parts[2]),
-                           1e10 if '*' in parts[3] else float(parts[3])]
+            gradients[i] = [
+                1e10 if "*" in parts[1] else float(parts[1]),
+                1e10 if "*" in parts[2] else float(parts[2]),
+                1e10 if "*" in parts[3] else float(parts[3]),
+            ]
         line_idx += 1
-    
+
     # Parse strain gradients header: "gradients strain eV" (if present)
     stress_raw = np.zeros(6)  # Default to zero stress
-    
+
     if line_idx < len(lines):
         strain_header = lines[line_idx].strip()
         if strain_header.startswith("gradients strain"):
             line_idx += 1
-            
+
             # Parse strain gradients
             strain_gradients = []
             while line_idx < len(lines) and lines[line_idx].strip():
                 line = lines[line_idx].strip()
-                
+
                 # Skip force constants section if present
-                if 'force_constants' in line:
+                if "force_constants" in line:
                     line_idx += 1
                     # Skip the entire force constants block
                     while line_idx < len(lines) and lines[line_idx].strip():
                         line_idx += 1
                     break
-                
+
                 parts = lines[line_idx].split()
                 try:
                     # Convert each part to float, handling overflow
                     for part in parts:
-                        if '*' in part:
+                        if "*" in part:
                             strain_gradients.append(1e10)
                         else:
                             strain_gradients.append(float(part))
@@ -231,25 +245,29 @@ def parse_drv_file(drv_path: Path) -> Dict[str, Any]:
                     # Skip lines that can't be parsed as numbers
                     pass
                 line_idx += 1
-            
+
             # Convert strain gradients to stress (requires volume from calling context)
             # For now, just return the raw strain gradients
-            stress_raw = np.array(strain_gradients[:6]) if len(strain_gradients) >= 6 else np.zeros(6)
-    
+            stress_raw = (
+                np.array(strain_gradients[:6])
+                if len(strain_gradients) >= 6
+                else np.zeros(6)
+            )
+
     # Look for force constants if we skipped them earlier
     force_constants = None
     # Reset to find force constants section
     for i, line in enumerate(lines):
-        if 'force_constants' in line:
+        if "force_constants" in line:
             # Parse force constants matrix if needed
             # For now, just flag that they exist
             force_constants = "present"
             break
-    
+
     return {
-        'energy': energy,
-        'gradients': gradients,
-        'stress_raw': stress_raw,  # Will need volume to convert to stress
-        'natoms': natoms,
-        'force_constants': force_constants
+        "energy": energy,
+        "gradients": gradients,
+        "stress_raw": stress_raw,  # Will need volume to convert to stress
+        "natoms": natoms,
+        "force_constants": force_constants,
     }

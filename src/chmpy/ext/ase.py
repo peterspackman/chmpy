@@ -45,7 +45,6 @@ def ase_to_molecule(atoms, **kwargs):
     except ImportError as e:
         raise ImportError("ASE library is required") from e
 
-
     if atoms.pbc.any():
         raise ValueError("Atoms object must not have periodic boundary conditions")
 
@@ -115,7 +114,6 @@ def ase_to_crystal(atoms, **kwargs):
         import ase  # noqa: F401
     except ImportError as e:
         raise ImportError("ASE library is required") from e
-
 
     if not atoms.pbc.all():
         raise ValueError("Atoms object must have 3D periodic boundary conditions")
