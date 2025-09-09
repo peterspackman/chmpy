@@ -179,7 +179,7 @@ def parse_drv_file(drv_path: Path) -> dict[str, Any]:
     try:
         energy = float(energy_parts[1])
     except (ValueError, IndexError) as e:
-        raise ValueError(f"Could not parse energy from line '{energy_line}': {e}")
+        raise ValueError(f"Could not parse energy from line '{energy_line}'") from e
 
     line_idx += 1
 
@@ -257,7 +257,7 @@ def parse_drv_file(drv_path: Path) -> dict[str, Any]:
     # Look for force constants if we skipped them earlier
     force_constants = None
     # Reset to find force constants section
-    for i, line in enumerate(lines):
+    for _i, line in enumerate(lines):
         if "force_constants" in line:
             # Parse force constants matrix if needed
             # For now, just flag that they exist

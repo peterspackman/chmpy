@@ -1725,7 +1725,10 @@ class Crystal:
 
                 if clean_symbol == crystal17_symbol:
                     return sg
-            except:
+            except Exception as e:
+                LOG.debug(
+                    "Exception encountered when determining space group setting: %s", e
+                )
                 continue
 
         # If no match found, raise error
