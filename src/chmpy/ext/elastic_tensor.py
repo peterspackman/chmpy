@@ -285,6 +285,97 @@ class ElasticTensor:
         mesh = self.mesh(kind=kind)
         return np.mean(np.linalg.norm(mesh.vertices, axis=1), axis=0)
 
+    def voigt_rotation_matrix_6x6(self, rotation_matrix):
+        """
+        Construct the 6x6 rotation matrix for transforming Voigt notation tensors.
+        Follows the standard approach for 4th-order tensor rotation in Voigt notation.
+
+        Args:
+            rotation_matrix (np.ndarray): 3x3 rotation matrix R
+
+        Returns:
+            np.ndarray: 6x6 rotation matrix for Voigt notation
+        """
+        R = rotation_matrix
+
+        # Voigt index mapping
+        voigt_to_tensor = [(0, 0), (1, 1), (2, 2), (1, 2), (0, 2), (0, 1)]
+        T = np.zeros((6, 6))
+
+        for i in range(6):
+            for j in range(6):
+                p, q = voigt_to_tensor[i]  # row indices
+                r, s = voigt_to_tensor[j]  # column indices
+
+                # Apply the 4th-order tensor transformation rule:
+                # T_ij = sum over all valid combinations of R_pr * R_qs * R_rt * R_su
+                # where the indices match the tensor transformation pattern
+
+                # For symmetric tensors in Voigt notation, we use:
+                if i < 3:  # diagonal terms (11, 22, 33)
+                    if j < 3:  # diagonal terms
+                        T[i, j] = R[p, r] * R[q, s]
+                    else:  # off-diagonal terms (need factor of 2)
+                        T[i, j] = 2 * R[p, r] * R[q, s]
+                else:  # off-diagonal terms (23, 13, 12)
+                    if j < 3:  # diagonal terms
+                        T[i, j] = R[p, r] * R[q, s]
+                    else:  # off-diagonal terms
+                        T[i, j] = R[p, r] * R[q, s] + R[p, s] * R[q, r]
+
+        return T
+
+    def rotate_voigt_tensor(self, rotation_matrix):
+        """
+        Rotate this elastic tensor using a 3x3 rotation matrix.
+        Uses a direct 6x6 transformation matrix construction.
+
+        Args:
+            rotation_matrix (np.ndarray): 3x3 rotation matrix R
+
+        Returns:
+            np.ndarray: Rotated 6x6 elastic tensor in Voigt notation
+        """
+        T = self.voigt_rotation_matrix_6x6(rotation_matrix)
+        rotated_tensor = T @ self.c_voigt @ T.T
+        return rotated_tensor
+
+    def reoriented_into_standard_frame(self, vectors):
+        """
+        Re-orient this elastic tensor from the provided cartesian frame
+        into a natural standard crystallographic frame for the crystal axes.
+
+        The standard frame uses the conventional crystallographic orientation:
+        - a along x-axis
+        - b in xy-plane
+        - c positioned to satisfy the lattice angles
+
+        Args:
+            vectors (np.ndarray): 3x3 matrix of lattice vectors (row major)
+                from the original coordinate system
+
+        Returns:
+            ElasticTensor: New elastic tensor in the standard frame
+        """
+        from chmpy.crystal.unit_cell import UnitCell
+        from chmpy.util.num import kabsch_rotation_matrix
+
+        # Create unit cell from the provided vectors
+        original_uc = UnitCell(vectors)
+
+        # Create standard orientation unit cell with same lattice parameters
+        # This uses the standard crystallographic convention in chmpy
+        standard_uc = UnitCell(np.eye(3))  # temporary
+        standard_uc.set_lengths_and_angles(
+            [original_uc.a, original_uc.b, original_uc.c],
+            [original_uc.alpha, original_uc.beta, original_uc.gamma],
+        )
+
+        rotation_matrix = kabsch_rotation_matrix(original_uc.direct, standard_uc.direct)
+
+        rotated_c_voigt = self.rotate_voigt_tensor(rotation_matrix)
+        return ElasticTensor(rotated_c_voigt)
+
     def __repr__(self):
         s = np.array2string(
             self.c_voigt, precision=4, suppress_small=True, separator="  "
