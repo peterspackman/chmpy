@@ -1553,6 +1553,7 @@ class Crystal:
             ".vasp": cls.from_vasp_file,
             ".pdb": cls.from_pdb_file,
             ".gen": cls.from_gen_file,
+            ".in": cls.from_aims_file,
         }
 
     def _ext_save_map(self):
@@ -1560,7 +1561,11 @@ class Crystal:
 
     @classmethod
     def _fname_load_map(cls):
-        return {"POSCAR": cls.from_vasp_file, "CONTCAR": cls.from_vasp_file}
+        return {
+            "POSCAR": cls.from_vasp_file,
+            "CONTCAR": cls.from_vasp_file,
+            "geometry.in": cls.from_aims_file,
+        }
 
     def _fname_save_map(self):
         return {"POSCAR": self.to_poscar_file, "CONTCAR": self.to_poscar_file}
@@ -1605,6 +1610,31 @@ class Crystal:
     def from_vasp_file(cls, filename, **kwargs):
         "Initialize a crystal structure from a VASP POSCAR file"
         return cls.from_vasp_string(Path(filename).read_text(), **kwargs)
+
+    @classmethod
+    def from_aims_string(cls, string, **kwargs):
+        "Initialize a crystal structure from an FHI-aims geometry.in string"
+        from chmpy.fmt.aims import parse_geometry_string
+
+        aims_data = parse_geometry_string(string)
+        if "lattice" not in aims_data:
+            raise ValueError("FHI-aims geometry.in file must contain lattice vectors for Crystal")
+
+        uc = UnitCell(aims_data["lattice"])
+        sg = SpaceGroup(1)
+
+        # Convert to fractional if necessary
+        coords = aims_data["positions"]
+        if not aims_data["fractional"]:
+            coords = uc.to_fractional(coords)
+
+        asym = AsymmetricUnit(aims_data["elements"], coords)
+        return Crystal(uc, sg, asym)
+
+    @classmethod
+    def from_aims_file(cls, filename, **kwargs):
+        "Initialize a crystal structure from an FHI-aims geometry.in file"
+        return cls.from_aims_string(Path(filename).read_text(), **kwargs)
 
     @classmethod
     def from_ase_atoms(cls, atoms, **kwargs):
