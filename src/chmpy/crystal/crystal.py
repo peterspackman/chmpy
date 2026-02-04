@@ -1,5 +1,4 @@
 import logging
-from pathlib import Path
 from typing import Union
 
 import numpy as np
@@ -10,7 +9,6 @@ from trimesh import Trimesh
 
 from chmpy.core.element import Element
 from chmpy.core.molecule import Molecule
-from chmpy.fmt.cif import Cif
 from chmpy.util.num import cartesian_product
 
 from .asymmetric_unit import AsymmetricUnit
@@ -18,33 +16,6 @@ from .space_group import SpaceGroup, SymmetryOperation
 from .unit_cell import UnitCell
 
 LOG = logging.getLogger(__name__)
-
-
-def _nearest_molecule_idx(vertices, el, pos):
-    from time import time
-
-    from scipy.sparse.csgraph import connected_components
-
-    time()
-    m = Molecule.from_arrays(el, pos)
-    m.guess_bonds()
-    nfrag, labels = connected_components(m.bonds)
-    tree = KDTree(pos)
-    d, idxs = tree.query(vertices, k=1)
-    time()
-    l = labels[idxs]
-    u, idxs = np.unique(l, return_inverse=True)
-    return np.arange(len(u), dtype=np.uint8)[idxs]
-
-
-def _nearest_atom_idx(vertices, el, pos):
-    from time import time
-
-    time()
-    tree = KDTree(pos)
-    d, idxs = tree.query(vertices, k=1)
-    time()
-    return idxs
 
 
 class Crystal:
@@ -826,58 +797,8 @@ class Crystal:
         return results
 
     def promolecule_density_isosurfaces(self, **kwargs) -> list[Trimesh]:
-        """
-        Calculate promolecule electron density isosurfaces
-        for each symmetry unique molecule in this crystal.
-
-        Args:
-            kwargs: Keyword arguments used by `Molecule.promolecule_density_isosurface`.
-
-                Options are:
-                ```
-                isovalue (float, optional): level set value for the isosurface
-                    (default=0.002) in au.
-                separation (float, optional): separation between density grid
-                    used in the surface calculation (default 0.2) in Angstroms.
-                color (str, optional): surface property to use for vertex coloring,
-                    one of ('d_norm_i', 'd_i', 'd_norm_e', 'd_e')
-                colormap (str, optional): matplotlib colormap to use for surface
-                    coloring (default 'viridis_r')
-                midpoint (float, optional): midpoint of the segmented
-                    colormap (if applicable)
-                ```
-
-        Returns:
-            A list of meshes representing the promolecule density isosurfaces
-        """
-        if kwargs.get("color", None) == "fragment_patch":
-            color = kwargs.pop("color")
-            surfaces = [
-                mol.promolecule_density_isosurface(**kwargs)
-                for mol in self.symmetry_unique_molecules()
-            ]
-            radius = kwargs.get("fragment_patch_radius", 6.0)
-            from chmpy.util.color import property_to_color
-            from chmpy.util.mesh import face_centroids
-
-            for i, (_mol, n_e, n_p) in enumerate(
-                self.molecule_environments(radius=radius)
-            ):
-                surf = surfaces[i]
-                prop = _nearest_molecule_idx(surf.vertices, n_e, n_p)
-                color = property_to_color(prop, cmap=kwargs.get("colormap", color))
-                face_points = face_centroids(surf)
-                surf.visual.vertex_colors = color
-                surf.vertex_attributes["fragment_patch"] = prop
-                surf.face_attributes["fragment_patch"] = _nearest_molecule_idx(
-                    face_points, n_e, n_p
-                )
-        else:
-            surfaces = [
-                mol.promolecule_density_isosurface(**kwargs)
-                for mol in self.symmetry_unique_molecules()
-            ]
-        return surfaces
+        from .surface import promolecule_density_isosurfaces
+        return promolecule_density_isosurfaces(self, **kwargs)
 
     def unit_cell_coordination_numbers(self) -> np.ndarray:
         """
@@ -1018,508 +939,44 @@ class Crystal:
             return charges
 
     def void_surface(self, *args, **kwargs) -> Trimesh:
-        """
-        Calculate void surface based on promolecule electron density
-        for the unit cell of this crystal
-
-        Args:
-            kwargs: Keyword arguments used in the evaluation of the surface.
-
-                Options are:
-                ```
-                isovalue (float, optional): level set value for the
-                    isosurface (default=0.002) in au.
-                separation (float, optional): separation between density grid
-                    used in the surface calculation (default 0.2) in Angstroms.
-                ```
-
-        Returns:
-            the mesh representing the promolecule density void isosurface
-        """
-
-        import trimesh
-
-        from chmpy import PromoleculeDensity
-        from chmpy.mc import marching_cubes
-
-        vertex_color = kwargs.get("color", None)
-
-        atoms = self.slab(bounds=((-1, -1, -1), (1, 1, 1)))
-        density = PromoleculeDensity((atoms["element"], atoms["cart_pos"]))
-        sep = kwargs.get("separation", kwargs.get("resolution", 0.5))
-        isovalue = kwargs.get("isovalue", 3e-4)
-        grid_type = kwargs.get("grid_type", "uc")
-        if grid_type == "uc":
-            seps = sep / np.array(self.unit_cell.lengths)
-            x_grid = np.arange(0, 1.0, seps[0], dtype=np.float32)
-            y_grid = np.arange(0, 1.0, seps[1], dtype=np.float32)
-            z_grid = np.arange(0, 1.0, seps[2], dtype=np.float32)
-            x, y, z = np.meshgrid(x_grid, y_grid, z_grid)
-            shape = x.shape
-            pts = np.c_[x.ravel(), y.ravel(), z.ravel()]
-            pts = pts.astype(np.float32)
-            pts = self.to_cartesian(pts)
-        elif grid_type == "box":
-            ((x0, y0, z0), (x1, y1, z1)) = kwargs.get(
-                "box_corners", ((0.0, 0.0, 0.0), (5.0, 5.0, 5.0))
-            )
-            x, y, z = np.mgrid[x0:x1:sep, y0:y1:sep, z0:z1:sep]
-            pts = np.c_[x.ravel(), y.ravel(), z.ravel()]
-            pts = pts.astype(np.float32)
-            shape = x.shape
-            seps = (sep, sep, sep)
-        else:
-            raise NotImplementedError("Only uc grid supported currently")
-        tree = KDTree(atoms["cart_pos"])
-        distances, _ = tree.query(pts)
-        values = np.ones(pts.shape[0], dtype=np.float32)
-        mask = distances > 1.0  # minimum bigger than 1 angstrom
-        rho = density.rho(pts[mask])
-        values[mask] = rho
-        values = values.reshape(shape)
-        verts, faces, normals, _ = marching_cubes(
-            values, isovalue, spacing=seps, gradient_direction="ascent"
-        )
-        if grid_type == "uc":
-            verts = self.to_cartesian(np.c_[verts[:, 1], verts[:, 0], verts[:, 2]])
-        mesh = trimesh.Trimesh(vertices=verts, faces=faces, normals=normals)
-
-        if kwargs.get("subdivide", False):
-            for _ in range(int(kwargs.get("subdivide", False))):
-                mesh = mesh.subdivide()
-
-        if vertex_color == "esp":
-            from chmpy.util.color import property_to_color
-
-            asym_charges = self.asymmetric_unit_partial_charges()
-            mol = Molecule.from_arrays(atoms["element"], atoms["cart_pos"])
-            partial_charges = np.empty(len(mol), dtype=np.float32)
-            partial_charges = asym_charges[atoms["asym_atom"]]
-            mol._partial_charges = partial_charges
-            prop = mol.electrostatic_potential(mesh.vertices)
-            mesh.visual.vertex_colors = property_to_color(
-                prop, cmap=kwargs.get("cmap", "esp")
-            )
-        return mesh
+        from .surface import void_surface
+        return void_surface(self, *args, **kwargs)
 
     def mesh_scene(self, **kwargs):
-        """
-        Calculate a scene of this meshes of unit cell molecules in this crystal,
-        along with optional void surface.
-
-        Args:
-            kwargs: optional arguments used in the generation of this scene.
-
-        Returns:
-            trimesh.scene.Scene: trimesh scene object.
-        """
-        from trimesh import Scene
-
-        meshes = {}
-        for i, m in enumerate(self.unit_cell_molecules()):
-            mesh = m.to_mesh(representation=kwargs.get("representation", "ball_stick"))
-            n = m.molecular_formula
-            for k, v in mesh.items():
-                meshes[f"mol_{i}_{n}.{k}"] = v
-
-        if kwargs.get("void", False):
-            void_kwargs = kwargs.get("void_kwargs", {})
-            meshes["void_surface"] = self.void_surface(**void_kwargs)
-        if kwargs.get("axes", False):
-            from trimesh.creation import axis
-
-            meshes["axes"] = axis(
-                transform=self.unit_cell.direct_homogeneous.T, axis_length=1.0
-            )
-        return Scene(meshes)
+        from .surface import mesh_scene
+        return mesh_scene(self, **kwargs)
 
     def hirshfeld_surfaces(self, **kwargs):
         "Alias for `self.stockholder_weight_isosurfaces`"
         return self.stockholder_weight_isosurfaces(**kwargs)
 
     def stockholder_weight_isosurfaces(self, kind="mol", **kwargs) -> list[Trimesh]:
-        """
-        Calculate stockholder weight isosurfaces (i.e. Hirshfeld surfaces)
-        for each symmetry unique molecule or atom in this crystal.
+        from .surface import stockholder_weight_isosurfaces
+        return stockholder_weight_isosurfaces(self, kind=kind, **kwargs)
 
-        Args:
-            kind (str, optional): dictates whether we calculate surfaces
-                for each unique molecule or for each unique atom
-            kwargs: keyword arguments passed to `stockholder_weight_isosurface`.
+    def functional_group_shape_descriptors(self, l_max=5, radius=6.0, kind="carboxylic_acid") -> np.ndarray:
+        from .shape_descriptors import functional_group_shape_descriptors
+        return functional_group_shape_descriptors(self, l_max=l_max, radius=radius, kind=kind)
 
-                Options include:
-                ```
-                isovalue: float, optional
-                    level set value for the isosurface (default=0.5). Must be between
-                    0 and 1, but values other than 0.5 probably won't make sense anyway.
-                separation: float, optional
-                    separation between density grid used in the surface calculation
-                    (default 0.2) in Angstroms.
-                radius: float, optional
-                    maximum distance for contributing neighbours for the stockholder
-                    weight calculation
-                color: str, optional
-                    surface property to use for vertex coloring, one of ('d_norm_i',
-                    'd_i', 'd_norm_e', 'd_e', 'd_norm', 'fragment_patch')
-                colormap: str, optional
-                    matplotlib colormap to use for surface coloring
-                    (default 'viridis_r')
-                midpoint: float, optional, default 0.0 if using d_norm
-                    use the midpoint norm (as is used in CrystalExplorer)
-                ```
+    def molecule_shape_descriptors(self, mol, l_max=5, radius=6.0, with_property=None) -> np.ndarray:
+        from .shape_descriptors import molecule_shape_descriptors
+        return molecule_shape_descriptors(self, mol, l_max=l_max, radius=radius, with_property=with_property)
 
-        Returns:
-            A list of meshes representing the stockholder weight isosurfaces
-        """
-        import trimesh
+    def molecular_shape_descriptors(self, l_max=5, radius=6.0, with_property=None, return_coefficients=False) -> np.ndarray:
+        from .shape_descriptors import molecular_shape_descriptors
+        return molecular_shape_descriptors(self, l_max=l_max, radius=radius, with_property=with_property, return_coefficients=return_coefficients)
 
-        from chmpy import StockholderWeight
-        from chmpy.surface import stockholder_weight_isosurface
-        from chmpy.util.color import property_to_color
-
-        sep = kwargs.get("separation", kwargs.get("resolution", 0.2))
-        radius = kwargs.get("radius", 12.0)
-        vertex_color = kwargs.get("color", "d_norm")
-        isovalue = kwargs.get("isovalue", 0.5)
-        meshes = []
-        extra_props = {}
-        isos = []
-
-        def nearest_atomic_number(pos, n_e, n_p):
-            return np.array(n_e[_nearest_atom_idx(pos, n_e, n_p)], dtype=np.uint8)
-
-        if kind == "atom":
-            for surrounds in self.atomic_surroundings(radius=radius):
-                n = surrounds["centre"]["element"]
-                pos = surrounds["centre"]["cart_pos"]
-                neighbour_els = surrounds["neighbours"]["element"]
-                neighbour_pos = surrounds["neighbours"]["cart_pos"]
-                s = StockholderWeight.from_arrays(
-                    [n], [pos], neighbour_els, neighbour_pos
-                )
-                iso = stockholder_weight_isosurface(s, isovalue=isovalue, sep=sep)
-                isos.append(iso)
-        elif kind == "mol":
-            for _i, (mol, n_e, n_p) in enumerate(
-                self.molecule_environments(radius=radius)
-            ):
-                extra_props = {}
-                if vertex_color == "esp":
-                    extra_props["esp"] = mol.electrostatic_potential
-                elif vertex_color == "fragment_patch":
-                    extra_props["fragment_patch"] = (
-                        lambda x, _n_e=n_e, _n_p=n_p: _nearest_molecule_idx(
-                            x, _n_e, _n_p
-                        )
-                    )
-                extra_props["nearest_atom_external"] = (
-                    lambda x, _n_e=n_e, _n_p=n_p: nearest_atomic_number(x, _n_e, _n_p)
-                )
-                extra_props["nearest_atom_internal"] = (
-                    lambda x,
-                    _atomic_nums=mol.atomic_numbers,
-                    _positions=mol.positions: nearest_atomic_number(
-                        x, _atomic_nums, _positions
-                    )
-                )
-                s = StockholderWeight.from_arrays(
-                    mol.atomic_numbers, mol.positions, n_e, n_p
-                )
-                iso = stockholder_weight_isosurface(
-                    s, isovalue=isovalue, sep=sep, extra_props=extra_props
-                )
-                isos.append(iso)
-        else:
-            for arr in self.functional_group_surroundings(radius=radius, kind=kind):
-                s = StockholderWeight.from_arrays(*arr)
-                iso = stockholder_weight_isosurface(s, isovalue=isovalue, sep=sep)
-                isos.append(iso)
-
-        for iso in isos:
-            prop = iso.vertex_prop[vertex_color]
-            color = property_to_color(prop, cmap=kwargs.get("cmap", vertex_color))
-            mesh = trimesh.Trimesh(
-                vertices=iso.vertices,
-                faces=iso.faces,
-                normals=iso.normals,
-                vertex_colors=color,
-            )
-            for k, v in iso.vertex_prop.items():
-                mesh.vertex_attributes[k] = v
-            meshes.append(mesh)
-        return meshes
-
-    def functional_group_shape_descriptors(
-        self, l_max=5, radius=6.0, kind="carboxylic_acid"
-    ) -> np.ndarray:
-        """
-        Calculate the shape descriptors `[1,2]` for the all atoms in
-        the functional group given for all symmetry unique molecules in this crystal.
-
-        Args:
-            l_max (int, optional): maximum level of angular momenta to include
-                in the spherical harmonic transform of the molecular shape function.
-                (default: 5)
-            radius (float, optional): maximum distance (Angstroms) of neighbouring
-                atoms to include in stockholder weight calculation (default: 5)
-            kind (str, optional): Identifier for the functional group
-                type (default: 'carboxylic_acid')
-
-        Returns:
-            shape description vector
-
-        References:
-        ```
-        [1] PR Spackman et al. Sci. Rep. 6, 22204 (2016)
-            https://dx.doi.org/10.1038/srep22204
-        [2] PR Spackman et al. Angew. Chem. 58 (47), 16780-16784 (2019)
-            https://dx.doi.org/10.1002/anie.201906602
-        ```
-        """
-        descriptors = []
-        from chmpy.shape import SHT, stockholder_weight_descriptor
-
-        sph = SHT(l_max)
-        for (
-            in_els,
-            in_pos,
-            neighbour_els,
-            neighbour_pos,
-        ) in self.functional_group_surroundings(kind=kind, radius=radius):
-            masses = np.asarray([Element[x].mass for x in in_els])
-            c = np.sum(in_pos * masses[:, np.newaxis] / np.sum(masses), axis=0).astype(
-                np.float32
-            )
-            dists = np.linalg.norm(in_pos - c, axis=1)
-            bounds = np.min(dists) / 2, np.max(dists) + 10.0
-            descriptors.append(
-                stockholder_weight_descriptor(
-                    sph,
-                    in_els,
-                    in_pos,
-                    neighbour_els,
-                    neighbour_pos,
-                    origin=c,
-                    bounds=bounds,
-                )
-            )
-        return np.asarray(descriptors)
-
-    def molecule_shape_descriptors(
-        self, mol, l_max=5, radius=6.0, with_property=None
-    ) -> np.ndarray:
-        """
-        Calculate the molecular shape descriptors `[1,2]` for
-        the provided molecule in the crystal.
-
-        Args:
-            l_max (int, optional): maximum level of angular momenta to include
-                in the spherical harmonic
-                transform of the molecular shape function.
-            radius (float, optional): maximum distance (Angstroms) to include
-                surroundings in the shape description
-            with_property (str, optional): name of the surface property to include
-                in the shape description
-
-        Returns:
-            shape description vector
-
-        References:
-        ```
-        [1] PR Spackman et al. Sci. Rep. 6, 22204 (2016)
-            https://dx.doi.org/10.1038/srep22204
-        [2] PR Spackman et al. Angew. Chem. 58 (47), 16780-16784 (2019)
-            https://dx.doi.org/10.1002/anie.201906602
-        ```
-        """
-        from chmpy.shape import SHT, stockholder_weight_descriptor
-
-        sph = SHT(l_max)
-        mol, neighbour_els, neighbour_pos = self.molecule_environment(
-            mol, radius=radius
-        )
-        c = np.array(mol.centroid, dtype=np.float32)
-        dists = np.linalg.norm(mol.positions - c, axis=1)
-        bounds = np.min(dists) / 2, np.max(dists) + 10.0
-        return stockholder_weight_descriptor(
-            sph,
-            mol.atomic_numbers,
-            mol.positions,
-            neighbour_els,
-            neighbour_pos,
-            origin=c,
-            bounds=bounds,
-            with_property=with_property,
-        )
-
-    def molecular_shape_descriptors(
-        self, l_max=5, radius=6.0, with_property=None, return_coefficients=False
-    ) -> np.ndarray:
-        """
-        Calculate the molecular shape descriptors[1,2] for all symmetry unique
-        molecules in this crystal.
-
-        Args:
-            l_max (int, optional): maximum level of angular momenta to include
-                in the spherical harmonic transform of the molecular shape function.
-            radius (float, optional): maximum distance (Angstroms) to include
-                surroundings in the shape description
-            with_property (str, optional): name of the surface property to include
-                in the shape description
-            return_coefficients (bool, optional): also return the spherical
-                harmonic coefficients
-
-        Returns:
-            shape description vector
-
-        References:
-        ```
-        [1] PR Spackman et al. Sci. Rep. 6, 22204 (2016)
-            https://dx.doi.org/10.1038/srep22204
-        [2] PR Spackman et al. Angew. Chem. 58 (47), 16780-16784 (2019)
-            https://dx.doi.org/10.1002/anie.201906602
-        ```
-        """
-        descriptors = []
-        coeffs = []
-        from chmpy.shape import SHT, stockholder_weight_descriptor
-
-        sph = SHT(l_max)
-        for mol, neighbour_els, neighbour_pos in self.molecule_environments(
-            radius=radius
-        ):
-            c = np.array(mol.centroid, dtype=np.float32)
-            dists = np.linalg.norm(mol.positions - c, axis=1)
-            bounds = np.min(dists) / 2, np.max(dists) + 10.0
-            descriptor = stockholder_weight_descriptor(
-                sph,
-                mol.atomic_numbers,
-                mol.positions,
-                neighbour_els,
-                neighbour_pos,
-                origin=c,
-                bounds=bounds,
-                with_property=with_property,
-                coefficients=return_coefficients,
-            )
-
-            if return_coefficients:
-                coeffs.append(descriptor[0])
-                descriptors.append(descriptor[1])
-            else:
-                descriptors.append(descriptor)
-        if return_coefficients:
-            return np.asarray(coeffs), np.asarray(descriptors)
-        else:
-            return np.asarray(descriptors)
-
-    def atomic_shape_descriptors(
-        self, l_max=5, radius=6.0, return_coefficients=False, with_property=None
-    ) -> np.ndarray:
-        """
-        Calculate the shape descriptors[1,2] for all symmetry unique
-        atoms in this crystal.
-
-        Args:
-            l_max (int, optional): maximum level of angular momenta to include
-                in the spherical harmonic transform of the molecular shape function.
-            radius (float, optional): maximum distance (Angstroms) to include
-                surroundings in the shape description
-            with_property (str, optional): name of the surface property to include
-                in the shape description
-            return_coefficients (bool, optional): also return the spherical
-                harmonic coefficients
-
-        Returns:
-            shape description vector
-
-        References:
-        ```
-        [1] PR Spackman et al. Sci. Rep. 6, 22204 (2016)
-            https://dx.doi.org/10.1038/srep22204
-        [2] PR Spackman et al. Angew. Chem. 58 (47), 16780-16784 (2019)
-            https://dx.doi.org/10.1002/anie.201906602
-        ```
-        """
-        descriptors = []
-        coeffs = []
-        from chmpy.shape import SHT, stockholder_weight_descriptor
-
-        sph = SHT(l_max)
-        for surrounds in self.atomic_surroundings(radius=radius):
-            n = surrounds["centre"]["element"]
-            pos = surrounds["centre"]["cart_pos"]
-            neighbour_els = surrounds["neighbours"]["element"]
-            neighbour_pos = surrounds["neighbours"]["cart_pos"]
-
-            ubound = Element[n].vdw_radius * 3 + 2.0
-            desc = stockholder_weight_descriptor(
-                sph,
-                [n],
-                [pos],
-                neighbour_els,
-                neighbour_pos,
-                bounds=(0.15, ubound),
-                coefficients=return_coefficients,
-                with_property=with_property,
-            )
-            if return_coefficients:
-                descriptors.append(desc[1])
-                coeffs.append(desc[0])
-            else:
-                descriptors.append(desc)
-        if return_coefficients:
-            return np.asarray(coeffs), np.asarray(descriptors)
-        else:
-            return np.asarray(descriptors)
+    def atomic_shape_descriptors(self, l_max=5, radius=6.0, return_coefficients=False, with_property=None) -> np.ndarray:
+        from .shape_descriptors import atomic_shape_descriptors
+        return atomic_shape_descriptors(self, l_max=l_max, radius=radius, return_coefficients=return_coefficients, with_property=with_property)
 
     def atom_group_shape_descriptors(self, atoms, l_max=5, radius=6.0) -> np.ndarray:
-        """Calculate the shape descriptors[1,2] for the given atomic
-        group in this crystal.
-
-        Args:
-            atoms (Tuple): atoms to include in the as the 'inside'
-                of the shape description.
-            l_max (int, optional): maximum level of angular momenta to include
-                in the spherical harmonic transform of the molecular shape function.
-            radius (float, optional): maximum distance (Angstroms) to include
-                surroundings in the shape description
-
-        Returns:
-            shape description vector
-
-        References:
-        ```
-        [1] PR Spackman et al. Sci. Rep. 6, 22204 (2016)
-            https://dx.doi.org/10.1038/srep22204
-        [2] PR Spackman et al. Angew. Chem. 58 (47), 16780-16784 (2019)
-            https://dx.doi.org/10.1002/anie.201906602
-        ```
-        """
-        from chmpy.shape import SHT, stockholder_weight_descriptor
-
-        sph = SHT(l_max)
-        inside, outside = self.atom_group_surroundings(atoms, radius=radius)
-        m = Molecule.from_arrays(*inside)
-        c = np.array(m.centroid, dtype=np.float32)
-        dists = np.linalg.norm(m.positions - c, axis=1)
-        bounds = np.min(dists) / 2, np.max(dists) + 10.0
-        return np.asarray(
-            stockholder_weight_descriptor(
-                sph, *inside, *outside, origin=c, bounds=bounds
-            )
-        )
+        from .shape_descriptors import atom_group_shape_descriptors
+        return atom_group_shape_descriptors(self, atoms, l_max=l_max, radius=radius)
 
     def shape_descriptors(self, kind="molecular", **kwargs):
-        k = kind.lower()
-        if k == "molecular":
-            return self.molecular_shape_descriptors(**kwargs)
-        elif k == "molecule":
-            return self.molecule_shape_descriptors(**kwargs)
-        elif k == "atomic":
-            return self.atomic_shape_descriptors(**kwargs)
-        elif k == "atom group":
-            return self.atom_group_shape_descriptors(**kwargs)
+        from .shape_descriptors import shape_descriptors
+        return shape_descriptors(self, kind=kind, **kwargs)
 
     @property
     def site_labels(self):
@@ -1546,348 +1003,94 @@ class Crystal:
         return uc_mass / uc_vol / 0.6022
 
     @classmethod
-    def _ext_load_map(cls):
-        return {
-            ".cif": cls.from_cif_file,
-            ".res": cls.from_shelx_file,
-            ".vasp": cls.from_vasp_file,
-            ".pdb": cls.from_pdb_file,
-            ".gen": cls.from_gen_file,
-            ".in": cls.from_aims_file,
-        }
-
-    def _ext_save_map(self):
-        return {".cif": self.to_cif_file, ".res": self.to_shelx_file}
-
-    @classmethod
-    def _fname_load_map(cls):
-        return {
-            "POSCAR": cls.from_vasp_file,
-            "CONTCAR": cls.from_vasp_file,
-            "geometry.in": cls.from_aims_file,
-        }
-
-    def _fname_save_map(self):
-        return {"POSCAR": self.to_poscar_file, "CONTCAR": self.to_poscar_file}
-
-    @classmethod
     def load(cls, filename, **kwargs) -> Union["Crystal", dict]:
-        """
-        Load a crystal structure from file (.res, .cif)
-
-        Args:
-            filename (str): the path to the crystal structure file
-
-        Returns:
-            the resulting crystal structure or dictionary of crystal structures
-        """
-        fpath = Path(filename)
-        n = fpath.name
-        fname_map = cls._fname_load_map()
-        if n in fname_map:
-            return fname_map[n](filename)
-        extension_map = cls._ext_load_map()
-        extension = kwargs.pop("fmt", fpath.suffix.lower())
-        if not extension.startswith("."):
-            extension = "." + extension
-        return extension_map[extension](filename, **kwargs)
+        from .io import load
+        return load(filename, **kwargs)
 
     @classmethod
     def from_vasp_string(cls, string, **kwargs):
-        "Initialize a crystal structure from a VASP POSCAR string"
-        from chmpy.fmt.vasp import parse_poscar
-
-        vasp_data = parse_poscar(string)
-        uc = UnitCell(vasp_data["direct"])
-        sg = SpaceGroup(1)
-        coords = vasp_data["positions"]
-        if not vasp_data["coord_type"].startswith("d"):
-            coords = uc.to_fractional(coords)
-        asym = AsymmetricUnit(vasp_data["elements"], coords)
-        return Crystal(uc, sg, asym, titl=vasp_data["name"])
+        from .io import from_vasp_string
+        return from_vasp_string(string, **kwargs)
 
     @classmethod
     def from_vasp_file(cls, filename, **kwargs):
-        "Initialize a crystal structure from a VASP POSCAR file"
-        return cls.from_vasp_string(Path(filename).read_text(), **kwargs)
+        from .io import from_vasp_file
+        return from_vasp_file(filename, **kwargs)
 
     @classmethod
     def from_aims_string(cls, string, **kwargs):
-        "Initialize a crystal structure from an FHI-aims geometry.in string"
-        from chmpy.fmt.aims import parse_geometry_string
-
-        aims_data = parse_geometry_string(string)
-        if "lattice" not in aims_data:
-            raise ValueError("FHI-aims geometry.in file must contain lattice vectors for Crystal")
-
-        uc = UnitCell(aims_data["lattice"])
-        sg = SpaceGroup(1)
-
-        # Convert to fractional if necessary
-        coords = aims_data["positions"]
-        if not aims_data["fractional"]:
-            coords = uc.to_fractional(coords)
-
-        asym = AsymmetricUnit(aims_data["elements"], coords)
-        return Crystal(uc, sg, asym)
+        from .io import from_aims_string
+        return from_aims_string(string, **kwargs)
 
     @classmethod
     def from_aims_file(cls, filename, **kwargs):
-        "Initialize a crystal structure from an FHI-aims geometry.in file"
-        return cls.from_aims_string(Path(filename).read_text(), **kwargs)
+        from .io import from_aims_file
+        return from_aims_file(filename, **kwargs)
 
     @classmethod
     def from_ase_atoms(cls, atoms, **kwargs):
-        from chmpy.ext.ase import ase_to_crystal
-
-        return ase_to_crystal(atoms, **kwargs)
+        from .io import from_ase_atoms
+        return from_ase_atoms(atoms, **kwargs)
 
     @classmethod
     def from_cif_data(cls, cif_data, titl=None):
-        """Initialize a crystal structure from a dictionary
-        of CIF data"""
-        labels = cif_data.get("atom_site_label", None)
-        symbols = cif_data.get("atom_site_type_symbol", None)
-        if symbols is None:
-            if labels is None:
-                raise ValueError(
-                    "Unable to determine elements in CIF, "
-                    "need one of _atom_site_label or "
-                    "_atom_site_type_symbol present"
-                )
-            elements = [Element[x] for x in labels]
-        else:
-            elements = [Element[x] for x in symbols]
-        x = np.asarray(cif_data.get("atom_site_fract_x", []))
-        y = np.asarray(cif_data.get("atom_site_fract_y", []))
-        z = np.asarray(cif_data.get("atom_site_fract_z", []))
-        occupation = np.asarray(cif_data.get("atom_site_occupancy", [1] * len(x)))
-        frac_pos = np.array([x, y, z]).T
-        asym = AsymmetricUnit(
-            elements=elements, positions=frac_pos, labels=labels, occupation=occupation
-        )
-        lengths = [cif_data[f"cell_length_{x}"] for x in ("a", "b", "c")]
-        angles = [cif_data[f"cell_angle_{x}"] for x in ("alpha", "beta", "gamma")]
-        unit_cell = UnitCell.from_lengths_and_angles(lengths, angles, unit="degrees")
-
-        space_group = SpaceGroup(1)
-        symop_data_names = (
-            "symmetry_equiv_pos_as_xyz",
-            "space_group_symop_operation_xyz",
-        )
-        number = space_group.international_tables_number
-        for k in ("space_group_IT_number", "symmetry_Int_Tables_number"):
-            if k in cif_data:
-                number = cif_data[k]
-                break
-
-        # Try to parse the Hermann-Mauguin symbol first
-        hm_parsed = False
-        hm_symbol = cif_data.get("symmetry_space_group_name_H-M", "").strip()
-        if hm_symbol:
-            try:
-                # Convert CIF Hermann-Mauguin notation to correct SpaceGroup
-                space_group = cls._parse_hermann_mauguin_symbol(hm_symbol, number)
-                hm_parsed = True
-            except (ValueError, KeyError):
-                # Fall back to symmetry operations if HM symbol parsing fails
-                pass
-
-        # Only try symmetry operations if HM parsing failed
-        if not hm_parsed:
-            for symop_data_block in symop_data_names:
-                if symop_data_block in cif_data:
-                    symops = [
-                        SymmetryOperation.from_string_code(x)
-                        for x in cif_data[symop_data_block]
-                    ]
-                    try:
-                        new_sg = SpaceGroup.from_symmetry_operations(symops)
-                        space_group = new_sg
-                    except ValueError:
-                        space_group.symmetry_operations = symops
-                        symbol = cif_data.get(
-                            "symmetry_space_group_name_H-M", "Unknown"
-                        )
-                        space_group.international_tables_number = number
-                        space_group.symbol = symbol
-                        space_group.full_symbol = symbol
-                        LOG.warn(
-                            "Initializing non-standard spacegroup setting %s, "
-                            "some SG data may be missing",
-                            symbol,
-                        )
-                    break
-            else:
-                # fall back to international tables number
-                space_group = SpaceGroup(number)
-
-        return Crystal(unit_cell, space_group, asym, cif_data=cif_data, titl=titl)
+        from .io import from_cif_data
+        return from_cif_data(cif_data, titl=titl)
 
     @classmethod
     def _parse_hermann_mauguin_symbol(cls, hm_symbol, sg_number):
-        """
-        Parse Hermann-Mauguin symbol from CIF and find matching SpaceGroup.
-
-        Args:
-            hm_symbol (str): Hermann-Mauguin symbol from CIF (e.g. 'P C M 21')
-            sg_number (int): Space group number from CIF
-
-        Returns:
-            SpaceGroup: Matching space group object
-        """
-        from .space_group import SG_FROM_NUMBER
-
-        # Clean up the symbol - remove extra spaces, normalize
-        clean_symbol = " ".join(hm_symbol.upper().split())
-
-        # Get all possible settings for this space group number
-        if str(sg_number) not in SG_FROM_NUMBER:
-            raise ValueError(f"Space group number {sg_number} not found")
-
-        sg_settings = SG_FROM_NUMBER[str(sg_number)]
-
-        # Try each setting and check if crystal17_spacegroup_symbol matches
-        for sg_data in sg_settings:
-            try:
-                sg = SpaceGroup(sg_number, choice=sg_data.choice)
-                crystal17_symbol = sg.crystal17_spacegroup_symbol().upper()
-
-                if clean_symbol == crystal17_symbol:
-                    return sg
-            except Exception as e:
-                LOG.debug(
-                    "Exception encountered when determining space group setting: %s", e
-                )
-                continue
-
-        # If no match found, raise error
-        raise ValueError(
-            f"Could not match Hermann-Mauguin symbol '{hm_symbol}' "
-            f"to any setting of space group #{sg_number}"
-        )
+        from .io import _parse_hermann_mauguin_symbol
+        return _parse_hermann_mauguin_symbol(hm_symbol, sg_number)
 
     @classmethod
     def from_cif_file(cls, filename, data_block_name=None):
-        """Initialize a crystal structure from a CIF file"""
-        cif = Cif.from_file(filename)
-        if data_block_name is not None:
-            return cls.from_cif_data(cif.data[data_block_name], titl=data_block_name)
-
-        crystals = {
-            name: cls.from_cif_data(data, titl=name) for name, data in cif.data.items()
-        }
-        keys = list(crystals.keys())
-        if len(keys) == 1:
-            return crystals[keys[0]]
-        return crystals
+        from .io import from_cif_file
+        return from_cif_file(filename, data_block_name=data_block_name)
 
     @classmethod
     def from_pdb_file(cls, filename):
-        from chmpy.fmt.pdb import Pdb
-
-        pdb = Pdb.from_file(filename)
-        uc = UnitCell.from_lengths_and_angles(
-            [pdb.unit_cell["a"], pdb.unit_cell["b"], pdb.unit_cell["c"]],
-            [pdb.unit_cell["alpha"], pdb.unit_cell["beta"], pdb.unit_cell["gamma"]],
-            unit="degrees",
-        )
-        pos_cart = np.c_[pdb.atoms["x"], pdb.atoms["y"], pdb.atoms["z"]]
-        pos_frac = uc.to_fractional(pos_cart)
-        elements = [Element.from_string(x) for x in pdb.atoms["element"]]
-        labels = pdb.atoms["name"]
-        asym = AsymmetricUnit(elements, pos_frac, labels=labels)
-        sg = SpaceGroup.from_symbol(pdb.space_group)
-        return Crystal(uc, sg, asym)
+        from .io import from_pdb_file
+        return from_pdb_file(filename)
 
     @classmethod
     def from_cif_string(cls, file_content, **kwargs):
-        data_block_name = kwargs.get("data_block_name", None)
-        cif = Cif.from_string(file_content)
-        if data_block_name is not None:
-            return cls.from_cif_data(cif.data[data_block_name], titl=data_block_name)
-
-        crystals = {
-            name: cls.from_cif_data(data, titl=name) for name, data in cif.data.items()
-        }
-        keys = list(crystals.keys())
-        if len(keys) == 1:
-            return crystals[keys[0]]
-        return crystals
+        from .io import from_cif_string
+        return from_cif_string(file_content, **kwargs)
 
     @classmethod
     def from_shelx_file(cls, filename, **kwargs):
-        """Initialize a crystal structure from a shelx .res file"""
-        p = Path(filename)
-        titl = p.stem
-        return cls.from_shelx_string(p.read_text(), titl=titl, **kwargs)
+        from .io import from_shelx_file
+        return from_shelx_file(filename, **kwargs)
 
     @classmethod
     def from_shelx_string(cls, file_content, **kwargs):
-        """Initialize a crystal structure from a shelx .res string"""
-        from chmpy.fmt.shelx import parse_shelx_file_content
-
-        shelx_dict = parse_shelx_file_content(file_content)
-        asymmetric_unit = AsymmetricUnit.from_records(shelx_dict["ATOM"])
-        space_group = SpaceGroup.from_symmetry_operations(
-            shelx_dict["SYMM"], expand_latt=shelx_dict["LATT"]
-        )
-        unit_cell = UnitCell.from_lengths_and_angles(
-            shelx_dict["CELL"]["lengths"], shelx_dict["CELL"]["angles"], unit="degrees"
-        )
-        return cls(unit_cell, space_group, asymmetric_unit, **kwargs)
+        from .io import from_shelx_string
+        return from_shelx_string(file_content, **kwargs)
 
     @classmethod
     def from_crystal17_opt_string(cls, string, **kwargs):
-        from chmpy.fmt.crystal17 import load_crystal17_geometry_string
-
-        data = load_crystal17_geometry_string(string)
-        unit_cell = UnitCell(data["direct"])
-        space_group = SpaceGroup.from_symmetry_operations(data["symmetry_operations"])
-        asym = AsymmetricUnit(data["elements"], unit_cell.to_fractional(data["xyz"]))
-        return Crystal(unit_cell, space_group, asym)
+        from .io import from_crystal17_opt_string
+        return from_crystal17_opt_string(string, **kwargs)
 
     @classmethod
     def from_crystal17_opt_file(cls, filename, **kwargs):
-        p = Path(filename)
-        titl = p.stem
-        return cls.from_crystal17_opt_string(p.read_text(), titl=titl, **kwargs)
+        from .io import from_crystal17_opt_file
+        return from_crystal17_opt_file(filename, **kwargs)
 
     @classmethod
     def from_molecule(cls, molecule, **kwargs):
-        unit_cell = UnitCell.cubic(1000)
-
-        asym = AsymmetricUnit(
-            elements=molecule.elements,
-            positions=unit_cell.to_fractional(molecule.positions),
-            labels=molecule.labels,
-        )
-        space_group = SpaceGroup(1)
-        x = cls(unit_cell, space_group, asym)
-        _ = x.unit_cell_atoms(
-            tolerance=1e-12
-        )  # need to workaround default tolerance as we have a massive cell
-        return x
+        from .io import from_molecule
+        return from_molecule(molecule, **kwargs)
 
     @classmethod
     def from_gen_string(cls, contents, **kwargs):
-        from chmpy.fmt.gen import parse_gen_string
-
-        elements, positions, cell, fractional = parse_gen_string(contents)
-        unit_cell = UnitCell(cell[1:4, :])
-
-        asym = AsymmetricUnit(
-            elements=elements,
-            positions=positions,
-        )
-        space_group = SpaceGroup(1)
-        return cls(unit_cell, space_group, asym, **kwargs)
+        from .io import from_gen_string
+        return from_gen_string(contents, **kwargs)
 
     @classmethod
     def from_gen_file(cls, filename, **kwargs):
-        p = Path(filename)
-        titl = p.stem
-        return cls.from_gen_string(p.read_text(), titl=titl, **kwargs)
+        from .io import from_gen_file
+        return from_gen_file(filename, **kwargs)
 
     @property
     def name(self) -> str:
@@ -1906,48 +1109,12 @@ class Crystal:
         return self.asymmetric_unit.formula
 
     def to_ase_atoms(self, **kwargs):
-        from chmpy.ext.ase import crystal_to_ase
-
-        return crystal_to_ase(self)
+        from .io import to_ase_atoms
+        return to_ase_atoms(self, **kwargs)
 
     def to_cif_data(self, data_block_name=None) -> dict:
-        "Convert this crystal structure to cif data dict"
-        version = "1.0a1"
-        if data_block_name is None:
-            data_block_name = self.titl
-        if "cif_data" in self.properties:
-            cif_data = self.properties["cif_data"]
-            cif_data["audit_creation_method"] = (
-                f"chmpy python library version {version}"
-            )
-            cif_data["atom_site_fract_x"] = self.asymmetric_unit.positions[:, 0]
-            cif_data["atom_site_fract_y"] = self.asymmetric_unit.positions[:, 1]
-            cif_data["atom_site_fract_z"] = self.asymmetric_unit.positions[:, 2]
-        else:
-            cif_data = {
-                "audit_creation_method": f"chmpy python library version {version}",
-                "symmetry_equiv_pos_site_id": list(
-                    range(1, len(self.symmetry_operations) + 1)
-                ),
-                "symmetry_equiv_pos_as_xyz": [str(x) for x in self.symmetry_operations],
-                "cell_length_a": self.unit_cell.a,
-                "cell_length_b": self.unit_cell.b,
-                "cell_length_c": self.unit_cell.c,
-                "cell_angle_alpha": self.unit_cell.alpha_deg,
-                "cell_angle_beta": self.unit_cell.beta_deg,
-                "cell_angle_gamma": self.unit_cell.gamma_deg,
-                "atom_site_label": self.asymmetric_unit.labels,
-                "atom_site_type_symbol": [
-                    x.symbol for x in self.asymmetric_unit.elements
-                ],
-                "atom_site_fract_x": self.asymmetric_unit.positions[:, 0],
-                "atom_site_fract_y": self.asymmetric_unit.positions[:, 1],
-                "atom_site_fract_z": self.asymmetric_unit.positions[:, 2],
-                "atom_site_occupancy": self.asymmetric_unit.properties.get(
-                    "occupation", np.ones(len(self.asymmetric_unit))
-                ),
-            }
-        return {data_block_name: cif_data}
+        from .io import to_cif_data
+        return to_cif_data(self, data_block_name=data_block_name)
 
     def structure_factors(self, **kwargs):
         from chmpy.crystal.sfac import structure_factors
@@ -2010,80 +1177,420 @@ class Crystal:
         return new_crystal
 
     def to_cif_file(self, filename, **kwargs):
-        "save this crystal to a CIF formatted file"
-        cif_data = self.to_cif_data(**kwargs)
-        return Cif(cif_data).to_file(filename)
+        from .io import to_cif_file
+        return to_cif_file(self, filename, **kwargs)
 
     def to_cif_string(self, **kwargs):
-        "save this crystal to a CIF formatted string"
-        cif_data = self.to_cif_data(**kwargs)
-        return Cif(cif_data).to_string()
+        from .io import to_cif_string
+        return to_cif_string(self, **kwargs)
 
     def to_poscar_string(self, **kwargs):
-        "save this crystal to a VASP POSCAR formatted string"
-        from chmpy.ext.vasp import poscar_string
-
-        return poscar_string(self, name=self.titl)
+        from .io import to_poscar_string
+        return to_poscar_string(self, **kwargs)
 
     def to_poscar_file(self, filename, **kwargs):
-        "save this crystal to a VASP POSCAR formatted file"
-        Path(filename).write_text(self.to_poscar_string(**kwargs))
+        from .io import to_poscar_file
+        return to_poscar_file(self, filename, **kwargs)
 
     def to_shelx_file(self, filename):
-        """Write this crystal structure as a shelx .res formatted file"""
-        Path(filename).write_text(self.to_shelx_string())
+        from .io import to_shelx_file
+        return to_shelx_file(self, filename)
 
     def to_shelx_string(self, titl=None):
-        """Represent this crystal structure as a shelx .res formatted string"""
-        from chmpy.fmt.shelx import to_res_contents
-
-        sfac = list(np.unique(self.site_atoms))
-        atom_sfac = [sfac.index(x) + 1 for x in self.site_atoms]
-        shelx_data = {
-            "TITL": self.titl if titl is None else titl,
-            "CELL": self.unit_cell.parameters,
-            "SFAC": [Element[x].symbol for x in sfac],
-            "SYMM": [
-                str(s)
-                for s in self.space_group.reduced_symmetry_operations()
-                if not s.is_identity()
-            ],
-            "LATT": self.space_group.latt,
-            "ATOM": [
-                "{:3} {:3} {: 20.12f} {: 20.12f} {: 20.12f}".format(l, s, *pos)
-                for l, s, pos in zip(
-                    self.asymmetric_unit.labels,
-                    atom_sfac,
-                    self.site_positions,
-                    strict=False,
-                )
-            ],
-        }
-        return to_res_contents(shelx_data)
+        from .io import to_shelx_string
+        return to_shelx_string(self, titl=titl)
 
     def to_pdb_string(self, header=None):
-        """Represent this crystal structure as a PDB formatted string."""
-        from chmpy.fmt.pdb import Pdb
-
-        pdb = Pdb.from_crystal(self, header=header)
-        return pdb.to_string()
+        from .io import to_pdb_string
+        return to_pdb_string(self, header=header)
 
     def to_pdb_file(self, filename, header=None):
-        """Write this crystal structure as a PDB formatted file."""
-        Path(filename).write_text(self.to_pdb_string(header=header))
+        from .io import to_pdb_file
+        return to_pdb_file(self, filename, header=header)
 
     def save(self, filename, **kwargs):
-        """Save this crystal structure to file (.cif, .res, POSCAR)"""
-        fpath = Path(filename)
-        n = fpath.name
-        fname_map = self._fname_save_map()
-        if n in fname_map:
-            return fname_map[n](filename, **kwargs)
-        extension_map = self._ext_save_map()
-        extension = kwargs.pop("fmt", fpath.suffix.lower())
-        if not extension.startswith("."):
-            extension = "." + extension
-        return extension_map[extension](filename, **kwargs)
+        from .io import save
+        return save(self, filename, **kwargs)
+
+    def enumerate_subgroups(self, max_index: int = 8) -> list:
+        """Enumerate translationengleiche (t-) subgroups of this crystal's space group.
+
+        Returns subgroups that preserve the same lattice but have fewer
+        point operations. Each subgroup increases Z' by a factor equal
+        to the subgroup index.
+
+        Args:
+            max_index: Maximum index [G:H] to consider (default 8)
+
+        Returns:
+            List of SubgroupResult, sorted by index then size
+        """
+        from .subgroup import SubgroupEnumerator
+
+        enumerator = SubgroupEnumerator.from_space_group(self.space_group)
+        return enumerator.enumerate_all(max_index=max_index)
+
+    def _has_connected_asymmetric_unit(self) -> bool:
+        """Check if each symmetry-unique molecule is connected.
+
+        Returns True if the number of symmetry-unique molecules equals
+        the expected Z' (= Z / |G|). When False, the asymmetric unit
+        contains atoms from multiple molecules — typically because a
+        molecule sits on a retained symmetry element (e.g. inversion).
+        """
+        n_uc_mols = len(self.unit_cell_molecules())
+        n_symops = len(self.symmetry_operations)
+        expected_z_prime = n_uc_mols / n_symops
+        n_unique = len(self.symmetry_unique_molecules())
+        return n_unique <= expected_z_prime
+
+    def to_subgroup(
+        self,
+        target_z_prime: float | None = None,
+        subgroup_index: int | None = None,
+        subgroup_result=None,
+        tolerance: float = 1e-4,
+        reconnect: bool = True,
+    ) -> "Crystal":
+        """Create a new Crystal with reduced symmetry using a subgroup.
+
+        The asymmetric unit is expanded to account for the reduced symmetry,
+        while the unit cell remains the same (t-subgroup).
+
+        Exactly one of target_z_prime, subgroup_index, or subgroup_result
+        must be provided.
+
+        Args:
+            target_z_prime: Desired Z' value. The method finds a subgroup
+                that achieves this Z'.
+            subgroup_index: Index [G:H] of the desired subgroup. If multiple
+                subgroups exist with this index, the first identified one
+                is used.
+            subgroup_result: A specific SubgroupResult to apply.
+            tolerance: Tolerance for position comparison during expansion.
+            reconnect: If True (default), prefer subgroups where the
+                asymmetric unit forms connected molecules. When a molecule
+                sits on a symmetry element (e.g. inversion center), this
+                selects a subgroup that drops that element.
+
+        Returns:
+            New Crystal with the subgroup as space group and expanded
+            asymmetric unit.
+
+        Raises:
+            ValueError: If no valid subgroup is found or arguments are invalid.
+        """
+        from .subgroup import (
+            SubgroupEnumerator,
+            SubgroupResult,
+            expand_asymmetric_unit,
+        )
+
+        n_args = sum(x is not None for x in [target_z_prime, subgroup_index, subgroup_result])
+        if n_args != 1:
+            raise ValueError(
+                "Exactly one of target_z_prime, subgroup_index, or "
+                "subgroup_result must be provided"
+            )
+
+        enumerator = SubgroupEnumerator.from_space_group(self.space_group)
+
+        def _build_crystal(result):
+            new_asym = expand_asymmetric_unit(
+                self.asymmetric_unit,
+                self.symmetry_operations,
+                result.symop_indices,
+                enumerator.sg_table,
+                tolerance=tolerance,
+            )
+            sub_symops = [self.symmetry_operations[i] for i in result.symop_indices]
+            sg_number = result.space_group_number or 1
+            try:
+                new_sg = SpaceGroup.from_symmetry_operations(sub_symops)
+            except ValueError:
+                new_sg = SpaceGroup(sg_number)
+                new_sg.symmetry_operations = sub_symops
+            new_crystal = Crystal(self.unit_cell, new_sg, new_asym)
+            new_crystal.properties = {
+                "parent_space_group": self.space_group.symbol,
+                "subgroup_index": result.index,
+            }
+            if result.space_group_symbol is not None:
+                new_crystal.properties["subgroup_space_group"] = result.space_group_symbol
+            if result.point_group_symbol is not None:
+                new_crystal.properties["subgroup_point_group"] = result.point_group_symbol
+            return new_crystal
+
+        if subgroup_result is not None:
+            return _build_crystal(subgroup_result)
+
+        if target_z_prime is not None:
+            # Z' = Z / |G|, where Z = number of molecules in the unit cell
+            # and |G| = number of symmetry operations.
+            n_uc_mols = len(self.unit_cell_molecules())
+            n_symops = len(self.symmetry_operations)
+            current_z_prime = n_uc_mols / n_symops
+            candidates = enumerator.find_for_target_z_prime(
+                current_z_prime, target_z_prime
+            )
+            if not candidates:
+                raise ValueError(
+                    f"No subgroup found that achieves Z' = {target_z_prime} "
+                    f"(current Z' = {current_z_prime})"
+                )
+        else:
+            candidates = enumerator.find_by_index(subgroup_index)
+            if not candidates:
+                raise ValueError(
+                    f"No subgroup found with index {subgroup_index}"
+                )
+
+        # Sort candidates: prefer identified space groups
+        candidates.sort(key=lambda c: (c.space_group_number is None, c.index))
+
+        if not reconnect:
+            return _build_crystal(candidates[0])
+
+        # When reconnect=True, try each candidate and pick the first
+        # one that produces a connected asymmetric unit (each symmetry-
+        # unique molecule is a single connected fragment).  This avoids
+        # subgroups whose retained symmetry (e.g. inversion) splits a
+        # molecule that sits on that symmetry element.
+        best = None
+        for candidate in candidates:
+            crystal = _build_crystal(candidate)
+            if crystal._has_connected_asymmetric_unit():
+                return crystal
+            if best is None:
+                best = crystal
+
+        LOG.info(
+            "No subgroup produces a fully connected asymmetric unit; "
+            "the molecule likely sits on a retained symmetry element"
+        )
+        return best
+
+    def to_standard_setting(self) -> "Crystal":
+        """Transform this crystal to the standard ITA setting.
+
+        After to_subgroup(), the symmetry operations may be in a
+        non-standard setting (e.g. shifted origin). This method
+        identifies the standard setting, computes the required origin
+        shift and/or basis transformation, and returns a new Crystal
+        with standard-setting symmetry operations.
+
+        Returns:
+            New Crystal in the standard ITA setting.
+
+        Raises:
+            ValueError: If the symmetry operations cannot be matched
+                to any known standard setting.
+        """
+        from .subgroup import identify_standard_setting
+
+        result = identify_standard_setting(self.symmetry_operations)
+        if result is None:
+            raise ValueError(
+                "Could not identify a standard ITA setting for the "
+                "current symmetry operations"
+            )
+
+        # No transform needed — already standard
+        if result.basis_transform is None and result.origin_shift is None:
+            new_sg = SpaceGroup(result.sg_number, choice=result.choice)
+            new_asym = AsymmetricUnit(
+                list(self.asymmetric_unit.elements),
+                self.asymmetric_unit.positions.copy(),
+                labels=list(self.asymmetric_unit.labels),
+            )
+            return Crystal(self.unit_cell, new_sg, new_asym)
+
+        # Origin shift only (no basis transform) — most common case
+        if result.basis_transform is None:
+            positions = self.asymmetric_unit.positions - result.origin_shift
+            positions = positions % 1.0
+            new_sg = SpaceGroup(result.sg_number, choice=result.choice)
+            new_asym = AsymmetricUnit(
+                list(self.asymmetric_unit.elements),
+                positions,
+                labels=list(self.asymmetric_unit.labels),
+            )
+            new_crystal = Crystal(self.unit_cell, new_sg, new_asym)
+            new_crystal.properties = dict(self.properties)
+            return new_crystal
+
+        # Basis transform present — need to rebuild the asymmetric unit
+        return self._to_standard_setting_with_basis_transform(result)
+
+    def detect_symmetry(self, tolerance: float = 0.01) -> "Crystal":
+        """Detect the full symmetry of this crystal from atomic positions.
+
+        Returns a new Crystal with the detected (possibly higher) symmetry.
+        Uses native detection -- no spglib dependency.
+
+        Args:
+            tolerance: Cartesian distance tolerance in Angstroms.
+
+        Returns:
+            Crystal with detected space group, or self if no higher symmetry found.
+        """
+        from .symmetry_finder import find_symmetry_operations, find_asymmetric_unit_indices
+        from .subgroup import identify_standard_setting
+
+        uc_dict = self.unit_cell_atoms()
+        positions = uc_dict["frac_pos"]
+        elements = uc_dict["element"]
+
+        symops = find_symmetry_operations(
+            self.unit_cell, positions, elements, atol=tolerance
+        )
+
+        if len(symops) <= len(self.symmetry_operations):
+            return self
+
+        result = identify_standard_setting(symops)
+        if result is None:
+            LOG.warning(
+                "Found %d symmetry operations but could not identify space group",
+                len(symops),
+            )
+            return self
+
+        sg = SpaceGroup(result.sg_number, choice=result.choice)
+
+        # Build asymmetric unit from equivalence classes
+        asym_indices = find_asymmetric_unit_indices(
+            positions, elements, symops, self.unit_cell.direct, atol=tolerance
+        )
+
+        asym = AsymmetricUnit(
+            [Element.from_atomic_number(int(elements[i])) for i in asym_indices],
+            positions[asym_indices],
+            labels=uc_dict["label"][asym_indices],
+        )
+        return Crystal(self.unit_cell, sg, asym)
+
+    def _to_standard_setting_with_basis_transform(self, result) -> "Crystal":
+        """Handle to_standard_setting when a basis transform is needed.
+
+        When the cell changes, the asymmetric unit must be reconstructed
+        from the full unit cell content, because:
+        1. The new cell may have different volume (det(P) != 1)
+        2. Atoms on special positions in the old cell may be on general
+           positions in the new cell, and vice versa
+
+        The approach:
+        1. Build the new cell from P @ old_direct
+        2. Correctly transform symops using row-vector convention
+        3. Identify standard setting for those symops (origin shift only)
+        4. Tile old UC atoms into the new cell
+        5. Find the asymmetric unit under the standard symops
+        """
+        from itertools import product as iproduct
+
+        from scipy.spatial import cKDTree as KDTree
+
+        from chmpy.core.element import Element
+
+        from .subgroup import (
+            _deduplicate_asymmetric_unit,
+            identify_standard_setting,
+        )
+        from .symmetry_operation import SymmetryOperation
+
+        P = result.basis_transform
+        P_inv = np.linalg.inv(P)
+        det_P_raw = abs(np.linalg.det(P))
+        det_P = max(1, round(det_P_raw))  # For tiling range: at least 1
+
+        # Build new unit cell
+        new_direct = P @ self.unit_cell.direct
+        new_uc = UnitCell(new_direct)
+
+        # Correctly transform symops using row-vector convention:
+        # R_new = P @ R_old @ P_inv (same for both conventions)
+        # t_new = t_old @ P_inv (row-vector convention)
+        correct_symops = []
+        for s in self.symmetry_operations:
+            R_new = P @ s.rotation @ P_inv
+            t_new = s.translation @ P_inv
+            correct_symops.append(
+                SymmetryOperation(np.round(R_new).astype(float), t_new)
+            )
+
+        # Deduplicate transformed symops: centering translations become
+        # lattice vectors under the primitive transform, producing
+        # duplicate ops that differ only by integer translations.
+        unique_symops = []
+        seen_codes = set()
+        for s in correct_symops:
+            t_wrapped = s.translation % 1.0
+            s_wrapped = SymmetryOperation(s.rotation, t_wrapped)
+            code = s_wrapped.integer_code
+            if code not in seen_codes:
+                seen_codes.add(code)
+                unique_symops.append(s_wrapped)
+        correct_symops = unique_symops
+
+        # Identify standard setting for the correctly-transformed symops
+        # (should only need origin shift, no further basis transform)
+        result2 = identify_standard_setting(correct_symops)
+        if result2 is None:
+            raise ValueError(
+                "Could not identify standard setting after basis transform"
+            )
+
+        std_sg = SpaceGroup(result2.sg_number, choice=result2.choice)
+
+        # Generate all unit cell atoms from the current crystal
+        uc_dict = self.unit_cell_atoms()
+        old_frac = uc_dict["frac_pos"]
+        old_elems = uc_dict["element"]
+
+        # Tile old UC atoms into the new (possibly larger/smaller) cell
+        all_frac = []
+        all_elems = []
+        for shift in iproduct(range(-1, det_P + 1), repeat=3):
+            shifted = old_frac + np.array(shift, dtype=float)
+            cart = self.unit_cell.to_cartesian(shifted)
+            frac_new = new_uc.to_fractional(cart)
+            for i in range(len(frac_new)):
+                f = frac_new[i]
+                if np.all(f >= -1e-6) and np.all(f < 1.0 - 1e-6):
+                    all_frac.append(f % 1.0)
+                    all_elems.append(int(old_elems[i]))
+
+        all_frac = np.array(all_frac)
+        all_elems = np.array(all_elems)
+
+        # Remove positional duplicates
+        tree = KDTree(all_frac)
+        dist = tree.sparse_distance_matrix(tree, max_distance=0.01)
+        mask = np.ones(len(all_frac), dtype=bool)
+        for (i, j), _ in dist.items():
+            if i < j and all_elems[i] == all_elems[j]:
+                mask[j] = False
+        uc_frac = all_frac[mask]
+        uc_elems = all_elems[mask]
+
+        # Apply origin shift if needed
+        if result2.origin_shift is not None:
+            uc_frac = (uc_frac - result2.origin_shift) % 1.0
+
+        # Find asymmetric unit under standard symops
+        elem_list = [Element.from_atomic_number(e) for e in uc_elems]
+        full_asym = AsymmetricUnit(elem_list, uc_frac)
+        unique_idx, _ = _deduplicate_asymmetric_unit(
+            full_asym, std_sg.symmetry_operations
+        )
+
+        final_elems = [elem_list[i] for i in unique_idx]
+        final_pos = uc_frac[unique_idx]
+        new_asym = AsymmetricUnit(final_elems, final_pos)
+
+        new_crystal = Crystal(new_uc, std_sg, new_asym)
+        new_crystal.properties = dict(self.properties)
+        return new_crystal
 
     def choose_trigonal_lattice(self, choice="H"):
         """
@@ -2306,305 +1813,33 @@ class Crystal:
         self.asymmetric_unit.positions = self.to_fractional(pos_cart)
 
     def assign_atom_types(self, force_field="UFF", **kwargs):
-        """
-        Assign atom types and force field parameters to this crystal structure.
-
-        Args:
-            force_field (str or ForceFieldType): Force field to use for typing.
-                Options: "UFF", "UFF4MOF", "DREIDING", "COMPASS"
-            **kwargs: Additional arguments passed to the atom typing system
-
-        Returns:
-            dict: Dictionary with typing results containing:
-                - atom_types: mapping of atom indices to (ff_type, descriptor) tuples
-                - parameters: mapping of atom indices to ForceFieldParameters objects
-                - force_field: name of the force field used
-                - unique_types: set of unique atom types found
-
-        Example:
-            >>> crystal = Crystal.load("MOF.cif")
-            >>> results = crystal.assign_atom_types("UFF")
-            >>> print(f"Found {len(results['unique_types'])} unique atom types")
-            >>> for i, params in results["parameters"].items():
-            ...     print(f"Atom {i}: {params.ff_type} (ε={params.epsilon:.3f})")
-        """
-        from chmpy.ff.params import ForceFieldType, type_crystal_structure
-
-        # Convert string to enum if needed
-        if isinstance(force_field, str):
-            ff_enum = ForceFieldType(force_field.upper())
-        else:
-            ff_enum = force_field
-
-        results = type_crystal_structure(self, ff_enum, **kwargs)
-
-        # Cache results on the crystal object for future access
-        self._atom_typing_results = results
-
-        return results
+        from .force_field import assign_atom_types
+        return assign_atom_types(self, force_field=force_field, **kwargs)
 
     def get_atom_types(self, force_field="UFF", use_cached=True, **kwargs):
-        """
-        Get atom type assignments for this crystal structure.
-
-        Args:
-            force_field (str or ForceFieldType): Force field to use
-            use_cached (bool): Whether to use cached results if available
-            **kwargs: Additional arguments for atom typing
-
-        Returns:
-            dict: Mapping of atom indices to (force_field_type, AtomTypeDescriptor) tuples
-        """
-        if use_cached and hasattr(self, "_atom_typing_results"):
-            cached_ff = self._atom_typing_results.get("force_field", "").upper()
-            if cached_ff == str(force_field).upper():
-                return self._atom_typing_results["atom_types"]
-
-        results = self.assign_atom_types(force_field, **kwargs)
-        return results["atom_types"]
+        from .force_field import get_atom_types
+        return get_atom_types(self, force_field=force_field, use_cached=use_cached, **kwargs)
 
     def get_ff_parameters(self, force_field="UFF", use_cached=True, **kwargs):
-        """
-        Get force field parameters for this crystal structure.
-
-        Args:
-            force_field (str or ForceFieldType): Force field to use
-            use_cached (bool): Whether to use cached results if available
-            **kwargs: Additional arguments for atom typing
-
-        Returns:
-            dict: Mapping of atom indices to ForceFieldParameters objects
-        """
-        if use_cached and hasattr(self, "_atom_typing_results"):
-            cached_ff = self._atom_typing_results.get("force_field", "").upper()
-            if cached_ff == str(force_field).upper():
-                return self._atom_typing_results["parameters"]
-
-        results = self.assign_atom_types(force_field, **kwargs)
-        return results["parameters"]
+        from .force_field import get_ff_parameters
+        return get_ff_parameters(self, force_field=force_field, use_cached=use_cached, **kwargs)
 
     def get_unique_atom_types(self, force_field="UFF", use_cached=True, **kwargs):
-        """
-        Get the set of unique atom types in this crystal structure.
-
-        Args:
-            force_field (str or ForceFieldType): Force field to use
-            use_cached (bool): Whether to use cached results if available
-            **kwargs: Additional arguments for atom typing
-
-        Returns:
-            set: Set of unique force field atom type strings
-        """
-        if use_cached and hasattr(self, "_atom_typing_results"):
-            cached_ff = self._atom_typing_results.get("force_field", "").upper()
-            if cached_ff == str(force_field).upper():
-                return self._atom_typing_results["unique_types"]
-
-        results = self.assign_atom_types(force_field, **kwargs)
-        return results["unique_types"]
+        from .force_field import get_unique_atom_types
+        return get_unique_atom_types(self, force_field=force_field, use_cached=use_cached, **kwargs)
 
     def get_lj_parameters_array(self, force_field="UFF", use_cached=True, **kwargs):
-        """
-        Get Lennard-Jones parameters as structured arrays for simulation input.
-
-        Args:
-            force_field (str or ForceFieldType): Force field to use
-            use_cached (bool): Whether to use cached results if available
-            **kwargs: Additional arguments for atom typing
-
-        Returns:
-            tuple: (atom_types_array, epsilon_array, sigma_array, mass_array, charges_array)
-                where each array is ordered by atom index
-        """
-        parameters = self.get_ff_parameters(force_field, use_cached, **kwargs)
-        uc_atoms = self.unit_cell_atoms()
-        n_atoms = len(uc_atoms["element"])
-
-        # Initialize arrays
-        atom_types = []
-        epsilons = np.zeros(n_atoms)
-        sigmas = np.zeros(n_atoms)
-        masses = np.zeros(n_atoms)
-        charges = np.zeros(n_atoms)
-
-        # Fill arrays in atom index order
-        for i in range(n_atoms):
-            if i in parameters:
-                params = parameters[i]
-                atom_types.append(params.ff_type)
-                epsilons[i] = params.epsilon
-                sigmas[i] = params.sigma
-                masses[i] = params.mass if params.mass is not None else 0.0
-                charges[i] = params.charge
-            else:
-                # Fallback for missing parameters
-                element = Element[uc_atoms["element"][i]].symbol
-                atom_types.append(f"{element}_generic")
-                masses[i] = Element[uc_atoms["element"][i]].mass
-
-        return atom_types, epsilons, sigmas, masses, charges
+        from .force_field import get_lj_parameters_array
+        return get_lj_parameters_array(self, force_field=force_field, use_cached=use_cached, **kwargs)
 
     def export_lammps_data(self, filename, force_field="UFF", **kwargs):
-        """
-        Export crystal structure with atom types in LAMMPS data format.
-
-        Args:
-            filename (str): Output filename for LAMMPS data file
-            force_field (str or ForceFieldType): Force field to use
-            **kwargs: Additional arguments for atom typing and export
-
-        Note:
-            This is a placeholder - would need integration with LAMMPS export functionality
-        """
-        results = self.assign_atom_types(force_field, **kwargs)
-        atom_types, epsilons, sigmas, masses, charges = self.get_lj_parameters_array(
-            force_field, **kwargs
-        )
-
-        # This would integrate with existing LAMMPS export functionality
-        # For now, just store the information
-        lammps_data = {
-            "atom_types": atom_types,
-            "epsilons": epsilons,
-            "sigmas": sigmas,
-            "masses": masses,
-            "charges": charges,
-            "positions": self.unit_cell_atoms()["cart_pos"],
-            "cell_parameters": self.unit_cell.parameters,
-        }
-
-        print(f"LAMMPS export functionality would write to {filename}")
-        print(f"Found {len(results['unique_types'])} unique atom types:")
-        for atom_type in sorted(results["unique_types"]):
-            count = atom_types.count(atom_type)
-            print(f"  {atom_type}: {count} atoms")
-
-        return lammps_data
+        from .force_field import export_lammps_data
+        return export_lammps_data(self, filename, force_field=force_field, **kwargs)
 
     def export_raspa_files(self, force_field="UFF", output_dir=".", **kwargs):
-        """
-        Export force field parameters in RASPA format.
-
-        Args:
-            force_field (str or ForceFieldType): Force field to use
-            output_dir (str): Directory to write RASPA files
-            **kwargs: Additional arguments for atom typing
-
-        Returns:
-            dict: Paths to created RASPA files
-        """
-        from pathlib import Path
-
-        _ = self.assign_atom_types(force_field, **kwargs)
-        output_path = Path(output_dir)
-        output_path.mkdir(exist_ok=True)
-
-        # Get arrays for RASPA format
-        atom_types, epsilons, sigmas, masses, charges = self.get_lj_parameters_array(
-            force_field, **kwargs
-        )
-
-        # Create pseudo_atoms.def file
-        pseudo_atoms_file = output_path / "pseudo_atoms.def"
-        ff_mixing_file = output_path / "force_field_mixing_rules.def"
-
-        # Write pseudo_atoms.def
-        with open(pseudo_atoms_file, "w") as f:
-            f.write("# Pseudo atoms definition file\n")
-            f.write(f"# Generated by chmpy for crystal: {self.titl}\n")
-            f.write(f"# Force field: {force_field}\n\n")
-
-            unique_params = {}
-            for i, ff_type in enumerate(atom_types):
-                if ff_type not in unique_params:
-                    unique_params[ff_type] = {
-                        "epsilon": epsilons[i],
-                        "sigma": sigmas[i],
-                        "mass": masses[i],
-                        "charge": charges[i],
-                        "element": Element[self.unit_cell_atoms()["element"][i]].symbol,
-                    }
-
-            f.write(f"{len(unique_params)}\n")
-            for ff_type, params in unique_params.items():
-                f.write(
-                    f"{ff_type:12s} yes {params['element']:2s} {params['element']:2s} "
-                )
-                f.write(f"0 {params['mass']:8.3f} {params['charge']:8.3f} ")
-                f.write(f"0.0 1.0 {params['sigma']:8.3f} 0 0 relative 0\n")
-
-        # Write force_field_mixing_rules.def
-        with open(ff_mixing_file, "w") as f:
-            f.write("# Force field mixing rules\n")
-            f.write(f"# Generated by chmpy for crystal: {self.titl}\n")
-            f.write(f"# Force field: {force_field}\n\n")
-
-            f.write("# general rule for Lorentz-Berthelot mixing\n")
-            f.write("# LJ potential\n")
-            f.write(f"{len(unique_params)}\n")
-
-            for ff_type, params in unique_params.items():
-                f.write(
-                    f"{ff_type:12s} lennard-jones {params['epsilon']:10.6f} {params['sigma']:10.6f}\n"
-                )
-
-            f.write("# general mixing rule\n")
-            f.write("lorentz-berthelot\n")
-
-        return {
-            "pseudo_atoms": str(pseudo_atoms_file),
-            "mixing_rules": str(ff_mixing_file),
-        }
+        from .force_field import export_raspa_files
+        return export_raspa_files(self, force_field=force_field, output_dir=output_dir, **kwargs)
 
     def atom_typing_summary(self, force_field="UFF", **kwargs):
-        """
-        Print a summary of atom typing results for this crystal.
-
-        Args:
-            force_field (str or ForceFieldType): Force field to use
-            **kwargs: Additional arguments for atom typing
-        """
-        results = self.assign_atom_types(force_field, **kwargs)
-
-        print(f"\nAtom Typing Summary for {self.titl}")
-        print(f"Force Field: {results['force_field']}")
-        print(f"Total atoms: {len(results['atom_types'])}")
-        print(f"Unique types: {len(results['unique_types'])}")
-        print("-" * 50)
-
-        # Count atoms by type
-        type_counts = {}
-        for ff_type, _descriptor in results["atom_types"].values():
-            type_counts[ff_type] = type_counts.get(ff_type, 0) + 1
-
-        # Print sorted by count
-        for ff_type, count in sorted(
-            type_counts.items(), key=lambda x: x[1], reverse=True
-        ):
-            # Get example parameters
-            example_params = None
-            for params in results["parameters"].values():
-                if params.ff_type == ff_type:
-                    example_params = params
-                    break
-
-            if example_params:
-                print(
-                    f"{ff_type:12s}: {count:3d} atoms  "
-                    f"(ε={example_params.epsilon:6.3f}, σ={example_params.sigma:6.3f})"
-                )
-            else:
-                print(f"{ff_type:12s}: {count:3d} atoms")
-
-        print("-" * 50)
-
-        # Show any special environments
-        special_envs = set()
-        for _ff_type, descriptor in results["atom_types"].values():
-            if descriptor.special_environment:
-                special_envs.add(descriptor.special_environment)
-
-        if special_envs:
-            print(f"Special environments detected: {', '.join(special_envs)}")
-
-        print()
+        from .force_field import atom_typing_summary
+        return atom_typing_summary(self, force_field=force_field, **kwargs)

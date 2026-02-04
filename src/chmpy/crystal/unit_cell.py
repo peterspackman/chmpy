@@ -34,6 +34,11 @@ class UnitCell:
         self.set_vectors(vectors)
 
     @property
+    def metric_tensor(self) -> np.ndarray:
+        """G = A^T A, the metric tensor of the lattice."""
+        return self.direct.T @ self.direct
+
+    @property
     def lattice(self) -> np.ndarray:
         "The direct matrix of this unit cell i.e. vectors of the lattice"
         return self.direct

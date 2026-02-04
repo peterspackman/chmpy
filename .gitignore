@@ -10,3 +10,4 @@ __pycache__/
 junk/
 .*.swp
 .DS_Store
+local/

@@ -353,6 +353,57 @@ class SymmetryOperation:
         "Alternative constructor for the the identity symop i.e. x,y,z"
         return cls.from_integer_code(16484)
 
+    def compose(self, other: "SymmetryOperation") -> "SymmetryOperation":
+        """
+        Compose this symmetry operation with another: self ∘ other.
+
+        The result is a new symmetry operation that first applies `other`,
+        then applies `self`. In matrix form: (R_self, t_self) ∘ (R_other, t_other)
+        = (R_self @ R_other, R_self @ t_other + t_self)
+
+        Args:
+            other: The symmetry operation to compose with
+
+        Returns:
+            SymmetryOperation: The composed operation (self ∘ other)
+        """
+        # Compose rotations: R_new = R_self @ R_other
+        new_rotation = np.dot(self.rotation, other.rotation)
+
+        # Compose translations: t_new = R_self @ t_other + t_self
+        new_translation = np.dot(self.rotation, other.translation) + self.translation
+
+        return SymmetryOperation(new_rotation, new_translation)
+
+    def __mul__(self, other: "SymmetryOperation") -> "SymmetryOperation":
+        """
+        Multiplication operator for symmetry operations: self * other = self ∘ other.
+
+        This is equivalent to `self.compose(other)`.
+        """
+        return self.compose(other)
+
+    def inverse(self) -> "SymmetryOperation":
+        """
+        Return the inverse of this symmetry operation.
+
+        For a symmetry operation (R, t), the inverse is (R^-1, -R^-1 @ t).
+
+        Returns:
+            SymmetryOperation: The inverse operation
+        """
+        # For crystallographic rotations in fractional coordinates,
+        # R is integer with det ±1 so R^-1 is also integer.
+        # Note: R^T = R^-1 only holds in Cartesian coordinates;
+        # in fractional coordinates (e.g. hexagonal systems) the
+        # rotation matrices are generally not orthogonal.
+        inv_rotation = np.round(np.linalg.inv(self.rotation))
+
+        # t_inv = -R^-1 @ t
+        inv_translation = -np.dot(inv_rotation, self.translation)
+
+        return SymmetryOperation(inv_rotation, inv_translation)
+
 
 def expanded_symmetry_list(reduced_symops, lattice_type):
     """

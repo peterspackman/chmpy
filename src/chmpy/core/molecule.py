@@ -459,6 +459,37 @@ class Molecule:
         return cls.from_mol2_string(Path(filename).read_text(), **kwargs)
 
     @classmethod
+    def from_aims_string(cls, contents, **kwargs):
+        """Initialize a molecule from an FHI-aims geometry.in string.
+
+        Args:
+            contents (str): Contents of the geometry.in file
+            **kwargs: Additional keyword arguments passed to Molecule constructor
+
+        Returns:
+            Molecule: A new Molecule object
+
+        Raises:
+            ValueError: If the geometry contains lattice vectors (periodic system)
+        """
+        from chmpy.fmt.aims import geometry_string_to_molecule
+
+        return geometry_string_to_molecule(contents)
+
+    @classmethod
+    def from_aims_file(cls, filename, **kwargs):
+        """Initialize a molecule from an FHI-aims geometry.in file.
+
+        Args:
+            filename (str or Path): Path to the geometry.in file
+            **kwargs: Additional keyword arguments passed to Molecule constructor
+
+        Returns:
+            Molecule: A new Molecule object
+        """
+        return cls.from_aims_string(Path(filename).read_text(), **kwargs)
+
+    @classmethod
     def _ext_load_map(cls):
         return {
             ".xyz": cls.from_xyz_file,
@@ -466,11 +497,15 @@ class Molecule:
             ".fchk": cls.from_fchk_file,
             ".coord": cls.from_turbomole_file,
             ".mol2": cls.from_mol2_file,
+            ".in": cls.from_aims_file,
         }
 
     @classmethod
     def _fname_load_map(cls):
-        return {}
+        return {
+            "geometry.in": cls.from_aims_file,
+            "geometry.in.next_step": cls.from_aims_file,
+        }
 
     def _ext_save_map(self):
         return {".xyz": self.to_xyz_file, ".sdf": self.to_sdf_file}

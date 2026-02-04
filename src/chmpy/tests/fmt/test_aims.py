@@ -6,7 +6,11 @@ import numpy as np
 from chmpy.core import Molecule
 from chmpy.crystal import Crystal
 from chmpy.fmt.aims import (
+    AimsOutput,
     crystal_to_geometry_string,
+    generate_control_in,
+    geometry_string_to_crystal,
+    geometry_string_to_molecule,
     molecule_to_geometry_string,
     parse_geometry_string,
     to_geometry_string,
@@ -211,6 +215,310 @@ atom_frac 0.0 0.0 0.0 C
 
             self.assertIsInstance(crystal, Crystal)
             self.assertGreater(len(crystal.asymmetric_unit.elements), 0)
+
+    def test_generate_control_in_basic(self):
+        """Test basic control.in generation."""
+        species_dir = Path("~/src/FHIaims-250822/species_defaults").expanduser()
+        if not species_dir.exists():
+            self.skipTest("Species defaults directory not found")
+
+        control_str = generate_control_in(
+            self.acetic_acid,
+            species_defaults_dir=species_dir,
+            basis="light",
+            xc="pbe",
+        )
+
+        # Check header
+        self.assertIn("FHI-aims control.in file", control_str)
+        self.assertIn("xc                                 pbe", control_str)
+
+        # Check species blocks
+        self.assertIn("species        C", control_str)
+        self.assertIn("species        H", control_str)
+        self.assertIn("species        O", control_str)
+
+    def test_generate_control_in_with_relaxation(self):
+        """Test control.in with geometry and cell relaxation."""
+        species_dir = Path("~/src/FHIaims-250822/species_defaults").expanduser()
+        if not species_dir.exists():
+            self.skipTest("Species defaults directory not found")
+
+        control_str = generate_control_in(
+            self.acetic_acid,
+            species_defaults_dir=species_dir,
+            basis="light",
+            xc="pbe",
+            k_grid=(4, 4, 4),
+            relax_geometry=True,
+            relax_unit_cell="full",
+            output_options=["hirshfeld"],
+        )
+
+        # Check keywords
+        self.assertIn("relax_geometry trm", control_str)
+        self.assertIn("relax_unit_cell                    full", control_str)
+        self.assertIn("k_grid                             4 4 4", control_str)
+        self.assertIn("output                             hirshfeld", control_str)
+
+    def test_generate_control_in_different_basis(self):
+        """Test control.in with different basis sets."""
+        species_dir = Path("~/src/FHIaims-250822/species_defaults").expanduser()
+        if not species_dir.exists():
+            self.skipTest("Species defaults directory not found")
+
+        # Test lightdense
+        if (species_dir / "defaults_2020" / "lightdense").exists():
+            control_str = generate_control_in(
+                self.acetic_acid,
+                species_defaults_dir=species_dir,
+                basis="lightdense",
+                xc="b86bpbe-25",
+            )
+            self.assertIn("Basis set: lightdense", control_str)
+            self.assertIn("xc                                 b86bpbe-25", control_str)
+
+    def test_generate_control_in_extra_keywords(self):
+        """Test control.in with extra keywords."""
+        species_dir = Path("~/src/FHIaims-250822/species_defaults").expanduser()
+        if not species_dir.exists():
+            self.skipTest("Species defaults directory not found")
+
+        control_str = generate_control_in(
+            self.acetic_acid,
+            species_defaults_dir=species_dir,
+            basis="light",
+            xc="b86bpbe-25",
+            extra_keywords={"xdm": "0.69125110 1.57470830", "output_level": "MD_light"},
+        )
+
+        self.assertIn("xdm", control_str)
+        self.assertIn("0.69125110 1.57470830", control_str)
+        self.assertIn("output_level", control_str)
+        self.assertIn("MD_light", control_str)
+
+    def test_generate_control_in_molecule(self):
+        """Test control.in generation for a molecule (non-periodic)."""
+        species_dir = Path("~/src/FHIaims-250822/species_defaults").expanduser()
+        if not species_dir.exists():
+            self.skipTest("Species defaults directory not found")
+
+        control_str = generate_control_in(
+            self.water, species_defaults_dir=species_dir, basis="light", xc="pbe"
+        )
+
+        # Should not have k_grid for molecules
+        self.assertNotIn("k_grid", control_str)
+
+        # Should have species
+        self.assertIn("species        H", control_str)
+        self.assertIn("species        O", control_str)
+
+    def test_geometry_string_to_molecule(self):
+        """Test converting geometry string to Molecule."""
+        test_input = """# Molecule geometry
+atom 0.0 0.0 0.0 O
+atom 0.96 0.0 0.0 H
+atom -0.24 0.93 0.0 H
+"""
+        mol = geometry_string_to_molecule(test_input)
+
+        self.assertIsInstance(mol, Molecule)
+        self.assertEqual(len(mol.elements), 3)
+        self.assertEqual(mol.elements[0].symbol, "O")
+        self.assertEqual(mol.elements[1].symbol, "H")
+        self.assertEqual(mol.elements[2].symbol, "H")
+
+    def test_geometry_string_to_molecule_rejects_periodic(self):
+        """Test that geometry_string_to_molecule raises error for periodic systems."""
+        test_input = """lattice_vector 10.0 0.0 0.0
+lattice_vector 0.0 10.0 0.0
+lattice_vector 0.0 0.0 10.0
+
+atom 0.0 0.0 0.0 C
+"""
+        with self.assertRaises(ValueError) as context:
+            geometry_string_to_molecule(test_input)
+
+        self.assertIn("lattice vectors", str(context.exception))
+
+    def test_geometry_string_to_crystal(self):
+        """Test converting geometry string to Crystal."""
+        test_input = """lattice_vector 5.0 0.0 0.0
+lattice_vector 0.0 5.0 0.0
+lattice_vector 0.0 0.0 5.0
+
+atom_frac 0.0 0.0 0.0 Na
+atom_frac 0.5 0.5 0.5 Cl
+"""
+        crystal = geometry_string_to_crystal(test_input)
+
+        self.assertIsInstance(crystal, Crystal)
+        uc_atoms = crystal.unit_cell_atoms()
+        self.assertEqual(len(uc_atoms["element"]), 2)
+
+    def test_molecule_from_aims_string(self):
+        """Test Molecule.from_aims_string() method."""
+        test_input = """atom 1.0 2.0 3.0 C
+atom 4.0 5.0 6.0 H
+"""
+        mol = Molecule.from_aims_string(test_input)
+
+        self.assertIsInstance(mol, Molecule)
+        self.assertEqual(len(mol.elements), 2)
+        np.testing.assert_array_almost_equal(mol.positions[0], [1.0, 2.0, 3.0])
+
+
+class AimsOutputTestCase(unittest.TestCase):
+    """Tests for the AimsOutput parser."""
+
+    def test_aims_output_parse_periodic_optimization(self):
+        """Test parsing a periodic optimization output."""
+        # Check if we have the test file
+        aims_out_path = Path.home() / "work/embed/aims-jobs/opt/taurine/aims.out"
+        if not aims_out_path.exists():
+            self.skipTest("Test aims.out file not found")
+
+        output = AimsOutput.from_file(aims_out_path)
+
+        self.assertTrue(output.is_periodic)
+        self.assertTrue(output.is_optimization)
+        self.assertTrue(output.converged)
+        self.assertGreater(output.n_steps, 0)
+        self.assertIsNotNone(output.final_energy)
+        self.assertIsNotNone(output.final_structure)
+
+        # Check final structure has lattice
+        self.assertIsNotNone(output.final_structure.lattice)
+        self.assertEqual(output.final_structure.lattice.shape, (3, 3))
+
+    def test_aims_output_parse_molecule_optimization(self):
+        """Test parsing a molecule optimization output."""
+        aims_out_path = Path.home() / "work/embed/aims-jobs/opt/monomers/sulfamic/aims.out"
+        if not aims_out_path.exists():
+            self.skipTest("Test aims.out file not found")
+
+        output = AimsOutput.from_file(aims_out_path)
+
+        self.assertFalse(output.is_periodic)
+        self.assertTrue(output.is_optimization)
+        self.assertTrue(output.converged)
+        self.assertIsNotNone(output.final_energy)
+        self.assertIsNotNone(output.final_structure)
+
+        # Check that molecule has no lattice
+        self.assertIsNone(output.final_structure.lattice)
+
+    def test_aims_output_get_energies(self):
+        """Test extracting energies from aims.out."""
+        aims_out_path = Path.home() / "work/embed/aims-jobs/opt/taurine/aims.out"
+        if not aims_out_path.exists():
+            self.skipTest("Test aims.out file not found")
+
+        output = AimsOutput.from_file(aims_out_path)
+        energies = output.get_energies()
+
+        self.assertGreater(len(energies), 0)
+        # Energies should decrease or stay roughly constant during optimization
+        # Just check they are all negative (typical for DFT total energies)
+        for e in energies:
+            self.assertLess(e, 0)
+
+    def test_aims_output_get_trajectory(self):
+        """Test getting trajectory from aims.out."""
+        aims_out_path = Path.home() / "work/embed/aims-jobs/opt/taurine/aims.out"
+        if not aims_out_path.exists():
+            self.skipTest("Test aims.out file not found")
+
+        output = AimsOutput.from_file(aims_out_path)
+        trajectory = output.get_trajectory()
+
+        self.assertGreater(len(trajectory), 0)
+        # Should be Crystal objects for periodic system
+        for struct in trajectory:
+            self.assertIsInstance(struct, Crystal)
+
+    def test_aims_output_to_crystal(self):
+        """Test converting final structure to Crystal."""
+        aims_out_path = Path.home() / "work/embed/aims-jobs/opt/taurine/aims.out"
+        if not aims_out_path.exists():
+            self.skipTest("Test aims.out file not found")
+
+        output = AimsOutput.from_file(aims_out_path)
+        crystal = output.final_structure.to_crystal()
+
+        self.assertIsInstance(crystal, Crystal)
+        uc_atoms = crystal.unit_cell_atoms()
+        self.assertGreater(len(uc_atoms["element"]), 0)
+
+    def test_aims_output_to_molecule(self):
+        """Test converting final structure to Molecule for non-periodic."""
+        aims_out_path = Path.home() / "work/embed/aims-jobs/opt/monomers/sulfamic/aims.out"
+        if not aims_out_path.exists():
+            self.skipTest("Test aims.out file not found")
+
+        output = AimsOutput.from_file(aims_out_path)
+        mol = output.final_structure.to_molecule()
+
+        self.assertIsInstance(mol, Molecule)
+        self.assertEqual(len(mol.elements), 8)  # Sulfamic acid has 8 atoms
+
+    def test_aims_output_synthetic(self):
+        """Test parsing synthetic aims.out content."""
+        synthetic_output = """
+------------------------------------------------------------
+          Invoking FHI-aims ...
+------------------------------------------------------------
+
+  | Number of atoms                   :        3
+
+  | Total energy uncorrected      :         -0.760000000000000E+02 eV
+
+  Self-consistency cycle converged.
+
+  Geometry optimization: Attempting to predict improved coordinates.
+
+  || Forces on atoms   || =   0.100000E-01 eV/A.
+  Maximum force component is  0.100000E-01 eV/A.
+  Present geometry is not yet converged.
+
+  Updated atomic structure:
+                         x [A]             y [A]             z [A]
+            atom         0.00000000        0.00000000        0.00000000  O
+            atom         0.96000000        0.00000000        0.00000000  H
+            atom        -0.24000000        0.93000000        0.00000000  H
+------------------------------------------------------------
+
+  | Total energy uncorrected      :         -0.760500000000000E+02 eV
+
+  Self-consistency cycle converged.
+
+  Geometry optimization: Attempting to predict improved coordinates.
+
+  || Forces on atoms   || =   0.400000E-02 eV/A.
+  Maximum force component is  0.400000E-02 eV/A.
+  Present geometry is converged.
+
+  Final atomic structure:
+                         x [A]             y [A]             z [A]
+            atom         0.00000000        0.00000000        0.00000000  O
+            atom         0.95700000        0.00000000        0.00000000  H
+            atom        -0.24000000        0.92800000        0.00000000  H
+------------------------------------------------------------
+
+  | Total energy uncorrected      :         -0.760510000000000E+02 eV
+"""
+
+        output = AimsOutput.from_string(synthetic_output)
+
+        self.assertFalse(output.is_periodic)
+        self.assertTrue(output.is_optimization)
+        self.assertTrue(output.converged)
+        self.assertEqual(output.n_atoms, 3)
+        self.assertEqual(output.n_steps, 1)
+        self.assertIsNotNone(output.final_structure)
+        self.assertEqual(len(output.final_structure.elements), 3)
+        self.assertAlmostEqual(output.final_structure.positions[1][0], 0.957, places=3)
 
 
 if __name__ == "__main__":
