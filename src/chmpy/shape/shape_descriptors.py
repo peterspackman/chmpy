@@ -129,7 +129,7 @@ def stockholder_weight_descriptor(sht, n_i, p_i, n_e, p_e, **kwargs):
     g[:, 1] = y.flatten()
     g[:, 2] = z.flatten()
 
-    r = sphere_stockholder_radii(s, o, g, r_min, r_max, 1e-7, 50, isovalue).reshape(
+    r = sphere_stockholder_radii(s, o, g, r_min, r_max, isovalue=isovalue).reshape(
         sht.grid[0].shape
     )
     if np.any(r < 0):
@@ -197,7 +197,7 @@ def promolecule_density_descriptor(sht, n_i, p_i, **kwargs):
 
     o = kwargs.get("origin", np.mean(p_i, axis=0, dtype=np.float32))
     r = sphere_promolecule_radii(
-        pro, o, g, r_min, r_max, 1e-12, 50, isovalue
+        pro, o, g, r_min, r_max, isovalue=isovalue
     ).reshape(sht.grid[0].shape)
     if np.any(r < 0):
         raise ValueError(
