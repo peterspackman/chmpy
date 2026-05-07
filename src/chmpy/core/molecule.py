@@ -9,7 +9,6 @@ from scipy.spatial.distance import cdist
 
 from .element import Element
 
-_FUNCTIONAL_GROUP_SUBGRAPHS = {}
 LOG = logging.getLogger(__name__)
 
 
@@ -109,10 +108,6 @@ class Molecule:
 
         Will set the `bonds` member.
 
-        If the `graph_tool` library is available, this will call the
-        `bond_graph` method to populate the connectivity graph.
-
-
         Args:
             tolerance (float, optional): Additional tolerance for attributing
                 two sites as 'bonded'.
@@ -130,10 +125,6 @@ class Molecule:
         self.bonds = np.zeros(dist.shape)
         self.bonds[mask] = dist[mask]
         self.bonds = dok_matrix(self.bonds)
-        try:
-            self.bond_graph()
-        except Exception:
-            pass
 
     def connected_fragments(self) -> list:
         """
@@ -655,137 +646,108 @@ class Molecule:
         b_min, b_max = self.bbox_corners
         return np.abs(b_max - b_min)
 
-    def bond_graph(self):
+    @property
+    def graph(self):
         """
-        Calculate the `graph_tool.Graph` object corresponding
-        to this molecule. Requires the graph_tool library to be
-        installed
+        Get a MolecularGraph representation of this molecule.
+
+        Returns a graph object that can be used for ring detection,
+        aromaticity perception, SMILES generation, and substructure
+        matching.
 
         Returns:
-            graph_tool.Graph: the (undirected) graph of this molecule
+            MolecularGraph: Graph representation of this molecule.
         """
+        if not hasattr(self, "_molecular_graph"):
+            from chmpy.graph import MolecularGraph
 
-        if hasattr(self, "_bond_graph"):
-            return self._bond_graph
-        try:
-            import graph_tool as gt
-        except ImportError as e:
-            raise RuntimeError(
-                "Please install the graph_tool library for graph operations"
-            ) from e
-        if self.bonds is None:
-            self.guess_bonds()
-        g = gt.Graph(directed=False)
-        v_el = g.new_vertex_property("int")
-        g.add_edge_list(self.bonds.keys())
-        e_w = g.new_edge_property("float")
-        v_el.a[:] = self.atomic_numbers
-        g.vertex_properties["element"] = v_el
-        e_w.a[:] = list(self.bonds.values())
-        g.edge_properties["bond_distance"] = e_w
-        self._bond_graph = g
-        return g
+            self._molecular_graph = MolecularGraph.from_molecule(self)
+        return self._molecular_graph
 
-    def functional_groups(self, kind=None) -> dict | list:
+    def bond_graph(self):
+        """Alias for the `graph` property, retained for backwards compatibility."""
+        return self.graph
+
+    def functional_groups(self, kind=None):
         """
-        Find all indices of atom groups which constitute
-        subgraph isomorphisms with stored functional group data
+        Find all indices of atom groups matching named functional group patterns.
+
+        Patterns are defined in `chmpy.graph.substructure.FUNCTIONAL_GROUPS`.
+        The legacy name "carboxylic_acid" is accepted as an alias for "carboxyl".
 
         Args:
-            kind (str, optional):Find only matches of the given kind
+            kind (str, optional): Find only matches of the given kind. If None,
+                returns matches for every available group.
 
         Returns:
-            Either a dict with keys as functional group type and values as list of
-            lists of indices, or a list of lists of indices if kind is specified.
+            list[list[int]] when `kind` is given, otherwise dict[str, list[list[int]]].
         """
-        global _FUNCTIONAL_GROUP_SUBGRAPHS
-        try:
-            import graph_tool.topology as top  # noqa: F401
-        except ImportError as e:
-            raise RuntimeError(
-                "Please install the graph_tool library for graph operations"
-            ) from e
+        from chmpy.graph import find_functional_groups, list_functional_groups
 
-        if not _FUNCTIONAL_GROUP_SUBGRAPHS:
-            from chmpy.subgraphs import load_data
+        # Back-compat alias for the previous .gt-backed pattern.
+        aliases = {"carboxylic_acid": "carboxyl"}
 
-            _FUNCTIONAL_GROUP_SUBGRAPHS = load_data()
+        def _matches(name):
+            real = aliases.get(name, name)
+            return [list(m.values()) for m in find_functional_groups(self.graph, real)]
 
         if kind is not None:
-            sub = _FUNCTIONAL_GROUP_SUBGRAPHS[kind]
-            matches = self.matching_subgraph(sub)
-            if kind == "ring":
-                matches = list({tuple(sorted(x)) for x in matches})
-            return matches
+            return _matches(kind)
 
-        matches = {}
-        for n, sub in _FUNCTIONAL_GROUP_SUBGRAPHS.items():
-            m = self.matching_subgraph(sub)
-            if n == "ring":
-                m = list({tuple(sorted(x)) for x in m})
-            matches[n] = m
-        return matches
+        return {name: _matches(name) for name in list_functional_groups()}
 
-    def matching_subgraph(self, sub):
-        """Find all indices of atoms which match the given graph.
+    def to_smiles(self, canonical: bool = True, guess_charges: bool = True) -> str:
+        """
+        Generate a SMILES string for this molecule.
 
         Args:
-            sub (graph_tool.Graph): the subgraph
+            canonical: If True, generate canonical SMILES (default True).
+            guess_charges: If True, automatically detect formal charges for
+                common functional groups like nitro, carboxylate, etc. (default True).
 
         Returns:
-            List: list of lists of atomic indices matching the atoms in sub
-                to those in this molecule
+            SMILES string representation of this molecule.
         """
+        from chmpy.graph import to_smiles
 
-        try:
-            import graph_tool.topology as top
-        except ImportError as e:
-            raise RuntimeError(
-                "Please install the graph_tool library for graph operations"
-            ) from e
+        return to_smiles(self.graph, canonical=canonical, guess_charges=guess_charges)
 
-        g = self.bond_graph()
-        matches = top.subgraph_isomorphism(
-            sub,
-            g,
-            vertex_label=(
-                sub.vertex_properties["element"],
-                g.vertex_properties["element"],
-            ),
-        )
-        return [tuple(x.a) for x in matches]
-
-    def matching_fragments(self, fragment, method="connectivity"):
+    def find_rings(self) -> list[tuple[int, ...]]:
         """
-        Find the indices of a matching fragment to the given
-        molecular fragment
+        Find rings in this molecule using the SSSR algorithm.
+
+        Returns:
+            List of tuples, each containing atom indices forming a ring.
+        """
+        from chmpy.graph import find_sssr
+
+        return find_sssr(self.graph)
+
+    def is_aromatic(self) -> bool:
+        """
+        Check if this molecule contains any aromatic rings.
+
+        Returns:
+            True if the molecule has at least one aromatic ring.
+        """
+        from chmpy.graph import get_aromatic_rings
+
+        return len(get_aromatic_rings(self.graph)) > 0
+
+    def morgan_fingerprint(self, radius: int = 2, n_bits: int = 2048):
+        """
+        Calculate a Morgan/ECFP fingerprint for this molecule.
 
         Args:
-            fragment (Molecule): Molecule object containing the desired fragment
-            method (str, optional): the method for matching
+            radius: Maximum radius for atom environments (default 2).
+            n_bits: Size of the fingerprint bit vector (default 2048).
 
         Returns:
-            List[dict]: List of maps between matching indices in this molecule and those
-                in the fragment
+            Boolean array of shape (n_bits,) representing the fingerprint.
         """
-        try:
-            import graph_tool.topology as top
-        except ImportError as e:
-            raise RuntimeError(
-                "Please install the graph_tool library for graph operations"
-            ) from e
+        from chmpy.graph import morgan_fingerprint
 
-        sub = fragment.bond_graph()
-        g = self.bond_graph()
-        matches = top.subgraph_isomorphism(
-            sub,
-            g,
-            vertex_label=(
-                sub.vertex_properties["element"],
-                g.vertex_properties["element"],
-            ),
-        )
-        return [list(x.a) for x in matches]
+        return morgan_fingerprint(self.graph, radius=radius, n_bits=n_bits)
 
     def calculate_wavefunction(self, method="HF", basis_set="3-21G", program="nwchem"):
         from chmpy.fmt.nwchem import to_nwchem_input
