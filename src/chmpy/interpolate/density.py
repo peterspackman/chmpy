@@ -28,22 +28,6 @@ class PromoleculeDensity:
             self.rho_data[i, :] = _RHO[el - 1, :]
         self.principal_axes, _, _ = np.linalg.svd((self.positions - self.centroid).T)
         self.vdw_radii = vdw_radii(self.elements)
-        self._cython_dens = None
-
-    @property
-    def dens(self):
-        """Backwards-compatible cython density object.
-
-        Built lazily so that the surface fast path doesn't require the cython
-        extension to be present. The shape-descriptor code still uses this for
-        `sphere_promolecule_radii`/`sphere_stockholder_radii` (a follow-up will
-        port those to the python backend too).
-        """
-        if self._cython_dens is None:
-            from ._density import PromoleculeDensity as _cPromol
-
-            self._cython_dens = _cPromol(self.positions, _DOMAIN, self.rho_data)
-        return self._cython_dens
 
     def rho(self, positions):
         return _backends.rho(self.positions, self.rho_data, _DOMAIN, positions)
@@ -101,18 +85,6 @@ class StockholderWeight:
         self.dens_a = dens_a
         self.dens_b = dens_b
         self.background = float(background)
-        self._cython_stock = None
-
-    @property
-    def s(self):
-        """Backwards-compatible cython stockholder object (lazy)."""
-        if self._cython_stock is None:
-            from ._density import StockholderWeight as _cStock
-
-            self._cython_stock = _cStock(
-                self.dens_a.dens, self.dens_b.dens, background=self.background
-            )
-        return self._cython_stock
 
     @property
     def positions(self):
