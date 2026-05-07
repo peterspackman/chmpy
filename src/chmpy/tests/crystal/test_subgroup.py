@@ -5,24 +5,24 @@ import unittest
 
 import numpy as np
 
+from chmpy.core.element import Element
 from chmpy.crystal import Crystal, SpaceGroup
 from chmpy.crystal.asymmetric_unit import AsymmetricUnit
 from chmpy.crystal.space_group_table import SpaceGroupTable
 from chmpy.crystal.subgroup import (
+    StandardSettingResult,
     SubgroupEnumerator,
     SubgroupResult,
-    StandardSettingResult,
-    compute_closure,
-    expand_asymmetric_unit,
-    identify_standard_setting,
     _deduplicate_asymmetric_unit,
     _detect_centering,
     _identify_point_group,
     _reduce_centered_ops,
+    compute_closure,
+    expand_asymmetric_unit,
+    identify_standard_setting,
 )
-from chmpy.crystal.symmetry_operation import SymmetryOperation, decode_symm_int
+from chmpy.crystal.symmetry_operation import SymmetryOperation
 from chmpy.crystal.unit_cell import UnitCell
-from chmpy.core.element import Element
 
 from .. import TEST_FILES
 
@@ -210,7 +210,7 @@ class TestSpaceGroupIdentification(unittest.TestCase):
         subgroups = enumerator.enumerate_all()
         # The Pmm2 subgroup should be identified via basis transformation
         identified = [s for s in subgroups if s.space_group_number is not None]
-        identified_numbers = {s.space_group_number for s in identified}
+        {s.space_group_number for s in identified}
         # Should identify more subgroups than just P-4, P2_12_12, P2, P1
         # The basis transform should catch Pmm2 and Pm
         self.assertGreater(len(identified), 4)
@@ -308,7 +308,7 @@ class TestExpandAsymmetricUnit(unittest.TestCase):
 
     def test_deduplication_removes_redundant_atoms(self):
         """Asymmetric units with symmetry-related atoms should be deduplicated."""
-        uc = UnitCell.from_lengths_and_angles(
+        UnitCell.from_lengths_and_angles(
             (5.565, 5.565, 4.684), (90, 90, 90), unit="degrees"
         )
         sg = SpaceGroup(113)
@@ -509,7 +509,6 @@ class TestIdentifyStandardSetting(unittest.TestCase):
 
     def test_nonstandard_p21_needs_origin_shift(self):
         """Non-standard P2_1 ops (shifted origin) should require origin shift."""
-        from chmpy.crystal.symmetry_operation import SymmetryOperation
         # Standard P2_1: x,y,z and -x,1/2+y,-z
         # Shifted by p=(1/4,0,0): 1/2-x,1/2+y,-z
         op1 = SymmetryOperation.from_string_code("x,y,z")
@@ -557,8 +556,8 @@ class TestToStandardSetting(unittest.TestCase):
         # Symops should now match the standard setting
         std_sg = SpaceGroup(std.space_group.international_tables_number,
                             choice=std.space_group.choice)
-        std_codes = set(s.integer_code for s in std_sg.symmetry_operations)
-        our_codes = set(s.integer_code for s in std.symmetry_operations)
+        std_codes = {s.integer_code for s in std_sg.symmetry_operations}
+        our_codes = {s.integer_code for s in std.symmetry_operations}
         self.assertEqual(std_codes, our_codes)
 
     def test_preserves_cartesian_positions(self):

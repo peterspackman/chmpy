@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from .bond_orders import get_bond_order, total_bond_order
+from .bond_orders import total_bond_order
 
 if TYPE_CHECKING:
     from .adjacency import MolecularGraph
@@ -236,7 +236,7 @@ def _assign_valence_based_charges(
         if z not in STANDARD_VALENCES:
             continue
 
-        standard_valence = STANDARD_VALENCES[z]
+        STANDARD_VALENCES[z]
         actual_valence = int(round(total_bond_order(graph, atom_idx)))
 
         # Quaternary nitrogen (4 bonds, normally 3)

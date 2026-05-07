@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from .aromaticity import perceive_aromaticity
-from .bond_orders import get_bond_order, implicit_hydrogen_count
+from .bond_orders import get_bond_order
 from .canonicalization import canonical_ordering
 from .rings import find_sssr
 from .stereochemistry import (

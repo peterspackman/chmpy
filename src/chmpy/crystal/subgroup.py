@@ -12,20 +12,22 @@ Primary use case: expanding asymmetric units to contain complete molecules
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass
 from functools import reduce
-from itertools import permutations, product as iterproduct
+from itertools import permutations
+from itertools import product as iterproduct
 from math import gcd
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING
 
 import numpy as np
 
-from .space_group import SG_FROM_SYMOPS, SG_FROM_NUMBER, SpaceGroup
+from .space_group import SG_FROM_NUMBER, SG_FROM_SYMOPS, SpaceGroup
 from .space_group_table import SpaceGroupTable
 from .symmetry_operation import (
     SymmetryOperation,
-    encode_symm_int,
     decode_symm_int,
+    encode_symm_int,
 )
 
 if TYPE_CHECKING:
@@ -288,7 +290,7 @@ def _detect_centering(
 
     # Verify: for every rotation group, adding the centering vector
     # maps each translation to another translation in the group
-    for rot_key, ts in rot_groups.items():
+    for ts in rot_groups.values():
         ts_set = set(ts)
         for t12 in ts:
             shifted = tuple((t12[i] + centering_key[i]) % 12 for i in range(3))
@@ -323,7 +325,7 @@ def _reduce_centered_ops(
         rot_groups[key].append((R, t))
 
     reduced = []
-    for key, pairs in rot_groups.items():
+    for pairs in rot_groups.values():
         # Keep the one with smallest translation norm (wrapped to [0, 1))
         best = min(pairs, key=lambda rt: np.linalg.norm(rt[1] % 1.0))
         reduced.append(best)
@@ -544,7 +546,7 @@ def _solve_origin_shift(
     candidates_seen = set()
     shifts = [-1, 0, 1]
 
-    for i, (A, b) in enumerate(zip(constraints_A, constraints_b)):
+    for A, b in zip(constraints_A, constraints_b, strict=False):
         for n in iterproduct(shifts, repeat=3):
             b_shifted = b + np.array(n, dtype=float)
             # Solve this single constraint (3 eqs, 3 unknowns)
@@ -601,7 +603,7 @@ def _verify_origin_shift(
     atol: float = 1e-3,
 ) -> bool:
     """Verify that p satisfies all constraints A_i @ p = b_i (mod 1)."""
-    for A, b in zip(constraints_A, constraints_b):
+    for A, b in zip(constraints_A, constraints_b, strict=False):
         residual = A @ p - b
         residual = residual - np.round(residual)
         if not np.allclose(residual, 0, atol=atol):
@@ -1007,7 +1009,7 @@ def _nearest_image(pos: np.ndarray, reference: np.ndarray) -> np.ndarray:
 
 
 def _deduplicate_asymmetric_unit(
-    asymmetric_unit: "AsymmetricUnit",
+    asymmetric_unit: AsymmetricUnit,
     symops: list[SymmetryOperation],
     tolerance: float = 1e-4,
 ) -> tuple[list[int], list]:
@@ -1066,12 +1068,12 @@ def _deduplicate_asymmetric_unit(
 
 
 def expand_asymmetric_unit(
-    asymmetric_unit: "AsymmetricUnit",
+    asymmetric_unit: AsymmetricUnit,
     symops: list[SymmetryOperation],
     subgroup_indices: Sequence[int],
     sg_table: SpaceGroupTable,
     tolerance: float = 1e-4,
-) -> "AsymmetricUnit":
+) -> AsymmetricUnit:
     """Expand asymmetric unit when reducing to a subgroup.
 
     First deduplicates the input asymmetric unit (removing atoms that are

@@ -141,7 +141,7 @@ def _canonicalize_ring(ring: list[int]) -> tuple[int, ...]:
     lexicographically smaller direction.
     """
     if not ring:
-        return tuple()
+        return ()
 
     # Find position of minimum element
     min_idx = ring.index(min(ring))

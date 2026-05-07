@@ -35,24 +35,7 @@ from .canonicalization import (
     reorder_graph,
     tanimoto_similarity,
 )
-from .smiles_writer import smiles_from_molecule, to_smiles
 from .formal_charges import assign_formal_charges, guess_formal_charges
-from .substructure import (
-    count_substructures,
-    find_functional_groups,
-    find_substructure,
-    has_substructure,
-    list_functional_groups,
-)
-from .stereochemistry import (
-    assign_stereochemistry,
-    count_stereocenters,
-    find_double_bond_stereo,
-    find_stereocenters,
-    get_double_bond_config,
-    get_stereocenter_config,
-    is_chiral,
-)
 from .rings import (
     find_all_rings,
     find_sssr,
@@ -62,6 +45,23 @@ from .rings import (
     ring_membership,
     ring_sizes,
     smallest_ring_containing_atom,
+)
+from .smiles_writer import smiles_from_molecule, to_smiles
+from .stereochemistry import (
+    assign_stereochemistry,
+    count_stereocenters,
+    find_double_bond_stereo,
+    find_stereocenters,
+    get_double_bond_config,
+    get_stereocenter_config,
+    is_chiral,
+)
+from .substructure import (
+    count_substructures,
+    find_functional_groups,
+    find_substructure,
+    has_substructure,
+    list_functional_groups,
 )
 
 __all__ = [

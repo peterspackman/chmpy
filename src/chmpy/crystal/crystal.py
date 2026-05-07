@@ -1282,7 +1282,6 @@ class Crystal:
         """
         from .subgroup import (
             SubgroupEnumerator,
-            SubgroupResult,
             expand_asymmetric_unit,
         )
 
@@ -1434,8 +1433,11 @@ class Crystal:
         Returns:
             Crystal with detected space group, or self if no higher symmetry found.
         """
-        from .symmetry_finder import find_symmetry_operations, find_asymmetric_unit_indices
         from .subgroup import identify_standard_setting
+        from .symmetry_finder import (
+            find_asymmetric_unit_indices,
+            find_symmetry_operations,
+        )
 
         uc_dict = self.unit_cell_atoms()
         positions = uc_dict["frac_pos"]

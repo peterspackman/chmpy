@@ -211,9 +211,9 @@ class AtomOrbitTableSpecialPositionTestCase(unittest.TestCase):
     def test_merged_sites(self):
         """Test that sites on special positions are properly merged."""
         # Create a crystal with an atom on a special position
+        from chmpy.core.element import Element
         from chmpy.crystal import Crystal, SpaceGroup, UnitCell
         from chmpy.crystal.asymmetric_unit import AsymmetricUnit
-        from chmpy.core.element import Element
 
         # Create a P1 structure with two atoms at same position
         uc = UnitCell.cubic(10.0)

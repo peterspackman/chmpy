@@ -3,8 +3,6 @@
 import logging
 import unittest
 
-import numpy as np
-
 from chmpy.crystal import Crystal
 from chmpy.crystal.space_group import SpaceGroup
 from chmpy.crystal.space_group_table import SpaceGroupTable

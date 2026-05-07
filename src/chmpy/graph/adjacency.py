@@ -161,7 +161,7 @@ class MolecularGraph:
             New MolecularGraph containing only the specified atoms.
         """
         atom_indices = np.asarray(atom_indices)
-        n = len(atom_indices)
+        len(atom_indices)
 
         # Extract vertex attributes
         new_atomic_numbers = self.atomic_numbers[atom_indices]
@@ -194,7 +194,7 @@ class MolecularGraph:
             List of unique (i, j) pairs where i < j.
         """
         rows, cols = self.adjacency.nonzero()
-        return [(i, j) for i, j in zip(rows, cols) if i < j]
+        return [(i, j) for i, j in zip(rows, cols, strict=False) if i < j]
 
     @classmethod
     def from_molecule(cls, molecule: "Molecule") -> "MolecularGraph":

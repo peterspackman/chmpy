@@ -4,26 +4,22 @@ import logging
 import unittest
 from pathlib import Path
 
-import numpy as np
-
 from chmpy.crystal import Crystal
-from chmpy.crystal.orbit import MoleculeOrbitTable
 from chmpy.crystal.dimer_index import (
+    AlgebraicDimerIndex,
+    AlgebraicMoleculeRef,
     DimerIndex,
     DimerList,
-    DimerEquivalenceClass,
-    MoleculeRef,
-    AlgebraicMoleculeRef,
-    AlgebraicDimerIndex,
     MolecularCosetTable,
-    find_symmetry_unique_dimers,
-    find_dimers_around_molecule,
-    find_symmetry_unique_dimers_algebraic,
-    apply_symop_to_algebraic_mol,
+    MoleculeRef,
     apply_symop_to_algebraic_dimer,
-    normalize_algebraic_dimer,
     compute_dimer_orbit_size,
+    find_dimers_around_molecule,
+    find_symmetry_unique_dimers,
+    find_symmetry_unique_dimers_algebraic,
+    normalize_algebraic_dimer,
 )
+from chmpy.crystal.orbit import MoleculeOrbitTable
 from chmpy.crystal.space_group_table import SpaceGroupTable
 
 from .. import TEST_FILES
@@ -219,7 +215,7 @@ class SymmetryUniqueDimersTestCase(unittest.TestCase):
         self.assertEqual(len(all_dimers), total_in_classes)
 
         # Each mapped dimer should reference a valid unique index
-        for uid, dimer in all_dimers:
+        for uid, _dimer in all_dimers:
             self.assertGreaterEqual(uid, 0)
             self.assertLess(uid, len(equiv_classes))
 
@@ -516,7 +512,7 @@ class UreaAlgebraicTestCase(unittest.TestCase):
         n_mols = mol_orbit.n_uc_molecules
 
         # Average site symmetry order = n_symops / n_mols
-        expected_order = n_symops // n_mols
+        n_symops // n_mols
         for i in range(coset_table.n_uc_molecules):
             self.assertGreaterEqual(coset_table.site_symmetry_order[i], 1)
 

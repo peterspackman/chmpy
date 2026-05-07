@@ -16,7 +16,7 @@ import numpy as np
 import scipy.sparse.csgraph as csgraph
 from scipy.spatial import cKDTree as KDTree
 
-from .symmetry_operation import SymmetryOperation, decode_symm_int
+from .symmetry_operation import decode_symm_int
 
 if TYPE_CHECKING:
     from .crystal import Crystal
@@ -166,7 +166,7 @@ class AtomOrbitTable:
                     parent[px] = py
 
         # Merge nearby sites (including zero distance - same position)
-        for (i, j), d in dist_matrix.items():
+        for (i, j), _d in dist_matrix.items():
             if i < j:
                 union(i, j)
 
@@ -434,7 +434,7 @@ class MoleculeOrbitTable:
         uc_graph, edge_cells = crystal.unit_cell_connectivity(tolerance=bond_tolerance)
         uc_dict = crystal.unit_cell_atoms()
         uc_frac = uc_dict["frac_pos"]
-        uc_cart = uc_dict["cart_pos"]
+        uc_dict["cart_pos"]
         uc_asym = uc_dict["asym_atom"]
         uc_symop = uc_dict["symop"]
 
@@ -470,7 +470,7 @@ class MoleculeOrbitTable:
             mol_cart = crystal.to_cartesian(mol_frac)
 
             centroid_frac = np.mean(mol_frac, axis=0)
-            centroid_cart = np.mean(mol_cart, axis=0)
+            np.mean(mol_cart, axis=0)
 
             # Wrap centroid to [0, 1)
             centroid_frac_wrapped = np.fmod(centroid_frac + 7.0, 1.0)

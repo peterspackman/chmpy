@@ -15,22 +15,20 @@ Key features:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Callable, Iterator
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import numpy as np
 from scipy.spatial import cKDTree as KDTree
 
+from .atomic_graph import AlgebraicAtomRef, AtomicCosetTable
 from .symmetric_graph import (
     AlgebraicEdge,
-    AlgebraicVertexRef,
-    apply_symop_to_edge,
     canonical_edge_representative,
     compute_edge_orbit,
     compute_edge_orbit_size,
-    normalize_edge,
 )
-from .atomic_graph import AtomicCosetTable, AlgebraicAtomRef
 
 if TYPE_CHECKING:
     from .crystal import Crystal
@@ -255,9 +253,9 @@ class AtomPairGraph:
             Total energy per unit cell
         """
         total = 0.0
-        n_uc = len(self._uc_atom_positions)
+        len(self._uc_atom_positions)
 
-        for i, pair in enumerate(self.unique_pairs):
+        for i, _pair in enumerate(self.unique_pairs):
             dist = self.pair_distances[i]
             mult = self.pair_multiplicities[i]
             energy = pair_potential(dist)
@@ -404,7 +402,7 @@ class AtomPairGraph:
         volume = self.crystal.unit_cell.volume()
         stress = np.zeros((3, 3))
 
-        for i, pair in enumerate(self.unique_pairs):
+        for i, _pair in enumerate(self.unique_pairs):
             r_ij = self.pair_vectors[i]
             dist = self.pair_distances[i]
             f_mag = force_magnitude(dist)

@@ -72,7 +72,7 @@ class CrystalNeighborList:
         uc_atoms = crystal.unit_cell_atoms()
         uc_cart = uc_atoms["cart_pos"]
         uc_frac = uc_atoms["frac_pos"]
-        n_atoms = len(uc_cart)
+        len(uc_cart)
 
         return cls._build_from_positions(
             uc_cart, uc_frac, crystal.unit_cell, cutoff

@@ -99,8 +99,8 @@ class PairwiseEnergyTestCase(unittest.TestCase):
         def harmonic(r):
             return 0.5 * r**2
 
-        e_small = pairs_small.compute_pairwise_energy(harmonic)
-        e_large = pairs_large.compute_pairwise_energy(harmonic)
+        pairs_small.compute_pairwise_energy(harmonic)
+        pairs_large.compute_pairwise_energy(harmonic)
 
         # Larger cutoff should include more pairs
         self.assertGreaterEqual(
@@ -199,7 +199,7 @@ class PairQueryTestCase(unittest.TestCase):
         involving = pairs.pairs_involving_atom(asym_idx=0)
 
         # Each pair should involve atom type 0
-        for pair, mult, dist in involving:
+        for pair, _mult, _dist in involving:
             self.assertTrue(
                 pair.src.asym_idx == 0 or pair.dst.asym_idx == 0
             )
@@ -213,7 +213,7 @@ class PairQueryTestCase(unittest.TestCase):
 
         # Verify they're actually C-C
         atoms = self.acetic.site_atoms
-        for pair, mult, dist in cc_pairs:
+        for pair, _mult, _dist in cc_pairs:
             type_a = atoms[pair.src.asym_idx]
             type_b = atoms[pair.dst.asym_idx]
             self.assertEqual(type_a, 6)

@@ -336,7 +336,7 @@ def normalize_algebraic_dimer(
         cell=(0, 0, 0),
     )
 
-    new_b_cell = tuple(c - s for c, s in zip(mol_b.cell, shift))
+    new_b_cell = tuple(c - s for c, s in zip(mol_b.cell, shift, strict=False))
     new_b = AlgebraicMoleculeRef(
         asym_mol_idx=mol_b.asym_mol_idx,
         symop_idx=mol_b.symop_idx,
@@ -738,8 +738,7 @@ def find_symmetry_unique_dimers(
 
                 # For non-permutative, also check ordered pair matches
                 if not permutative:
-                    rep = unique_ec.representative
-                    rep_ref_idx = unique_ec.metadata.get("ref_mol_idx")
+                    unique_ec.metadata.get("ref_mol_idx")
                     rep_central = unique_ec.metadata.get("central_type")
                     rep_neighbor = unique_ec.metadata.get("neighbor_type")
 
@@ -821,8 +820,8 @@ class MolecularCosetTable:
         cls,
         crystal: Crystal,
         mol_orbit: MoleculeOrbitTable,
-        sg_table: "SpaceGroupTable",
-    ) -> "MolecularCosetTable":
+        sg_table: SpaceGroupTable,
+    ) -> MolecularCosetTable:
         """
         Build the molecular coset table from crystal structure.
 
@@ -942,7 +941,7 @@ class AlgebraicDimerEquivalenceClass:
 
 def canonical_dimer_representative(
     dimer: AlgebraicDimerIndex,
-    sg_table: "SpaceGroupTable",
+    sg_table: SpaceGroupTable,
     coset_table: MolecularCosetTable | None = None,
 ) -> AlgebraicDimerIndex:
     """
@@ -973,7 +972,7 @@ def canonical_dimer_representative(
 
 def compute_dimer_orbit_size(
     dimer: AlgebraicDimerIndex,
-    sg_table: "SpaceGroupTable",
+    sg_table: SpaceGroupTable,
     coset_table: MolecularCosetTable | None = None,
 ) -> int:
     """
@@ -1003,7 +1002,7 @@ def build_algebraic_dimer_list(
     crystal: Crystal,
     mol_orbit: MoleculeOrbitTable,
     cutoff: float = 10.0,
-) -> tuple[list[AlgebraicDimerIndex], list[float], "SpaceGroupTable", MolecularCosetTable]:
+) -> tuple[list[AlgebraicDimerIndex], list[float], SpaceGroupTable, MolecularCosetTable]:
     """
     Build a list of algebraic dimers from the crystal structure.
 
@@ -1147,7 +1146,7 @@ def build_algebraic_dimer_list(
 
 def find_algebraic_equivalence_classes(
     dimers: list[AlgebraicDimerIndex],
-    sg_table: "SpaceGroupTable",
+    sg_table: SpaceGroupTable,
     coset_table: MolecularCosetTable | None = None,
 ) -> tuple[list[list[int]], list[int]]:
     """
@@ -1243,7 +1242,7 @@ def find_symmetry_unique_dimers_algebraic(
 
     # Build result
     result_classes = []
-    for member_indices, orbit_size in zip(equiv_classes, orbit_sizes):
+    for member_indices, orbit_size in zip(equiv_classes, orbit_sizes, strict=False):
         # Choose representative as the one with smallest index (first found)
         rep_idx = min(member_indices)
         rep = dimers[rep_idx]

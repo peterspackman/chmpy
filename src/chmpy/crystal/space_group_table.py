@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
-    from .space_group import SpaceGroup
+    from .space_group import SpaceGroup, SymmetryOperation
 
 LOG = logging.getLogger(__name__)
 
@@ -233,7 +233,7 @@ class SpaceGroupTable:
 
 
 def _find_matching_symop(
-    target: "SymmetryOperation",
+    target: SymmetryOperation,
     symops: list,
     symop_to_idx: dict[int, int],
 ) -> int:

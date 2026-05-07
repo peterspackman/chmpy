@@ -207,7 +207,7 @@ def _valence_propagation(
     n = graph.n_atoms
     max_iterations = 10
 
-    for iteration in range(max_iterations):
+    for _iteration in range(max_iterations):
         changed = False
 
         for atom_idx in range(n):

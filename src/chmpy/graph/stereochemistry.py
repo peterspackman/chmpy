@@ -108,7 +108,7 @@ def find_stereocenters(graph: "MolecularGraph") -> list[StereoCenter]:
 
         # Sort neighbors by CIP priority (high to low)
         sorted_neighbors = [
-            n for _, n in sorted(zip(priorities, neighbors), reverse=True)
+            n for _, n in sorted(zip(priorities, neighbors, strict=False), reverse=True)
         ]
 
         stereocenters.append(StereoCenter(atom_idx, sorted_neighbors))
@@ -152,10 +152,10 @@ def find_double_bond_stereo(graph: "MolecularGraph") -> list[DoubleBondStereo]:
 
         # Sort by priority
         sorted_i = [
-            n for _, n in sorted(zip(priorities_i, neighbors_i), reverse=True)
+            n for _, n in sorted(zip(priorities_i, neighbors_i, strict=False), reverse=True)
         ]
         sorted_j = [
-            n for _, n in sorted(zip(priorities_j, neighbors_j), reverse=True)
+            n for _, n in sorted(zip(priorities_j, neighbors_j, strict=False), reverse=True)
         ]
 
         double_bonds.append(DoubleBondStereo(i, j, sorted_i, sorted_j))
@@ -271,7 +271,7 @@ def _tetrahedral_stereo(
 
     p1 = project(v1)
     p2 = project(v2)
-    p3 = project(v3)
+    project(v3)
 
     # Calculate signed angle from p1 to p2 and p1 to p3
     # Using cross product to determine handedness
@@ -373,7 +373,7 @@ def get_stereocenter_config(
         return None
 
     sorted_neighbors = [
-        n for _, n in sorted(zip(priorities, neighbors), reverse=True)
+        n for _, n in sorted(zip(priorities, neighbors, strict=False), reverse=True)
     ]
 
     return _tetrahedral_stereo(graph, atom_idx, sorted_neighbors)
@@ -410,8 +410,8 @@ def get_double_bond_config(
     if len(neighbors2) == 2 and priorities2[0] == priorities2[1]:
         return None
 
-    sorted1 = [n for _, n in sorted(zip(priorities1, neighbors1), reverse=True)]
-    sorted2 = [n for _, n in sorted(zip(priorities2, neighbors2), reverse=True)]
+    sorted1 = [n for _, n in sorted(zip(priorities1, neighbors1, strict=False), reverse=True)]
+    sorted2 = [n for _, n in sorted(zip(priorities2, neighbors2, strict=False), reverse=True)]
 
     return _double_bond_stereo(graph, atom1, atom2, sorted1, sorted2)
 

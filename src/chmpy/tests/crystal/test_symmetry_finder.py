@@ -5,17 +5,16 @@ import unittest
 
 import numpy as np
 
+from chmpy.core.element import Element
 from chmpy.crystal import Crystal, SpaceGroup
 from chmpy.crystal.asymmetric_unit import AsymmetricUnit
 from chmpy.crystal.symmetry_finder import (
     _CRYSTALLOGRAPHIC_ROTATIONS,
     _metric_compatible_rotations,
-    _verify_operation,
     find_asymmetric_unit_indices,
     find_symmetry_operations,
 )
 from chmpy.crystal.unit_cell import UnitCell
-from chmpy.core.element import Element
 
 from .. import TEST_FILES
 

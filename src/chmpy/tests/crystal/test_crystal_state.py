@@ -255,7 +255,7 @@ class GradientConsistencyTestCase(unittest.TestCase):
             return grad
 
         # Compute analytical UC gradient: d(sum x^2)/dx = 2x
-        uc_grad = 2 * manager.state.uc_cart_positions
+        2 * manager.state.uc_cart_positions
 
         # We need to convert this to fractional coordinates for back-prop
         # For numerical comparison, use numerical gradient instead

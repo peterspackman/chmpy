@@ -115,7 +115,7 @@ class NeighborListComparisonTestCase(unittest.TestCase):
         slab_cart = slab["cart_pos"]
 
         # Find neighbors using KDTree
-        tree_uc = KDTree(uc_cart)
+        KDTree(uc_cart)
         tree_slab = KDTree(slab_cart)
 
         # For each UC atom, count neighbors in slab
@@ -153,7 +153,7 @@ class NeighborListComparisonTestCase(unittest.TestCase):
         for i in range(min(5, nlist.n_atoms)):
             indices, distances, cells = nlist.get_neighbors(i)
 
-            for j, dist, cell in zip(indices, distances, cells):
+            for j, dist, cell in zip(indices, distances, cells, strict=False):
                 # Compute distance directly
                 j_frac = uc_frac[j] + cell
                 j_cart = crystal.unit_cell.to_cartesian(j_frac)
@@ -179,7 +179,7 @@ class NeighborListPeriodicTestCase(unittest.TestCase):
 
         # Check that some neighbors have non-zero cell offsets
         has_periodic = False
-        for i, j, dist, cell in nlist.iter_all_pairs():
+        for _i, _j, _dist, cell in nlist.iter_all_pairs():
             if not np.all(cell == 0):
                 has_periodic = True
                 break

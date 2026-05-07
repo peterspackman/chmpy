@@ -4,9 +4,11 @@ All loaders and savers are implemented as standalone functions.
 Loaders return Crystal instances; savers accept a crystal as first argument.
 """
 
+from __future__ import annotations
+
 import logging
 from pathlib import Path
-from typing import Union
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -16,6 +18,9 @@ from chmpy.fmt.cif import Cif
 from .asymmetric_unit import AsymmetricUnit
 from .space_group import SpaceGroup, SymmetryOperation
 from .unit_cell import UnitCell
+
+if TYPE_CHECKING:
+    from .crystal import Crystal
 
 LOG = logging.getLogger(__name__)
 
@@ -59,7 +64,7 @@ def _fname_save_map(crystal):
 # Dispatchers
 # ---------------------------------------------------------------------------
 
-def load(filename, **kwargs) -> Union["Crystal", dict]:
+def load(filename, **kwargs) -> Crystal | dict:
     """
     Load a crystal structure from file (.res, .cif)
 
@@ -101,9 +106,9 @@ def save(crystal, filename, **kwargs):
 
 def from_vasp_string(string, **kwargs):
     "Initialize a crystal structure from a VASP POSCAR string"
-    from .crystal import Crystal
-
     from chmpy.fmt.vasp import parse_poscar
+
+    from .crystal import Crystal
 
     vasp_data = parse_poscar(string)
     uc = UnitCell(vasp_data["direct"])
@@ -122,9 +127,9 @@ def from_vasp_file(filename, **kwargs):
 
 def from_aims_string(string, **kwargs):
     "Initialize a crystal structure from an FHI-aims geometry.in string"
-    from .crystal import Crystal
-
     from chmpy.fmt.aims import parse_geometry_string
+
+    from .crystal import Crystal
 
     aims_data = parse_geometry_string(string)
     if "lattice" not in aims_data:
@@ -296,9 +301,9 @@ def from_cif_file(filename, data_block_name=None):
 
 
 def from_pdb_file(filename):
-    from .crystal import Crystal
-
     from chmpy.fmt.pdb import Pdb
+
+    from .crystal import Crystal
 
     pdb = Pdb.from_file(filename)
     uc = UnitCell.from_lengths_and_angles(
@@ -339,9 +344,9 @@ def from_shelx_file(filename, **kwargs):
 
 def from_shelx_string(file_content, **kwargs):
     """Initialize a crystal structure from a shelx .res string"""
-    from .crystal import Crystal
-
     from chmpy.fmt.shelx import parse_shelx_file_content
+
+    from .crystal import Crystal
 
     shelx_dict = parse_shelx_file_content(file_content)
     asymmetric_unit = AsymmetricUnit.from_records(shelx_dict["ATOM"])
@@ -355,9 +360,9 @@ def from_shelx_string(file_content, **kwargs):
 
 
 def from_crystal17_opt_string(string, **kwargs):
-    from .crystal import Crystal
-
     from chmpy.fmt.crystal17 import load_crystal17_geometry_string
+
+    from .crystal import Crystal
 
     data = load_crystal17_geometry_string(string)
     unit_cell = UnitCell(data["direct"])
@@ -391,9 +396,9 @@ def from_molecule(molecule, **kwargs):
 
 
 def from_gen_string(contents, **kwargs):
-    from .crystal import Crystal
-
     from chmpy.fmt.gen import parse_gen_string
+
+    from .crystal import Crystal
 
     elements, positions, cell, fractional = parse_gen_string(contents)
     unit_cell = UnitCell(cell[1:4, :])

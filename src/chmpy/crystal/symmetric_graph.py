@@ -23,8 +23,9 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Iterator
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -333,7 +334,7 @@ def normalize_edge(
         cell=(0, 0, 0),
     )
 
-    new_dst_cell = tuple(c - s for c, s in zip(dst.cell, shift))
+    new_dst_cell = tuple(c - s for c, s in zip(dst.cell, shift, strict=False))
     new_dst = AlgebraicVertexRef(
         asym_idx=dst.asym_idx,
         symop_idx=dst.symop_idx,

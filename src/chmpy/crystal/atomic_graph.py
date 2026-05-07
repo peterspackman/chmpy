@@ -15,21 +15,18 @@ Key features:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Iterator
+from collections.abc import Iterator
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import numpy as np
-from scipy.spatial import cKDTree as KDTree
 
 from .symmetric_graph import (
     AlgebraicEdge,
     AlgebraicVertexRef,
     CosetTable,
     SymmetricGraph,
-    apply_symop_to_vertex,
     canonical_edge_representative,
-    compute_edge_orbit_size,
-    normalize_edge,
 )
 
 if TYPE_CHECKING:
@@ -117,7 +114,7 @@ class AtomicCosetTable(CosetTable):
         """
         uc_dict = crystal.unit_cell_atoms()
         uc_frac = uc_dict["frac_pos"]
-        uc_asym = uc_dict["asym_atom"]
+        uc_dict["asym_atom"]
         n_atoms = len(uc_frac)
         n_symops = sg_table.n_ops
         n_asym = crystal.nsites

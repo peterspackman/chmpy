@@ -3,16 +3,13 @@
 import logging
 import unittest
 
-import numpy as np
-
 from chmpy.crystal import Crystal
-from chmpy.crystal.space_group_table import SpaceGroupTable
 from chmpy.crystal.atomic_graph import (
-    AlgebraicAtomRef,
     AlgebraicBondIndex,
     AtomicBondGraph,
     AtomicCosetTable,
 )
+from chmpy.crystal.space_group_table import SpaceGroupTable
 
 from .. import TEST_FILES
 
@@ -212,7 +209,7 @@ class AtomicBondGraphQueryTestCase(unittest.TestCase):
         cc_bonds = bonds.bonds_by_type(6, 6)
 
         # All returned bonds should be C-C
-        for bond, mult in cc_bonds:
+        for bond, _mult in cc_bonds:
             type_a, type_b = bonds.get_bond_atom_types(bond)
             self.assertEqual(type_a, 6)
             self.assertEqual(type_b, 6)
@@ -228,7 +225,7 @@ class BondMultiplicityTestCase(unittest.TestCase):
 
         n_symops = len(acetic.space_group.symmetry_operations)
 
-        for bond, mult in bonds.unique_bonds():
+        for _bond, mult in bonds.unique_bonds():
             # Multiplicity should divide group order
             # (Actually, it should divide n_symops * n_uc_copies)
             # For now just check it's reasonable
@@ -272,7 +269,7 @@ class HighSymmetryTestCase(unittest.TestCase):
 
         # Verify multiplicities are reasonable
         n_symops = len(ice.space_group.symmetry_operations)
-        for bond, mult in bonds.unique_bonds():
+        for _bond, mult in bonds.unique_bonds():
             self.assertLessEqual(mult, n_symops * bonds.n_uc_atoms)
 
 

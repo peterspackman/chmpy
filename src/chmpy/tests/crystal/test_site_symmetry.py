@@ -5,10 +5,10 @@ import unittest
 
 import numpy as np
 
+from chmpy.core.element import Element
 from chmpy.crystal import Crystal, SpaceGroup, UnitCell
 from chmpy.crystal.asymmetric_unit import AsymmetricUnit
 from chmpy.crystal.site_symmetry import SiteSymmetry, SiteSymmetryTable
-from chmpy.core.element import Element
 
 from .. import TEST_FILES
 
