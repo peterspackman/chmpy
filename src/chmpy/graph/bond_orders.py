@@ -225,12 +225,17 @@ def _valence_propagation(
             if any(abs(current_valence - v) < 0.1 for v in target_valences):
                 continue
 
-            # Try to adjust
-            target = min(target_valences, key=lambda v: abs(v - current_valence))
-            diff = target - current_valence
-
-            if abs(diff) < 0.1:
+            # Only correct OVER-valence (e.g. carboxylate carbon with both C-O
+            # bonds initially flagged as double). UNDER-valence is expected
+            # when hydrogens are implicit; "correcting" it by promoting bonds
+            # would turn an isolated C-C single bond into a triple, etc.
+            max_target = max(target_valences)
+            if current_valence <= max_target + 0.1:
                 continue
+
+            # Pick the largest target we still exceed and reduce toward it.
+            target = max(v for v in target_valences if v <= current_valence)
+            diff = target - current_valence  # negative
 
             # Adjust bonds proportionally
             adjustable_neighbors = [
@@ -307,12 +312,18 @@ def get_bond_order(graph: "MolecularGraph", atom_i: int, atom_j: int) -> float:
     if not graph.has_bond(atom_i, atom_j):
         return 0.0
 
-    if graph.bond_orders is not None:
-        order = graph.bond_orders[atom_i, atom_j]
-        if order > 0:
-            return float(order)
+    # Lazily perceive bond orders for the whole graph (with valence-constraint
+    # correction) and cache the result. The bond-length heuristic alone gets
+    # carboxylate-like sp2 carbons wrong because both C-O lengths are short
+    # enough to be flagged as double; the valence pass in perceive_bond_orders
+    # fixes that.
+    if graph.bond_orders is None:
+        graph.bond_orders = perceive_bond_orders(graph)
 
-    # Perceive from geometry
+    order = graph.bond_orders[atom_i, atom_j]
+    if order > 0:
+        return float(order)
+
     return _bond_length_heuristic(graph, atom_i, atom_j)
 
 
