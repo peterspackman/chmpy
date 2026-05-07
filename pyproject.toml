@@ -5,21 +5,59 @@ version = "1.1.11"
 requires-python = ">=3.10"
 description = "Molecules, crystals, promolecule and Hirshfeld surfaces using python."
 authors = [
-    { name = "Peter Spackman", email = "peterspackman@fastmail.com"}
+    { name = "Peter Spackman", email = "peterspackman@fastmail.com"},
 ]
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE.txt"]
+keywords = [
+    "chemistry",
+    "crystallography",
+    "molecular-modeling",
+    "hirshfeld-surface",
+    "promolecule-density",
+    "shape-descriptors",
+    "spherical-harmonics",
+    "cif",
+    "fhi-aims",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Chemistry",
+    "Topic :: Scientific/Engineering :: Physics",
+]
 dependencies = [
     "numpy>=2.1.2",
     "scipy>=1.14.1",
     "trimesh>=4.5.0",
     "matplotlib>=3.9.2",
     "seaborn>=0.13.2",
-    "Jinja2>=3.1.2"
+    "Jinja2>=3.1.2",
 ]
 
 [project.optional-dependencies]
-docs = ["mkdocs", "mkdocs-material", "mkdocstrings", "mkdocstrings-python", "mkdocs-gen-files", "mkdocs-literate-nav"]
+docs = [
+    "mkdocs",
+    "mkdocs-material",
+    "mkdocstrings",
+    "mkdocstrings-python",
+    "mkdocs-gen-files",
+    "mkdocs-literate-nav",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "ruff>=0.6",
+    "build>=1.2",
+]
 
 [project.urls]
 homepage = "https://github.com/peterspackman/chmpy"
@@ -27,7 +65,8 @@ repository = "https://github.com/peterspackman/chmpy"
 documentation = "https://peterspackman.github.io/chmpy/"
 
 [build-system]
-requires = ["setuptools>=68.0", "cython>=3.0", "numpy>=2.0"]
+# Cython 3.1 is the first release with Python 3.14 support.
+requires = ["setuptools>=68.0", "cython>=3.1", "numpy>=2.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
@@ -37,7 +76,8 @@ include-package-data = true
 where = ["src"]
 
 [tool.cibuildwheel]
-skip = "pp*"
+# Cibuildwheel honours requires-python, so cp36-cp39 are filtered automatically.
+skip = "pp* *-musllinux_*"
 
 [tool.ruff.lint]
 select = ["E", "F"]
