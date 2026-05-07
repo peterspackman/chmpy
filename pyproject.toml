@@ -65,8 +65,7 @@ repository = "https://github.com/peterspackman/chmpy"
 documentation = "https://peterspackman.github.io/chmpy/"
 
 [build-system]
-# Cython 3.1 is the first release with Python 3.14 support.
-requires = ["setuptools>=68.0", "cython>=3.1", "numpy>=2.0"]
+requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
@@ -74,10 +73,6 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[tool.cibuildwheel]
-# Cibuildwheel honours requires-python, so cp36-cp39 are filtered automatically.
-skip = "pp* *-musllinux_*"
 
 [tool.ruff.lint]
 select = ["E", "F"]
