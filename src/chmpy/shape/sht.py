@@ -8,9 +8,15 @@ from ._sht import (
     AssocLegendre,
     analysis_kernel_cplx,
     analysis_kernel_real,
+    analyze_cplx_full,
+    analyze_real_full,
+    build_plm_cache,
+    build_sht_index_tables,
     expand_coeffs_to_full,
     synthesis_kernel_cplx,
     synthesis_kernel_real,
+    synthesize_cplx_full,
+    synthesize_real_full,
 )
 
 _SHT_CACHE = {}
@@ -98,6 +104,10 @@ class SHT:
 
         self.fft_work_array = np.empty(self.nphi, dtype=np.complex128)
         self.plm_work_array = np.empty(self.nplm())
+        self._sht_tables = build_sht_index_tables(self.lmax, self.nphi)
+        # Cache Plm at every quadrature point — analysis / synthesis pay this
+        # construction cost once and then reuse the (ntheta, nplm) matrix.
+        self._plm_cache = build_plm_cache(self.lmax, self.cos_theta)
         self._grid = None
         self._grid_cartesian = None
 
@@ -309,23 +319,9 @@ class SHT:
         Returns:
             np.ndarray the set of spherical harmonic coefficients
         """
-
-        real = not np.iscomplexobj(values)
-        if real:
-            kernel = analysis_kernel_real
-            coeffs = np.zeros(self.nplm(), dtype=np.complex128)
-        else:
-            kernel = analysis_kernel_cplx
-            coeffs = np.zeros(self.nlm(), dtype=np.complex128)
-        for itheta, (ct, w) in enumerate(
-            zip(self.cos_theta, self.weights, strict=False)
-        ):
-            self.fft_work_array[:] = values[itheta, :]
-
-            fft(self.fft_work_array, norm="forward", overwrite_x=True)
-            self.plm.evaluate_batch(ct, result=self.plm_work_array)
-            kernel(self, w, coeffs)
-        return coeffs
+        if np.iscomplexobj(values):
+            return analyze_cplx_full(values, self.weights, self._plm_cache, self._sht_tables)
+        return analyze_real_full(values, self.weights, self._plm_cache, self._sht_tables)
 
     def synthesis(self, coeffs):
         """
@@ -338,25 +334,9 @@ class SHT:
         Returns:
             np.ndarray the evaluated function at the SHT grid points
         """
-        real = coeffs.size == self.nplm()
-        if real:
-            kernel = synthesis_kernel_real
-            values = np.zeros(self.grid[0].shape)
-        else:
-            kernel = synthesis_kernel_cplx
-            values = np.zeros(self.grid[0].shape, dtype=np.complex128)
-
-        for itheta, ct in enumerate(self.cos_theta):
-            self.fft_work_array[:] = 0
-            self.plm.evaluate_batch(ct, result=self.plm_work_array)
-            kernel(self, coeffs)
-            ifft(self.fft_work_array, norm="forward", overwrite_x=True)
-
-            if real:
-                values[itheta, :] = self.fft_work_array[:].real
-            else:
-                values[itheta, :] = self.fft_work_array[:]
-        return values
+        if coeffs.size == self.nplm():
+            return synthesize_real_full(coeffs, self._plm_cache, self._sht_tables, self.nphi)
+        return synthesize_cplx_full(coeffs, self._plm_cache, self._sht_tables, self.nphi)
 
     def _eval_at_points_real(self, coeffs, theta, phi):
         # very slow pure python implementation, should move to cython
