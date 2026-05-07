@@ -11,3 +11,45 @@ junk/
 .*.swp
 .DS_Store
 local/
+
+# Python tooling caches
+.pytest_cache/
+.ruff_cache/
+.venv/
+.mypy_cache/
+
+# Editor / IDE
+.idea/
+.vscode/
+tags
+TAGS
+
+# Build / CMake artefacts that escape build/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+
+# GULP run debris
+*.gin
+*.gout
+*.grs
+*.drv
+*.got
+gulptmp_*
+
+# Antechamber / SQM debris
+ANTECHAMBER_*
+ATOMTYPE.INF
+sqm.in
+sqm.out
+sqm.pdb
+
+# FHI-aims run dirs the examples drop in cwd
+aims_sp/
+aims_relax/
+aims_opt_full/
+
+# Markdown notes/drafts at the repo level (README + docs are kept below)
+*.md
+!README.md
+!docs/**/*.md
