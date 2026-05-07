@@ -1,3 +1,12 @@
-graft tests
-global-include *.jinja2 *.gt *.json *.npz *.py
-global-exclude *.py[cod]
+include README.md LICENSE.txt CHANGELOG.rst CITATION.cff
+recursive-include src/chmpy *.npz *.json *.jinja2
+recursive-include src/chmpy/tests/test_files *
+prune local
+prune _build
+prune build
+prune dist
+prune site
+prune .claude
+prune scripts
+prune docs
+global-exclude *.py[cod] __pycache__ .DS_Store
