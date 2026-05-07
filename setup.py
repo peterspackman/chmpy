@@ -24,12 +24,6 @@ extension_modules = [
         include_dirs=np_includes,
     ),
     Extension(
-        "chmpy.crystal.sfac._sfac",
-        sources=["src/chmpy/crystal/sfac/_sfac.pyx"],
-        define_macros=np_defines,
-        include_dirs=np_includes,
-    ),
-    Extension(
         "chmpy.mc._mc_lewiner",
         sources=["src/chmpy/mc/_mc_lewiner.pyx"],
         define_macros=np_defines,

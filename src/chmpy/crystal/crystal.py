@@ -1116,29 +1116,6 @@ class Crystal:
         from .io import to_cif_data
         return to_cif_data(self, data_block_name=data_block_name)
 
-    def structure_factors(self, **kwargs):
-        from chmpy.crystal.sfac import structure_factors
-
-        return structure_factors(self, **kwargs)
-
-    def unique_reflections(self, **kwargs):
-        from chmpy.crystal.sfac import reflections
-
-        return reflections(self, **kwargs)
-
-    def powder_pattern(self, **kwargs):
-        from chmpy.crystal.powder import PowderPattern
-        from chmpy.crystal.sfac import powder_pattern
-
-        tt, f2 = powder_pattern(self, **kwargs)
-        if not hasattr(self, "_have_warned_powder"):
-            LOG.warn(
-                "Warning -- pattern calculation is a work in progress, currently"
-                "values may be incorrect for many systems. USE AT YOUR OWN RISK"
-            )
-            self._have_warned_powder = True
-        return PowderPattern(tt, f2, **kwargs)
-
     def to_translational_symmetry(self, supercell=(1, 1, 1)) -> "Crystal":
         """
         Create a supercell of this crystal in space group P 1.
