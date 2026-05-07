@@ -29,18 +29,6 @@ extension_modules = [
         define_macros=np_defines,
         include_dirs=np_includes,
     ),
-    Extension(
-        "chmpy.sampling._lds",
-        sources=["src/chmpy/sampling/_lds.pyx"],
-        define_macros=np_defines,
-        include_dirs=np_includes,
-    ),
-    Extension(
-        "chmpy.sampling._sobol",
-        sources=["src/chmpy/sampling/_sobol.pyx"],
-        define_macros=np_defines,
-        include_dirs=np_includes,
-    ),
 ]
 
 setup(
