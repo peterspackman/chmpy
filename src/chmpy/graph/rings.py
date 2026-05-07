@@ -138,18 +138,16 @@ def _canonicalize_ring(ring: list[int]) -> tuple[int, ...]:
     Canonicalize a ring representation.
 
     Rotates to start at the smallest index and chooses the
-    lexicographically smaller direction.
+    lexicographically smaller direction. Atom indices come from
+    numpy-backed neighbour lookups, so cast to plain ``int`` here for a
+    clean public-API repr.
     """
     if not ring:
         return ()
 
-    # Find position of minimum element
+    ring = [int(x) for x in ring]
     min_idx = ring.index(min(ring))
-
-    # Rotate to start at minimum
     rotated = ring[min_idx:] + ring[:min_idx]
-
-    # Choose lexicographically smaller direction
     reversed_ring = [rotated[0]] + rotated[1:][::-1]
 
     if tuple(reversed_ring) < tuple(rotated):

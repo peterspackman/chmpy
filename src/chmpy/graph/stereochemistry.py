@@ -7,6 +7,7 @@ Implements CIP (Cahn-Ingold-Prelog) rules for:
 """
 
 import logging
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -19,36 +20,33 @@ if TYPE_CHECKING:
 LOG = logging.getLogger(__name__)
 
 
+@dataclass
 class StereoCenter:
-    """Represents a tetrahedral stereocenter."""
+    """Represents a tetrahedral stereocenter.
 
-    def __init__(
-        self,
-        atom_idx: int,
-        neighbors: list[int],
-        configuration: str | None = None,
-    ):
-        self.atom_idx = atom_idx
-        self.neighbors = neighbors  # In priority order (high to low)
-        self.configuration = configuration  # "R", "S", or None
+    ``neighbors`` is in priority order (high to low). ``configuration`` is
+    ``"R"``, ``"S"``, or ``None`` if undetermined.
+    """
+
+    atom_idx: int
+    neighbors: list[int]
+    configuration: str | None = None
 
 
+@dataclass
 class DoubleBondStereo:
-    """Represents E/Z stereochemistry at a double bond."""
+    """Represents E/Z stereochemistry at a double bond.
 
-    def __init__(
-        self,
-        atom1: int,
-        atom2: int,
-        substituents1: list[int],
-        substituents2: list[int],
-        configuration: str | None = None,
-    ):
-        self.atom1 = atom1
-        self.atom2 = atom2
-        self.substituents1 = substituents1  # High priority first
-        self.substituents2 = substituents2  # High priority first
-        self.configuration = configuration  # "E", "Z", or None
+    ``substituents1`` / ``substituents2`` list the high-priority neighbour
+    first for each end of the bond. ``configuration`` is ``"E"``, ``"Z"``,
+    or ``None`` if undetermined.
+    """
+
+    atom1: int
+    atom2: int
+    substituents1: list[int]
+    substituents2: list[int]
+    configuration: str | None = None
 
 
 def assign_stereochemistry(
