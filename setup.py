@@ -11,12 +11,6 @@ extension_modules = [
         define_macros=np_defines,
         include_dirs=np_includes,
     ),
-    Extension(
-        "chmpy.mc._mc_lewiner",
-        sources=["src/chmpy/mc/_mc_lewiner.pyx"],
-        define_macros=np_defines,
-        include_dirs=np_includes,
-    ),
 ]
 
 setup(
