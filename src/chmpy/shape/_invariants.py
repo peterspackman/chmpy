@@ -19,8 +19,9 @@ References:
 
 from __future__ import annotations
 
-from functools import lru_cache
-from math import factorial as _factorial, sqrt
+from functools import cache
+from math import factorial as _factorial
+from math import sqrt
 
 import numpy as np
 
@@ -34,7 +35,7 @@ _FACT_MAX = 100
 _FACT = [float(_factorial(n)) for n in range(_FACT_MAX + 1)]
 
 
-@lru_cache(maxsize=None)
+@cache
 def _clebsch_doubled(j1: int, m1: int, j2: int, m2: int, j: int, m: int) -> float:
     """Clebsch-Gordan coefficient with all arguments pre-doubled (matches cython)."""
     if abs(m1) > j1 or abs(m2) > j2 or abs(m) > j:

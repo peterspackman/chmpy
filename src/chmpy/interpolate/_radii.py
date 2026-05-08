@@ -27,7 +27,7 @@ from __future__ import annotations
 import numpy as np
 
 from . import _backends
-from .density import PromoleculeDensity, StockholderWeight, _DOMAIN
+from .density import _DOMAIN, PromoleculeDensity, StockholderWeight
 
 __all__ = ["sphere_promolecule_radii", "sphere_stockholder_radii"]
 

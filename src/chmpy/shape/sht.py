@@ -6,15 +6,11 @@ from chmpy.util.num import spherical_to_cartesian_mgrid
 
 from ._sht import (
     AssocLegendre,
-    analysis_kernel_cplx,
-    analysis_kernel_real,
     analyze_cplx_full,
     analyze_real_full,
     build_plm_cache,
     build_sht_index_tables,
     expand_coeffs_to_full,
-    synthesis_kernel_cplx,
-    synthesis_kernel_real,
     synthesize_cplx_full,
     synthesize_real_full,
 )

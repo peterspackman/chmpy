@@ -17,7 +17,8 @@ single-row wrappers for any callers that still rely on them, but the
 from __future__ import annotations
 
 import numpy as np
-from scipy.fft import fft as scipy_fft, ifft as scipy_ifft
+from scipy.fft import fft as scipy_fft
+from scipy.fft import ifft as scipy_ifft
 
 __all__ = [
     "AssocLegendre",
