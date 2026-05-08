@@ -20,11 +20,18 @@ References:
 from __future__ import annotations
 
 from functools import lru_cache
-from math import factorial, sqrt
+from math import factorial as _factorial, sqrt
 
 import numpy as np
 
 __all__ = ["clebsch_gordan", "p_invariants_c", "p_invariants_r"]
+
+# Precomputed factorial lookup. The Racah formula calls factorial repeatedly
+# inside its k-summation; for the lmax ranges chmpy's shape descriptors use
+# (typically <= 25, so doubled-j <= 50) a flat lookup is dramatically faster
+# than calling math.factorial each time.
+_FACT_MAX = 100
+_FACT = [float(_factorial(n)) for n in range(_FACT_MAX + 1)]
 
 
 @lru_cache(maxsize=None)
@@ -61,29 +68,31 @@ def _clebsch_doubled(j1: int, m1: int, j2: int, m2: int, j: int, m: int) -> floa
         res = 1.0
     else:
         res = 0.0
+        fact = _FACT
         for k in range(mink, maxk + 1):
             denom = (
-                factorial(j1nm1 - k)
-                * factorial(jnj2pm1 + k)
-                * factorial(j2pm2 - k)
-                * factorial(jnj1nm2 + k)
-                * factorial(k)
-                * factorial(j1pj2nj - k)
+                fact[j1nm1 - k]
+                * fact[jnj2pm1 + k]
+                * fact[j2pm2 - k]
+                * fact[jnj1nm2 + k]
+                * fact[k]
+                * fact[j1pj2nj - k]
             )
             res += iphase / denom
             iphase = -iphase
 
-    norm = sqrt(factorial(j1pj2nj))
-    norm *= sqrt(factorial((j1 + j - j2) // 2))
-    norm *= sqrt(factorial((j2 + j - j1) // 2))
-    norm /= sqrt(factorial((j1 + j2 + j) // 2 + 1))
+    fact = _FACT
+    norm = sqrt(fact[j1pj2nj])
+    norm *= sqrt(fact[(j1 + j - j2) // 2])
+    norm *= sqrt(fact[(j2 + j - j1) // 2])
+    norm /= sqrt(fact[(j1 + j2 + j) // 2 + 1])
     norm *= sqrt(j + 1)
-    norm *= sqrt(factorial((j1 + m1) // 2))
-    norm *= sqrt(factorial(j1nm1))
-    norm *= sqrt(factorial(j2pm2))
-    norm *= sqrt(factorial((j2 - m2) // 2))
-    norm *= sqrt(factorial((j + m) // 2))
-    norm *= sqrt(factorial((j - m) // 2))
+    norm *= sqrt(fact[(j1 + m1) // 2])
+    norm *= sqrt(fact[j1nm1])
+    norm *= sqrt(fact[j2pm2])
+    norm *= sqrt(fact[(j2 - m2) // 2])
+    norm *= sqrt(fact[(j + m) // 2])
+    norm *= sqrt(fact[(j - m) // 2])
 
     return res * norm
 
