@@ -162,23 +162,28 @@ def _compute_symmetry_adapted_transforms(
     """
     I3 = np.eye(3, dtype=int)
 
-    # Collect all symmetry-adapted vectors (deduplicated up to sign)
+    # Collect all symmetry-adapted vectors (deduplicated up to sign).
+    # The dedup test is "v is parallel to some existing e", i.e. cross == 0;
+    # for the small ints we deal with here `.any()` on the cross is faster
+    # than np.allclose's float-tolerance machinery.
+    def _is_parallel(v, e):
+        return not (np.cross(v, e)).any()
+
     all_vecs = []
     for R in rotations:
         R_int = np.round(R).astype(int)
-        if np.allclose(R_int, I3) or np.allclose(R_int, -I3):
+        if (R_int == I3).all() or (R_int == -I3).all():
             continue
 
         for A in [R_int - I3, R_int + I3]:
             for v in _integer_null_space(A):
-                is_dup = any(np.allclose(np.cross(v, e), 0) for e in all_vecs)
-                if not is_dup:
+                if not any(_is_parallel(v, e) for e in all_vecs):
                     all_vecs.append(v)
 
     # Supplement with cross products if needed
     if len(all_vecs) == 2:
         cross = np.cross(all_vecs[0], all_vecs[1])
-        if not np.allclose(cross, 0):
+        if cross.any():
             all_vecs.append(cross.astype(int))
 
     # If still fewer than 3 independent vectors, supplement with standard
@@ -186,12 +191,16 @@ def _compute_symmetry_adapted_transforms(
     # only the rotation axis is extracted from eigenvectors.
     if len(all_vecs) < 3:
         for e in [np.array([1, 0, 0]), np.array([0, 1, 0]), np.array([0, 0, 1])]:
-            is_dup = any(np.allclose(np.cross(e, v), 0) for v in all_vecs)
-            if not is_dup:
+            if not any(_is_parallel(e, v) for v in all_vecs):
                 all_vecs.append(e)
 
     if len(all_vecs) < 3:
         return []
+
+    # Stack all rotations into a single (N_rot, 3, 3) tensor so that the
+    # Q-validation step can do P @ R_all @ Q via one numpy matmul instead
+    # of looping per rotation.
+    rotations_stack = np.stack(rotations).astype(float)
 
     # Try all ordered triples (with sign flips) as columns of Q
     valid_Ps = []
@@ -209,29 +218,25 @@ def _compute_symmetry_adapted_transforms(
             if abs(det_Q) < 1e-8:
                 continue
 
+            # Deduplicate via a Q-based key first, so we skip the inv() and
+            # validation work on duplicates entirely.
+            q_key = tuple(np.round(Q * 24).astype(int).flatten())
+            if q_key in seen:
+                continue
+            seen.add(q_key)
+
             P = np.linalg.inv(Q)
 
-            # Deduplicate
-            key = tuple(np.round(P * 24).astype(int).flatten())
-            if key in seen:
+            # Verify in one batched matmul: all conjugated rotations must be
+            # integer with entries in {-1, 0, 1}.
+            R_new_all = P @ rotations_stack @ Q  # (N_rot, 3, 3)
+            R_int = np.round(R_new_all)
+            if np.abs(R_new_all - R_int).max() > 1e-6:
                 continue
-            seen.add(key)
+            if np.abs(R_int).max() > 1.5:
+                continue
 
-            # Verify: all conjugated rotations must be integer with entries
-            # in {-1, 0, 1} (valid crystallographic rotations)
-            valid = True
-            for R in rotations:
-                R_new = P @ R @ Q
-                R_int = np.round(R_new)
-                if not np.allclose(R_new, R_int, atol=1e-6):
-                    valid = False
-                    break
-                if np.any(np.abs(R_int) > 1.5):
-                    valid = False
-                    break
-
-            if valid:
-                valid_Ps.append(P)
+            valid_Ps.append(P)
 
     return valid_Ps
 
@@ -539,59 +544,61 @@ def _solve_origin_shift(
     if _verify_origin_shift(p, constraints_A, constraints_b):
         return p
 
-    # Generate candidate p vectors from individual constraints with
-    # integer corrections. For each constraint A_i @ p = b_i + n_i,
-    # solve for p with different integer vectors n_i, then verify
-    # against ALL constraints mod 1.
-    candidates_seen = set()
-    shifts = [-1, 0, 1]
+    # Generate candidate p vectors from individual constraints with integer
+    # corrections. For each constraint A_i @ p = b_i + n_i, we want every
+    # integer n_i in {-1, 0, 1}**3 — that's 27 candidates per constraint.
+    # We solve all 27 in one shot via the pseudo-inverse rather than calling
+    # lstsq inside a python loop, which dominated the profile.
+    candidates_seen: set[tuple[int, ...]] = set()
+    shifts_arr = np.array(list(iterproduct((-1, 0, 1), repeat=3)), dtype=float)
+    n_shifts = shifts_arr.shape[0]
 
     for A, b in zip(constraints_A, constraints_b, strict=False):
-        for n in iterproduct(shifts, repeat=3):
-            b_shifted = b + np.array(n, dtype=float)
-            # Solve this single constraint (3 eqs, 3 unknowns)
-            try:
-                rank = np.linalg.matrix_rank(A, tol=1e-6)
-                if rank == 3:
-                    p_cand = np.linalg.solve(A, b_shifted)
-                elif rank >= 1:
-                    p_cand, _, _, _ = np.linalg.lstsq(A, b_shifted, rcond=None)
-                else:
-                    continue
-            except np.linalg.LinAlgError:
-                continue
-
-            # Round to avoid floating point noise in deduplication
-            key = tuple(np.round(p_cand * 24).astype(int))
+        rank = np.linalg.matrix_rank(A, tol=1e-6)
+        if rank < 1:
+            continue
+        try:
+            pinv_A = np.linalg.pinv(A)
+        except np.linalg.LinAlgError:
+            continue
+        # All 27 b_shifted at once -> all 27 candidate p's via one matmul.
+        b_shifted = b + shifts_arr  # (27, 3)
+        p_cands = b_shifted @ pinv_A.T  # (27, 3)
+        keys = (np.round(p_cands * 24).astype(int))
+        for k in range(n_shifts):
+            key = (int(keys[k, 0]), int(keys[k, 1]), int(keys[k, 2]))
             if key in candidates_seen:
                 continue
             candidates_seen.add(key)
+            if _verify_origin_shift(p_cands[k], constraints_A, constraints_b):
+                return p_cands[k]
 
-            if _verify_origin_shift(p_cand, constraints_A, constraints_b):
-                return p_cand
-
-    # Try pairs of constraints for under-determined single constraints
+    # Try pairs of constraints for under-determined single constraints. A_pair
+    # is constant across the 729 (ni, nj) integer-shift combos, so factor
+    # once via pinv and reuse for all 729 b_pair vectors in a single matmul.
+    pair_shifts = np.array(
+        [(ni, nj) for ni in shifts_arr for nj in shifts_arr]
+    )  # (729, 2, 3)
     for i in range(len(constraints_A)):
         for j in range(i + 1, len(constraints_A)):
             A_pair = np.vstack([constraints_A[i], constraints_A[j]])
-            for ni in iterproduct(shifts, repeat=3):
-                for nj in iterproduct(shifts, repeat=3):
-                    b_pair = np.concatenate([
-                        constraints_b[i] + np.array(ni, dtype=float),
-                        constraints_b[j] + np.array(nj, dtype=float),
-                    ])
-                    try:
-                        p_cand, _, _, _ = np.linalg.lstsq(A_pair, b_pair, rcond=None)
-                    except np.linalg.LinAlgError:
-                        continue
-
-                    key = tuple(np.round(p_cand * 24).astype(int))
-                    if key in candidates_seen:
-                        continue
-                    candidates_seen.add(key)
-
-                    if _verify_origin_shift(p_cand, constraints_A, constraints_b):
-                        return p_cand
+            try:
+                pinv_pair = np.linalg.pinv(A_pair)
+            except np.linalg.LinAlgError:
+                continue
+            # Build (729, 6) of stacked b_pairs.
+            bi = constraints_b[i] + pair_shifts[:, 0, :]  # (729, 3)
+            bj = constraints_b[j] + pair_shifts[:, 1, :]  # (729, 3)
+            b_pairs = np.concatenate([bi, bj], axis=1)  # (729, 6)
+            p_cands = b_pairs @ pinv_pair.T  # (729, 3)
+            keys = np.round(p_cands * 24).astype(int)
+            for k in range(p_cands.shape[0]):
+                key = (int(keys[k, 0]), int(keys[k, 1]), int(keys[k, 2]))
+                if key in candidates_seen:
+                    continue
+                candidates_seen.add(key)
+                if _verify_origin_shift(p_cands[k], constraints_A, constraints_b):
+                    return p_cands[k]
 
     return None
 
