@@ -174,6 +174,21 @@ class PowderPatternTestCase(unittest.TestCase):
         self.assertIn("PowderPattern", repr(pattern))
         self.assertNotIn("\n", repr(pattern))  # concise, no array dump
 
+    def test_plot_returns_axes(self):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        pattern = powder_pattern(self.crystal, two_theta_range=(5, 50))
+        ax = pattern.plot()
+        self.assertGreater(len(ax.get_lines()[0].get_xdata()), 0)
+        self.assertIn("theta", ax.get_xlabel())
+        # draws onto a supplied Axes too
+        _, ax2 = plt.subplots()
+        self.assertIs(pattern.plot(ax=ax2), ax2)
+        plt.close("all")
+
 
 class FftStructureFactorTestCase(unittest.TestCase):
     def setUp(self):

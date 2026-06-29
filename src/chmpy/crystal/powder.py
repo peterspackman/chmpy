@@ -386,6 +386,47 @@ class PowderPattern:
             counts = 100.0 * counts / counts.max()
         return centres, counts
 
+    def plot(
+        self,
+        two_theta_range=None,
+        num_bins=4500,
+        fwhm=0.1,
+        normalize=True,
+        ax=None,
+        **kwargs,
+    ):
+        """Plot the pattern as intensity versus 2*theta.
+
+        Args:
+            two_theta_range: (min, max) 2*theta in degrees; defaults to the
+                range this pattern was computed over.
+            num_bins: number of bins across the range
+            fwhm: Gaussian peak width in degrees (set None for a stick pattern)
+            normalize: scale the maximum intensity to 100
+            ax: an existing matplotlib Axes to draw on (a new one is created if
+                not given)
+            **kwargs: forwarded to `Axes.plot`
+
+        Returns:
+            the matplotlib Axes the pattern was drawn on.
+        """
+        import matplotlib.pyplot as plt
+
+        x, y = self.profile(
+            two_theta_range=two_theta_range,
+            num_bins=num_bins,
+            fwhm=fwhm,
+            normalize=normalize,
+        )
+        if ax is None:
+            _, ax = plt.subplots()
+        ax.plot(x, y, **kwargs)
+        ax.set_xlabel(r"$2\theta$ (degrees)")
+        ax.set_ylabel("Intensity" + (" (normalised)" if normalize else ""))
+        ax.set_xlim(x[0], x[-1])
+        ax.set_ylim(bottom=0)
+        return ax
+
 
 # above this estimated cost (n_unique_reflections * n_atoms) the gridding+FFT
 # method overtakes the direct summation
