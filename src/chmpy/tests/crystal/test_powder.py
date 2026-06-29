@@ -19,6 +19,7 @@ from chmpy.core.element import Element
 from chmpy.crystal import AsymmetricUnit, Crystal, SpaceGroup, UnitCell
 from chmpy.crystal.powder import (
     generate_hkl,
+    plot_powder_patterns,
     powder_pattern,
     structure_factors,
     structure_factors_fft,
@@ -187,6 +188,34 @@ class PowderPatternTestCase(unittest.TestCase):
         # draws onto a supplied Axes too
         _, ax2 = plt.subplots()
         self.assertIs(pattern.plot(ax=ax2), ax2)
+        plt.close("all")
+
+    def test_plot_overlay(self):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        patterns = [
+            powder_pattern(self.crystal, wavelength=wl, two_theta_range=(5, 50))
+            for wl in (1.5406, 0.7107)
+        ]
+        ax = plot_powder_patterns(patterns, labels=["Cu", "Mo"], offset=10.0)
+        lines = ax.get_lines()
+        self.assertEqual(len(lines), 2)
+        # second pattern is offset above the first
+        self.assertGreater(lines[1].get_ydata().max(), 100)
+        # baseline pattern is drawn in front (higher zorder) of the stacked one
+        self.assertGreater(lines[0].get_zorder(), lines[1].get_zorder())
+        self.assertIsNotNone(ax.get_legend())
+        plt.close("all")
+
+        # optional horizontal shear offsets each pattern sideways too
+        ax = plot_powder_patterns(patterns, offset=10.0, x_offset=2.0)
+        lines = ax.get_lines()
+        shift = lines[1].get_xdata()[0] - lines[0].get_xdata()[0]
+        self.assertAlmostEqual(shift, 2.0, places=3)
+        self.assertGreater(ax.get_xlim()[1], 50.0)  # widened to fit the shift
         plt.close("all")
 
 

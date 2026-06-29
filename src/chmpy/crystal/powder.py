@@ -428,6 +428,79 @@ class PowderPattern:
         return ax
 
 
+def plot_powder_patterns(
+    patterns,
+    labels=None,
+    offset=10.0,
+    x_offset=0.0,
+    two_theta_range=None,
+    num_bins=4500,
+    fwhm=0.1,
+    normalize=True,
+    ax=None,
+    **kwargs,
+):
+    """Overlay several powder patterns, stacked with an offset.
+
+    Each pattern is drawn in the next colour of the matplotlib cycle and shifted
+    from the one below it (a waterfall plot). With a non-zero `x_offset` the
+    stack is also sheared sideways for a pseudo-3D look.
+
+    Args:
+        patterns: an iterable of PowderPattern
+        labels: optional labels, one per pattern, shown in a legend
+        offset: vertical shift between successive patterns (intensity units;
+            with normalize=True the patterns are scaled to a maximum of 100)
+        x_offset: horizontal shift between successive patterns, in 2*theta
+            degrees (default 0 for a purely vertical stack)
+        two_theta_range: (min, max) 2*theta in degrees; defaults to the union
+            of the patterns' ranges
+        num_bins: number of bins across the range
+        fwhm: Gaussian peak width in degrees (set None for stick patterns)
+        normalize: scale each pattern's maximum to 100
+        ax: an existing matplotlib Axes to draw on (created if not given)
+        **kwargs: forwarded to `Axes.plot`
+
+    Returns:
+        the matplotlib Axes the patterns were drawn on.
+    """
+    import matplotlib.pyplot as plt
+
+    patterns = list(patterns)
+    if two_theta_range is None and patterns:
+        lows = [p.two_theta_range[0] for p in patterns]
+        highs = [p.two_theta_range[1] for p in patterns]
+        two_theta_range = (min(lows), max(highs))
+    if ax is None:
+        _, ax = plt.subplots()
+
+    # draw back to front so the baseline pattern sits in front of the stacked
+    # ones above it
+    n = len(patterns)
+    base_zorder = kwargs.pop("zorder", None)
+    for i, pattern in enumerate(patterns):
+        x, y = pattern.profile(
+            two_theta_range=two_theta_range,
+            num_bins=num_bins,
+            fwhm=fwhm,
+            normalize=normalize,
+        )
+        label = labels[i] if labels is not None and i < len(labels) else None
+        zorder = base_zorder if base_zorder is not None else n - i
+        ax.plot(x + i * x_offset, y + i * offset, label=label, zorder=zorder, **kwargs)
+
+    ax.set_xlabel(r"$2\theta$ (degrees)")
+    ax.set_ylabel("Intensity" + (" (offset)" if offset else ""))
+    if two_theta_range is not None:
+        lo, hi = two_theta_range
+        shift = (n - 1) * x_offset
+        ax.set_xlim(min(lo, lo + shift), max(hi, hi + shift))
+    ax.set_ylim(bottom=0)
+    if labels is not None:
+        ax.legend()
+    return ax
+
+
 # above this estimated cost (n_unique_reflections * n_atoms) the gridding+FFT
 # method overtakes the direct summation
 _FFT_COST_THRESHOLD = 5_000_000
