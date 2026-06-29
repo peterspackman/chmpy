@@ -189,7 +189,64 @@ def encode_symm_int(rotation, translation):
     for i in (2, 1, 0):
         t += translation[i] * shift
         shift *= 12
-    return r + t * 19683
+    return int(r + t * 19683)
+
+
+# Crystallographic translations are exact integer multiples of 1/12, so the
+# float translations stored on a SymmetryOperation can be recovered exactly as
+# rationals with this denominator.
+_TRANSLATION_DENOMINATOR = 12
+
+# Hermann-Mauguin symbol of the rotational (linear) part, keyed by the trace of
+# the integer rotation matrix. The trace of an n-fold proper rotation is
+# 1 + 2cos(2*pi/n); improper parts (det -1) are the negated proper traces.
+_PROPER_ROTATION_SYMBOLS = {3: "1", -1: "2", 0: "3", 1: "4", 2: "6"}
+_IMPROPER_ROTATION_SYMBOLS = {-3: "-1", 1: "m", 0: "-3", -1: "-4", -2: "-6"}
+
+
+def _integer_rotation(rotation) -> np.ndarray:
+    "The rotation matrix as exact integers (entries are -1, 0 or 1)."
+    return np.round(rotation).astype(int)
+
+
+def _exact_translation(translation) -> tuple:
+    "The translation as exact `Fraction`s (recovered from 1/12 multiples)."
+    return tuple(
+        Fraction(
+            int(round(float(c) * _TRANSLATION_DENOMINATOR)), _TRANSLATION_DENOMINATOR
+        )
+        for c in translation
+    )
+
+
+def _rotation_order(rotation: np.ndarray) -> int:
+    "Order n of an integer rotation matrix (smallest n>0 with R**n = I)."
+    identity = np.eye(3, dtype=int)
+    power = rotation.copy()
+    order = 1
+    while not np.array_equal(power, identity):
+        power = power @ rotation
+        order += 1
+        if order > 12:
+            raise ValueError(f"Not a crystallographic rotation:\n{rotation}")
+    return order
+
+
+def _intrinsic_translation(
+    rotation: np.ndarray, translation: tuple, order: int
+) -> tuple:
+    """The origin-independent (screw/glide) translation component tau.
+
+    tau = (1/n) * sum_{k=0}^{n-1} R^k t  (mod 1), i.e. the projection of t onto
+    the +1 eigenspace of R. Computed exactly with `Fraction`s.
+    """
+    accumulated = [Fraction(0), Fraction(0), Fraction(0)]
+    power = np.eye(3, dtype=int)
+    for _ in range(order):
+        for i in range(3):
+            accumulated[i] += sum(int(power[i, j]) * translation[j] for j in range(3))
+        power = power @ rotation
+    return tuple((c / order) % 1 for c in accumulated)
 
 
 class SymmetryOperation:
@@ -239,6 +296,137 @@ class SymmetryOperation:
     def cif_form(self) -> str:
         "Represent this SymmetryOperation in string form e.g. '+x,+y,+z'"
         return str(self)
+
+    @property
+    def rotation_order(self) -> int:
+        """
+        The order n of the rotational (linear) part: the smallest n > 0 such
+        that R**n is the identity.
+
+        Note for rotoinversions the order is that of the matrix, e.g. a -3
+        (3-bar) operation has rotation_order 6.
+
+        Examples:
+            >>> SymmetryOperation.from_string_code("-x,-y,z").rotation_order
+            2
+            >>> SymmetryOperation.from_string_code("-x,-y,-z").rotation_order
+            2
+        """
+        if not hasattr(self, "_rotation_order"):
+            self._rotation_order = _rotation_order(_integer_rotation(self.rotation))
+        return self._rotation_order
+
+    def _exact_intrinsic_translation(self) -> tuple:
+        "The intrinsic translation as exact `Fraction`s (cached)."
+        if not hasattr(self, "_intrinsic_translation_exact"):
+            rotation = _integer_rotation(self.rotation)
+            translation = _exact_translation(self.translation)
+            self._intrinsic_translation_exact = _intrinsic_translation(
+                rotation, translation, self.rotation_order
+            )
+        return self._intrinsic_translation_exact
+
+    @property
+    def intrinsic_translation(self) -> np.ndarray:
+        """
+        The origin-independent (screw/glide) component of the translation.
+
+        This is the projection of the translation onto the +1 eigenspace of the
+        rotation, i.e. the part that cannot be removed by any choice of origin.
+        It is zero for pure rotations, mirrors, rotoinversions and the identity,
+        and non-zero for screw axes, glide planes and lattice translations.
+
+        Returns:
+            np.ndarray: (3,) intrinsic translation vector, reduced into [0, 1)
+
+        Examples:
+            >>> op = SymmetryOperation.from_string_code("-x,1/2+y,-z")
+            >>> op.intrinsic_translation.tolist()
+            [0.0, 0.5, 0.0]
+            >>> SymmetryOperation.from_string_code(
+            ...     "-x,-y,z"
+            ... ).intrinsic_translation.tolist()
+            [0.0, 0.0, 0.0]
+        """
+        return np.array([float(c) for c in self._exact_intrinsic_translation()])
+
+    @property
+    def has_intrinsic_translation(self) -> bool:
+        """
+        True if this operation has a non-zero intrinsic (screw/glide)
+        translation, i.e. it is a screw axis, glide plane or lattice translation.
+
+        Examples:
+            >>> SymmetryOperation.from_string_code(
+            ...     "-x,1/2+y,-z"
+            ... ).has_intrinsic_translation
+            True
+            >>> SymmetryOperation.from_string_code("-x,-y,z").has_intrinsic_translation
+            False
+        """
+        return any(c != 0 for c in self._exact_intrinsic_translation())
+
+    @property
+    def rotation_symbol(self) -> str:
+        """
+        The Hermann-Mauguin symbol of the rotational (linear) part of this
+        operation, ignoring any translation.
+
+        One of "1", "2", "3", "4", "6" (proper rotations), or "-1", "m", "-3",
+        "-4", "-6" (improper: inversion, reflection, rotoinversions).
+
+        Examples:
+            >>> SymmetryOperation.from_string_code("-x,-y,-z").rotation_symbol
+            '-1'
+            >>> SymmetryOperation.from_string_code("x,-y,z").rotation_symbol
+            'm'
+            >>> SymmetryOperation.from_string_code("-x,1/2+y,-z").rotation_symbol
+            '2'
+        """
+        rotation = _integer_rotation(self.rotation)
+        trace = int(np.trace(rotation))
+        if int(round(np.linalg.det(rotation))) == 1:
+            return _PROPER_ROTATION_SYMBOLS[trace]
+        return _IMPROPER_ROTATION_SYMBOLS[trace]
+
+    @property
+    def geometric_type(self) -> str:
+        """
+        Classify this operation as a crystallographic symmetry element.
+
+        Returns one of:
+            "identity", "translation", "rotation", "screw", "inversion",
+            "mirror", "glide", "rotoinversion"
+
+        The distinction between rotation/screw and mirror/glide is made on the
+        intrinsic translation (see `has_intrinsic_translation`). Use
+        `rotation_symbol` to recover the order (e.g. to distinguish a -3 from a
+        -4 rotoinversion). The classification reflects the operation as written;
+        in centered cells an operation that combines a rotation with a centering
+        translation is still reported as a screw or glide.
+
+        Examples:
+            >>> SymmetryOperation.from_string_code("x,y,z").geometric_type
+            'identity'
+            >>> SymmetryOperation.from_string_code("-x,1/2+y,-z").geometric_type
+            'screw'
+            >>> SymmetryOperation.from_string_code("x,-y,1/2+z").geometric_type
+            'glide'
+            >>> SymmetryOperation.from_string_code("-x,-y,-z").geometric_type
+            'inversion'
+        """
+        rotation = _integer_rotation(self.rotation)
+        trace = int(np.trace(rotation))
+        moving = self.has_intrinsic_translation
+        if int(round(np.linalg.det(rotation))) == 1:
+            if trace == 3:  # identity rotational part
+                return "translation" if moving else "identity"
+            return "screw" if moving else "rotation"
+        if trace == -3:  # -1
+            return "inversion"
+        if trace == 1:  # m
+            return "glide" if moving else "mirror"
+        return "rotoinversion"  # -3, -4, -6
 
     def inverted(self):
         """ "
