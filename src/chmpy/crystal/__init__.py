@@ -8,6 +8,8 @@ fractional coordinates (`SymmetryOperation`) and more.
 from .asymmetric_unit import AsymmetricUnit
 from .crystal import Crystal
 from .point_group import PointGroup
+from .powder import PowderPattern, powder_pattern
+from .reflection_conditions import ReflectionCondition
 from .space_group import SpaceGroup
 from .symmetry_operation import SymmetryOperation
 from .unit_cell import UnitCell
@@ -19,4 +21,7 @@ __all__ = [
     "PointGroup",
     "UnitCell",
     "SymmetryOperation",
+    "PowderPattern",
+    "powder_pattern",
+    "ReflectionCondition",
 ]

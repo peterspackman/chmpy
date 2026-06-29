@@ -223,6 +223,22 @@ class Crystal:
         }
         return self._unit_cell_atom_dict
 
+    def powder_pattern(self, **kwargs):
+        """
+        Compute a simulated powder X-ray diffraction pattern for this crystal.
+
+        Keyword arguments are forwarded to
+        `chmpy.crystal.powder.powder_pattern` (e.g. `wavelength`,
+        `two_theta_range`).
+
+        Returns:
+            PowderPattern: per-reflection data (hkl, d-spacing, 2-theta, |F|^2,
+            intensity); call `.profile()` to obtain a binned 1D pattern.
+        """
+        from .powder import powder_pattern
+
+        return powder_pattern(self, **kwargs)
+
     def unit_cell_connectivity(
         self, tolerance=0.4, neighbouring_cells=1, **kwargs
     ) -> tuple:
@@ -798,6 +814,7 @@ class Crystal:
 
     def promolecule_density_isosurfaces(self, **kwargs) -> list[Trimesh]:
         from .surface import promolecule_density_isosurfaces
+
         return promolecule_density_isosurfaces(self, **kwargs)
 
     def unit_cell_coordination_numbers(self) -> np.ndarray:
@@ -940,10 +957,12 @@ class Crystal:
 
     def void_surface(self, *args, **kwargs) -> Trimesh:
         from .surface import void_surface
+
         return void_surface(self, *args, **kwargs)
 
     def mesh_scene(self, **kwargs):
         from .surface import mesh_scene
+
         return mesh_scene(self, **kwargs)
 
     def hirshfeld_surfaces(self, **kwargs):
@@ -952,30 +971,61 @@ class Crystal:
 
     def stockholder_weight_isosurfaces(self, kind="mol", **kwargs) -> list[Trimesh]:
         from .surface import stockholder_weight_isosurfaces
+
         return stockholder_weight_isosurfaces(self, kind=kind, **kwargs)
 
-    def functional_group_shape_descriptors(self, l_max=5, radius=6.0, kind="carboxylic_acid") -> np.ndarray:
+    def functional_group_shape_descriptors(
+        self, l_max=5, radius=6.0, kind="carboxylic_acid"
+    ) -> np.ndarray:
         from .shape_descriptors import functional_group_shape_descriptors
-        return functional_group_shape_descriptors(self, l_max=l_max, radius=radius, kind=kind)
 
-    def molecule_shape_descriptors(self, mol, l_max=5, radius=6.0, with_property=None) -> np.ndarray:
+        return functional_group_shape_descriptors(
+            self, l_max=l_max, radius=radius, kind=kind
+        )
+
+    def molecule_shape_descriptors(
+        self, mol, l_max=5, radius=6.0, with_property=None
+    ) -> np.ndarray:
         from .shape_descriptors import molecule_shape_descriptors
-        return molecule_shape_descriptors(self, mol, l_max=l_max, radius=radius, with_property=with_property)
 
-    def molecular_shape_descriptors(self, l_max=5, radius=6.0, with_property=None, return_coefficients=False) -> np.ndarray:
+        return molecule_shape_descriptors(
+            self, mol, l_max=l_max, radius=radius, with_property=with_property
+        )
+
+    def molecular_shape_descriptors(
+        self, l_max=5, radius=6.0, with_property=None, return_coefficients=False
+    ) -> np.ndarray:
         from .shape_descriptors import molecular_shape_descriptors
-        return molecular_shape_descriptors(self, l_max=l_max, radius=radius, with_property=with_property, return_coefficients=return_coefficients)
 
-    def atomic_shape_descriptors(self, l_max=5, radius=6.0, return_coefficients=False, with_property=None) -> np.ndarray:
+        return molecular_shape_descriptors(
+            self,
+            l_max=l_max,
+            radius=radius,
+            with_property=with_property,
+            return_coefficients=return_coefficients,
+        )
+
+    def atomic_shape_descriptors(
+        self, l_max=5, radius=6.0, return_coefficients=False, with_property=None
+    ) -> np.ndarray:
         from .shape_descriptors import atomic_shape_descriptors
-        return atomic_shape_descriptors(self, l_max=l_max, radius=radius, return_coefficients=return_coefficients, with_property=with_property)
+
+        return atomic_shape_descriptors(
+            self,
+            l_max=l_max,
+            radius=radius,
+            return_coefficients=return_coefficients,
+            with_property=with_property,
+        )
 
     def atom_group_shape_descriptors(self, atoms, l_max=5, radius=6.0) -> np.ndarray:
         from .shape_descriptors import atom_group_shape_descriptors
+
         return atom_group_shape_descriptors(self, atoms, l_max=l_max, radius=radius)
 
     def shape_descriptors(self, kind="molecular", **kwargs):
         from .shape_descriptors import shape_descriptors
+
         return shape_descriptors(self, kind=kind, **kwargs)
 
     @property
@@ -1005,91 +1055,109 @@ class Crystal:
     @classmethod
     def load(cls, filename, **kwargs) -> Union["Crystal", dict]:
         from .io import load
+
         return load(filename, **kwargs)
 
     @classmethod
     def from_vasp_string(cls, string, **kwargs):
         from .io import from_vasp_string
+
         return from_vasp_string(string, **kwargs)
 
     @classmethod
     def from_vasp_file(cls, filename, **kwargs):
         from .io import from_vasp_file
+
         return from_vasp_file(filename, **kwargs)
 
     @classmethod
     def from_aims_string(cls, string, **kwargs):
         from .io import from_aims_string
+
         return from_aims_string(string, **kwargs)
 
     @classmethod
     def from_aims_file(cls, filename, **kwargs):
         from .io import from_aims_file
+
         return from_aims_file(filename, **kwargs)
 
     @classmethod
     def from_ase_atoms(cls, atoms, **kwargs):
         from .io import from_ase_atoms
+
         return from_ase_atoms(atoms, **kwargs)
 
     @classmethod
     def from_cif_data(cls, cif_data, titl=None):
         from .io import from_cif_data
+
         return from_cif_data(cif_data, titl=titl)
 
     @classmethod
     def _parse_hermann_mauguin_symbol(cls, hm_symbol, sg_number):
         from .io import _parse_hermann_mauguin_symbol
+
         return _parse_hermann_mauguin_symbol(hm_symbol, sg_number)
 
     @classmethod
     def from_cif_file(cls, filename, data_block_name=None):
         from .io import from_cif_file
+
         return from_cif_file(filename, data_block_name=data_block_name)
 
     @classmethod
     def from_pdb_file(cls, filename):
         from .io import from_pdb_file
+
         return from_pdb_file(filename)
 
     @classmethod
     def from_cif_string(cls, file_content, **kwargs):
         from .io import from_cif_string
+
         return from_cif_string(file_content, **kwargs)
 
     @classmethod
     def from_shelx_file(cls, filename, **kwargs):
         from .io import from_shelx_file
+
         return from_shelx_file(filename, **kwargs)
 
     @classmethod
     def from_shelx_string(cls, file_content, **kwargs):
         from .io import from_shelx_string
+
         return from_shelx_string(file_content, **kwargs)
 
     @classmethod
     def from_crystal17_opt_string(cls, string, **kwargs):
         from .io import from_crystal17_opt_string
+
         return from_crystal17_opt_string(string, **kwargs)
 
     @classmethod
     def from_crystal17_opt_file(cls, filename, **kwargs):
         from .io import from_crystal17_opt_file
+
         return from_crystal17_opt_file(filename, **kwargs)
 
     @classmethod
     def from_molecule(cls, molecule, **kwargs):
         from .io import from_molecule
+
         return from_molecule(molecule, **kwargs)
 
     @classmethod
     def from_gen_string(cls, contents, **kwargs):
         from .io import from_gen_string
+
         return from_gen_string(contents, **kwargs)
 
     @classmethod
     def from_gen_file(cls, filename, **kwargs):
         from .io import from_gen_file
+
         return from_gen_file(filename, **kwargs)
 
     @property
@@ -1110,10 +1178,12 @@ class Crystal:
 
     def to_ase_atoms(self, **kwargs):
         from .io import to_ase_atoms
+
         return to_ase_atoms(self, **kwargs)
 
     def to_cif_data(self, data_block_name=None) -> dict:
         from .io import to_cif_data
+
         return to_cif_data(self, data_block_name=data_block_name)
 
     def to_translational_symmetry(self, supercell=(1, 1, 1)) -> "Crystal":
@@ -1155,38 +1225,47 @@ class Crystal:
 
     def to_cif_file(self, filename, **kwargs):
         from .io import to_cif_file
+
         return to_cif_file(self, filename, **kwargs)
 
     def to_cif_string(self, **kwargs):
         from .io import to_cif_string
+
         return to_cif_string(self, **kwargs)
 
     def to_poscar_string(self, **kwargs):
         from .io import to_poscar_string
+
         return to_poscar_string(self, **kwargs)
 
     def to_poscar_file(self, filename, **kwargs):
         from .io import to_poscar_file
+
         return to_poscar_file(self, filename, **kwargs)
 
     def to_shelx_file(self, filename):
         from .io import to_shelx_file
+
         return to_shelx_file(self, filename)
 
     def to_shelx_string(self, titl=None):
         from .io import to_shelx_string
+
         return to_shelx_string(self, titl=titl)
 
     def to_pdb_string(self, header=None):
         from .io import to_pdb_string
+
         return to_pdb_string(self, header=header)
 
     def to_pdb_file(self, filename, header=None):
         from .io import to_pdb_file
+
         return to_pdb_file(self, filename, header=header)
 
     def save(self, filename, **kwargs):
         from .io import save
+
         return save(self, filename, **kwargs)
 
     def enumerate_subgroups(self, max_index: int = 8) -> list:
@@ -1262,7 +1341,9 @@ class Crystal:
             expand_asymmetric_unit,
         )
 
-        n_args = sum(x is not None for x in [target_z_prime, subgroup_index, subgroup_result])
+        n_args = sum(
+            x is not None for x in [target_z_prime, subgroup_index, subgroup_result]
+        )
         if n_args != 1:
             raise ValueError(
                 "Exactly one of target_z_prime, subgroup_index, or "
@@ -1292,9 +1373,13 @@ class Crystal:
                 "subgroup_index": result.index,
             }
             if result.space_group_symbol is not None:
-                new_crystal.properties["subgroup_space_group"] = result.space_group_symbol
+                new_crystal.properties["subgroup_space_group"] = (
+                    result.space_group_symbol
+                )
             if result.point_group_symbol is not None:
-                new_crystal.properties["subgroup_point_group"] = result.point_group_symbol
+                new_crystal.properties["subgroup_point_group"] = (
+                    result.point_group_symbol
+                )
             return new_crystal
 
         if subgroup_result is not None:
@@ -1317,9 +1402,7 @@ class Crystal:
         else:
             candidates = enumerator.find_by_index(subgroup_index)
             if not candidates:
-                raise ValueError(
-                    f"No subgroup found with index {subgroup_index}"
-                )
+                raise ValueError(f"No subgroup found with index {subgroup_index}")
 
         # Sort candidates: prefer identified space groups
         candidates.sort(key=lambda c: (c.space_group_number is None, c.index))
@@ -1793,32 +1876,50 @@ class Crystal:
 
     def assign_atom_types(self, force_field="UFF", **kwargs):
         from .force_field import assign_atom_types
+
         return assign_atom_types(self, force_field=force_field, **kwargs)
 
     def get_atom_types(self, force_field="UFF", use_cached=True, **kwargs):
         from .force_field import get_atom_types
-        return get_atom_types(self, force_field=force_field, use_cached=use_cached, **kwargs)
+
+        return get_atom_types(
+            self, force_field=force_field, use_cached=use_cached, **kwargs
+        )
 
     def get_ff_parameters(self, force_field="UFF", use_cached=True, **kwargs):
         from .force_field import get_ff_parameters
-        return get_ff_parameters(self, force_field=force_field, use_cached=use_cached, **kwargs)
+
+        return get_ff_parameters(
+            self, force_field=force_field, use_cached=use_cached, **kwargs
+        )
 
     def get_unique_atom_types(self, force_field="UFF", use_cached=True, **kwargs):
         from .force_field import get_unique_atom_types
-        return get_unique_atom_types(self, force_field=force_field, use_cached=use_cached, **kwargs)
+
+        return get_unique_atom_types(
+            self, force_field=force_field, use_cached=use_cached, **kwargs
+        )
 
     def get_lj_parameters_array(self, force_field="UFF", use_cached=True, **kwargs):
         from .force_field import get_lj_parameters_array
-        return get_lj_parameters_array(self, force_field=force_field, use_cached=use_cached, **kwargs)
+
+        return get_lj_parameters_array(
+            self, force_field=force_field, use_cached=use_cached, **kwargs
+        )
 
     def export_lammps_data(self, filename, force_field="UFF", **kwargs):
         from .force_field import export_lammps_data
+
         return export_lammps_data(self, filename, force_field=force_field, **kwargs)
 
     def export_raspa_files(self, force_field="UFF", output_dir=".", **kwargs):
         from .force_field import export_raspa_files
-        return export_raspa_files(self, force_field=force_field, output_dir=output_dir, **kwargs)
+
+        return export_raspa_files(
+            self, force_field=force_field, output_dir=output_dir, **kwargs
+        )
 
     def atom_typing_summary(self, force_field="UFF", **kwargs):
         from .force_field import atom_typing_summary
+
         return atom_typing_summary(self, force_field=force_field, **kwargs)
