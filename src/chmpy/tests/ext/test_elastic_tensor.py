@@ -3,6 +3,7 @@ import unittest
 import numpy as np
 
 from chmpy.ext.elastic_tensor import ElasticTensor
+from chmpy.util.optional import have
 
 TENSOR = """
     48.137	11.411	12.783	0.000	-3.654	0.000
@@ -26,6 +27,8 @@ class ElasticTensorTestCase(unittest.TestCase):
         lc = self.elastic.linear_compressibility([[0, 0, 1]])
         self.assertAlmostEqual(lc[0], 28.214314777188065)
 
+    # averages() integrates over a trimesh icosphere
+    @unittest.skipUnless(have("trimesh"), "needs chmpy[mesh]")
     def test_reorientation_to_standard_frame(self):
         """Test reorientation of elastic tensor from arbitrary to standard crystallographic frame.
 

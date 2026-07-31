@@ -38,6 +38,7 @@ dependencies = [
     "scipy>=1.14.1",
     "Jinja2>=3.1.2",
     "pillow>=8",
+    "pyparsing>=3",
 ]
 
 [project.optional-dependencies]

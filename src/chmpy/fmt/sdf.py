@@ -4,6 +4,8 @@ from pathlib import Path
 
 import numpy as np
 
+from chmpy.util.optional import require
+
 LOG = logging.getLogger(__name__)
 
 _COUNTS_FIELDS = (
@@ -131,7 +133,7 @@ def parse_sdf_contents(contents, limit=None, progress=False, keep_sdf_text=False
         return None
 
     if progress:
-        from tqdm import tqdm
+        tqdm = require("tqdm", "showing load progress").tqdm
 
         pbar = tqdm(desc="Loading SDF V2000 file", total=len(compounds), leave=False)
         update = pbar.update

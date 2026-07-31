@@ -4,21 +4,24 @@ import unittest
 import numpy as np
 
 from chmpy.crystal.wulff import WulffConstruction, WulffSHT
+from chmpy.util.optional import have
 
 LOG = logging.getLogger(__name__)
+
+CUBE_FACETS = np.array(
+    ((1, 0, 0), (0, 1, 0), (0, 0, 1), (-1, 0, 0), (0, -1, 0), (0, 0, -1))
+)
 
 
 class WulffConstructionTestCase(unittest.TestCase):
     def test_cube(self):
-        facets = np.array(
-            ((1, 0, 0), (0, 1, 0), (0, 0, 1), (-1, 0, 0), (0, -1, 0), (0, 0, -1))
-        )
-        facet_energies = np.ones(6)
-        w = WulffConstruction(facets, facet_energies)
+        w = WulffConstruction(CUBE_FACETS, np.ones(6))
         self.assertEqual(len(w.wulff_facets), 6)
         self.assertEqual(len(w.wulff_vertices), 8)
 
-        mesh = w.to_trimesh()
+    @unittest.skipUnless(have("trimesh"), "needs chmpy[mesh]")
+    def test_cube_mesh(self):
+        mesh = WulffConstruction(CUBE_FACETS, np.ones(6)).to_trimesh()
         self.assertAlmostEqual(mesh.volume, 8.0)
         self.assertAlmostEqual(mesh.area, 24.0)
 

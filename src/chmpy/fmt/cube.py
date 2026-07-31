@@ -82,7 +82,9 @@ class CubeData:
 
     def interpolator(self):
         if self._interpolator is None:
-            from sklearn.neighbors import KNeighborsRegressor
+            KNeighborsRegressor = require(
+                "sklearn.neighbors", "interpolating cube data"
+            ).KNeighborsRegressor
 
             self._interpolator = KNeighborsRegressor(n_neighbors=5, weights="distance")
             self._interpolator.fit(self.xyz, self.data)

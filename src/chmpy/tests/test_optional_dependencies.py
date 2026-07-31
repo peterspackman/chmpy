@@ -5,13 +5,17 @@ collected the test session has almost certainly imported both already, so
 asking `sys.modules` in-process would pass no matter what.
 """
 
+import ast
 import json
+import pathlib
+import re
 import subprocess
 import sys
 import textwrap
 import unittest
 from unittest import mock
 
+import chmpy
 from chmpy.util import optional
 
 
@@ -64,6 +68,69 @@ class ImportWeightTestCase(unittest.TestCase):
         self.assertGreater(reflections, 0)
 
 
+class DeclaredDependencyTestCase(unittest.TestCase):
+    """Nothing may be imported at module level unless chmpy depends on it.
+
+    A transitive dependency is not a dependency. pyparsing used to arrive with
+    matplotlib and pandas with seaborn, so `chmpy.fmt.smiles` imported a
+    package nothing declared and broke the moment those became extras. An
+    import inside a function is fine - `require` turns it into a message -
+    but a module-level one fails on import, which no amount of skipping saves.
+    """
+
+    #: not third-party: the package itself, and what setuptools puts on the path
+    IGNORED = {"chmpy", "pytest", "occpy"}
+
+    #: distributions that import under a different name than pip installs
+    MODULE_NAME = {"pillow": "PIL", "scikit_learn": "sklearn"}
+
+    @classmethod
+    def declared(cls):
+        """Every module name provided by a distribution chmpy requires.
+
+        Read from chmpy's own metadata so the test cannot drift from
+        pyproject. `packages_distributions()` would resolve the module names
+        without a hand-written table, but it returns almost nothing inside an
+        isolated uv environment, which is exactly where this needs to work.
+        """
+        from importlib.metadata import requires
+
+        modules = set()
+        for spec in requires("chmpy") or ():
+            name = re.split(r"[<>=!~;\[\s]", spec, maxsplit=1)[0].strip()
+            name = name.lower().replace("-", "_")
+            if name and name != "chmpy":
+                modules.add(cls.MODULE_NAME.get(name, name))
+        return modules
+
+    @staticmethod
+    def module_level_imports(path):
+        tree = ast.parse(path.read_text())
+        names = set()
+        for node in tree.body:
+            if isinstance(node, ast.Import):
+                names |= {a.name.split(".")[0] for a in node.names}
+            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                names.add(node.module.split(".")[0])
+        return names
+
+    def test_no_undeclared_module_level_imports(self):
+        declared = self.declared() | self.IGNORED | set(sys.stdlib_module_names)
+        root = pathlib.Path(chmpy.__file__).parent
+        offenders = {}
+        for path in sorted(root.rglob("*.py")):
+            if "tests" in path.parts:
+                continue
+            extra = {
+                name
+                for name in self.module_level_imports(path)
+                if name not in declared and not name.startswith("_")
+            }
+            if extra:
+                offenders[str(path.relative_to(root))] = sorted(extra)
+        self.assertEqual(offenders, {}, f"undeclared module-level imports: {offenders}")
+
+
 class RequireTestCase(unittest.TestCase):
     """`require` returns the module, or explains which extra provides it.
 
@@ -103,8 +170,11 @@ class RequireTestCase(unittest.TestCase):
     def test_mentions_the_purpose(self):
         self.assertIn("drawing a thing", self.missing("trimesh", "drawing a thing"))
 
-    def test_unknown_module_falls_back_to_its_own_name(self):
-        self.assertIn("chmpy[widget]", self.missing("widget.thing"))
+    def test_a_module_no_extra_provides_is_installed_directly(self):
+        """Naming an extra that does not exist would send the reader nowhere."""
+        message = self.missing("widget.thing")
+        self.assertIn("pip install widget", message)
+        self.assertNotIn("chmpy[", message)
 
     def test_have_does_not_raise(self):
         self.assertTrue(optional.have("json"))

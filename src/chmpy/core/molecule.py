@@ -1280,7 +1280,7 @@ class Molecule:
             return None
 
         if progress:
-            from tqdm import tqdm
+            tqdm = require("tqdm", "showing load progress").tqdm
 
             pbar = tqdm(
                 desc="Creating molecule objects", total=len(sdf_data), leave=False

@@ -19,10 +19,6 @@ EXTRAS = {
 }
 
 
-def _extra_for(module):
-    return EXTRAS.get(module.split(".")[0], module.split(".")[0])
-
-
 def require(module, purpose=None):
     """Import an optional module, or explain how to install it.
 
@@ -39,12 +35,19 @@ def require(module, purpose=None):
     try:
         return importlib.import_module(module)
     except ImportError as exc:
-        extra = _extra_for(module)
+        top = module.split(".")[0]
+        extra = EXTRAS.get(top)
         wanted = f"{purpose} needs" if purpose else "this needs"
-        raise ImportError(
-            f"{wanted} {module}, an optional dependency of chmpy. "
-            f"Install it with:  pip install 'chmpy[{extra}]'"
-        ) from exc
+        if extra:
+            detail = (
+                f"an optional dependency of chmpy. "
+                f"Install it with:  pip install 'chmpy[{extra}]'"
+            )
+        else:
+            # no extra provides it, so naming one would send the reader off to
+            # install something that does not exist
+            detail = f"which chmpy does not depend on. Install it with:  pip install {top}"
+        raise ImportError(f"{wanted} {module}, {detail}") from exc
 
 
 def pyplot(purpose="plotting"):

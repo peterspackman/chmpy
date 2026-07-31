@@ -1,11 +1,11 @@
 import logging
 
 import numpy as np
-from spglib import get_symmetry_dataset, standardize_cell
 
 from chmpy import Element
 from chmpy.crystal import AsymmetricUnit, Crystal, UnitCell
 from chmpy.crystal.space_group import SpaceGroup
+from chmpy.util.optional import require
 
 LOG = logging.getLogger(__name__)
 
@@ -22,11 +22,15 @@ def standardize_crystal(crystal, method="spglib", **kwargs):
     asym_labels = uc_dict["label"]
     cell = lattice, positions, elements
 
+    standardize_cell = require("spglib", "standardising a cell").standardize_cell
     reduced_cell = standardize_cell(cell, **kwargs)
 
     if reduced_cell is None:
         LOG.warn("Could not find reduced cell for crystal %s", crystal)
         return None
+    get_symmetry_dataset = require(
+        "spglib", "detecting symmetry"
+    ).get_symmetry_dataset
     dataset = get_symmetry_dataset(reduced_cell)
     asym_idx = np.unique(dataset["equivalent_atoms"])
     asym_idx = asym_idx[np.argsort(asym_atoms[asym_idx])]
@@ -52,6 +56,9 @@ def detect_symmetry(crystal, method="spglib", **kwargs):
     elements = uc_dict["element"]
     asym_atoms = uc_dict["asym_atom"]
     cell = lattice, positions, elements
+    get_symmetry_dataset = require(
+        "spglib", "detecting symmetry"
+    ).get_symmetry_dataset
     dataset = get_symmetry_dataset(cell, **kwargs)
     if dataset["number"] == crystal.space_group.international_tables_number:
         LOG.warn("Could not find additional symmetry for crystal %s", crystal)
