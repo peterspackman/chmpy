@@ -3,6 +3,7 @@ from pathlib import Path
 
 import numpy as np
 
+from chmpy.util.optional import require
 from chmpy.util.unit import units
 
 
@@ -88,7 +89,7 @@ class CubeData:
         return self._interpolator
 
     def isosurface(self, isovalue=0.0):
-        from trimesh import Trimesh
+        Trimesh = require("trimesh", "building an isosurface mesh").Trimesh
 
         from chmpy.mc import marching_cubes
 

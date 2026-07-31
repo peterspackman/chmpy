@@ -1,3 +1,5 @@
+from chmpy.util.optional import require
+
 # TODO add LinearSegmentedColormap objects for other
 # CrystalExplorer default colors
 DEFAULT_COLORMAPS = {
@@ -26,7 +28,7 @@ def property_to_color(prop, cmap="viridis", **kwargs):
     Returns:
         array_like: the array of color values for the given property
     """
-    from matplotlib import colormaps
+    colormaps = require("matplotlib", "mapping properties to colours").colormaps
 
     colormap = colormaps[kwargs.get("colormap", DEFAULT_COLORMAPS.get(cmap, cmap))]
 

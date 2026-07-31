@@ -1,6 +1,8 @@
 import numpy as np
 from scipy.spatial import ConvexHull
 
+from chmpy.util.optional import require
+
 
 def expand_symmetry_related_planes(hkl, energies, crystal):
     hkl.shape[0]
@@ -254,12 +256,12 @@ class WulffConstruction:
         self.wulff_triangle_indices = np.array(result[2])
 
     def to_trimesh(self):
-        from trimesh import Trimesh
+        Trimesh = require("trimesh", "building a Wulff mesh").Trimesh
 
         return Trimesh(self.wulff_vertices, self.wulff_triangles)
 
     def dual_trimesh(self):
-        from trimesh import Trimesh
+        Trimesh = require("trimesh", "building a Wulff mesh").Trimesh
 
         return Trimesh(self.facet_dual_vectors, self.dual_hull.simplices)
 

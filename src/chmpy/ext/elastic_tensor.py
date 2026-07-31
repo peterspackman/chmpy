@@ -13,6 +13,8 @@ See the page, and the source here:
 import numpy as np
 from scipy import optimize
 
+from chmpy.util.optional import pyplot, require
+
 
 def angles_to_cartesian(theta, phi):
     sint = np.sin(theta)
@@ -203,8 +205,7 @@ class ElasticTensor:
         }
 
     def plot2d(self, kind="youngs_modulus", axis="xy", npoints=100, **kwargs):
-        import matplotlib.pyplot as plt
-        import seaborn as sns
+        plt = pyplot("plotting an elastic tensor")
 
         u = np.linspace(0, np.pi * 2, npoints)
         v = np.zeros_like(u)
@@ -238,7 +239,8 @@ class ElasticTensor:
         ax.xaxis.set_major_locator(plt.MaxNLocator(9))
         ax.yaxis.set_major_locator(plt.MaxNLocator(9))
         ax.plot(x, y, c="k", **kwargs)
-        sns.despine(ax=ax, offset=0)
+        for side in ("top", "right"):
+            ax.spines[side].set_visible(False)
         ax.spines["bottom"].set_position("zero")
         ax.spines["left"].set_position("zero")
         if kwargs.get("grid", False):
@@ -257,7 +259,7 @@ class ElasticTensor:
         return ax
 
     def mesh(self, kind="youngs_modulus", subdivisions=3):
-        import trimesh
+        trimesh = require("trimesh", "building an elastic tensor mesh")
 
         f = getattr(self, kind)
         sphere = trimesh.creation.icosphere(subdivisions=subdivisions)

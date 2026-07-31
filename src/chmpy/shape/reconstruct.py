@@ -3,6 +3,7 @@ import logging
 import numpy as np
 
 from chmpy.util.num import cartesian_to_spherical_mgrid
+from chmpy.util.optional import require
 
 from .sht import SHT
 
@@ -68,7 +69,7 @@ def reconstruct(coefficients, real=True, pole_extension_factor=2):
 
 def reconstructed_surface_convex(coefficients, real=True):
     from scipy.spatial import ConvexHull
-    from trimesh import Trimesh
+    Trimesh = require("trimesh", "reconstructing a shape mesh").Trimesh
 
     pts, _ = reconstruct(coefficients, real=real)
     cvx = ConvexHull(pts)
@@ -76,7 +77,7 @@ def reconstructed_surface_convex(coefficients, real=True):
 
 
 def reconstructed_surface(coefficients, real=True):
-    from trimesh import Trimesh
+    Trimesh = require("trimesh", "reconstructing a shape mesh").Trimesh
 
     pts, faces = reconstruct(coefficients, real=real)
     mesh = Trimesh(vertices=pts, faces=faces)
@@ -93,7 +94,7 @@ def reconstructed_surface_icosphere(coefficients, real=True, subdivisions=3):
     LOG.debug("Reconstructing deduced l_max = %d", l_max)
     sht = SHT(l_max)
 
-    from trimesh.creation import icosphere
+    icosphere = require("trimesh.creation", "reconstructing a shape mesh").icosphere
 
     datatype = np.float64 if real else np.complex128
 

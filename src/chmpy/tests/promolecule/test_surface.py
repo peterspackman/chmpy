@@ -4,10 +4,12 @@ from tempfile import TemporaryDirectory
 
 from chmpy.crystal import Crystal
 from chmpy.util.mesh import save_mesh
+from chmpy.util.optional import have
 
 from .. import TEST_FILES
 
 
+@unittest.skipUnless(have("matplotlib") and have("trimesh"), "needs chmpy[plots,mesh]")
 class SurfaceTestCase(unittest.TestCase):
     def setUp(self):
         self.acetic_acid = Crystal.load(TEST_FILES["acetic_acid.cif"])

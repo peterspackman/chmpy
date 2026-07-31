@@ -25,6 +25,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from chmpy.util.optional import pyplot
+
 from .scattering_factors import atomic_form_factor
 
 #: Common characteristic X-ray wavelengths (K-alpha, Angstroms)
@@ -410,7 +412,7 @@ class PowderPattern:
         Returns:
             the matplotlib Axes the pattern was drawn on.
         """
-        import matplotlib.pyplot as plt
+        plt = pyplot("plotting a powder pattern")
 
         x, y = self.profile(
             two_theta_range=two_theta_range,
@@ -464,7 +466,7 @@ def plot_powder_patterns(
     Returns:
         the matplotlib Axes the patterns were drawn on.
     """
-    import matplotlib.pyplot as plt
+    plt = pyplot("plotting powder patterns")
 
     patterns = list(patterns)
     if two_theta_range is None and patterns:

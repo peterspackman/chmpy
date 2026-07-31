@@ -2,6 +2,8 @@ import unittest
 
 import numpy as np
 
+from chmpy.util.optional import have
+
 
 def function_to_test(theta, phi):
     return (
@@ -69,6 +71,7 @@ class SHTTestCase(unittest.TestCase):
         reconstructed = self.sht.synthesis(coeffs)
         np.testing.assert_allclose(vals_cplx, reconstructed)
 
+    @unittest.skipUnless(have("matplotlib"), "needs chmpy[plots]")
     def test_plot(self):
         _, _, z = self.sht.grid_cartesian
         vals = z**2 * np.exp(-np.ones(z.shape)) * 0.5

@@ -4,6 +4,8 @@ import numpy as np
 from numpy import allclose as close
 from numpy import zeros
 
+from chmpy.util.optional import require
+
 LOG = logging.getLogger(__name__)
 
 
@@ -597,7 +599,7 @@ class UnitCell:
         return UnitCell(np.dot(T, self.direct))
 
     def to_mesh(self):
-        from trimesh import Trimesh
+        Trimesh = require("trimesh", "building a unit cell mesh").Trimesh
 
         verts = np.array(
             [

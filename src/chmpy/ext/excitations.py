@@ -2,6 +2,8 @@ import logging
 
 import numpy as np
 
+from chmpy.util.optional import pyplot
+
 LOG = logging.getLogger(__name__)
 
 _FAC = 1.3062974e8
@@ -41,7 +43,7 @@ def plot_spectra(
         osc (np.ndarray): oscillator strengths (dimensionless).
 
     """
-    import matplotlib.pyplot as plt
+    plt = pyplot("plotting an excitation spectrum")
 
     x = np.linspace(bounds[0], bounds[1], bins)
     total = 0

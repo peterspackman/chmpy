@@ -36,13 +36,26 @@ classifiers = [
 dependencies = [
     "numpy>=2.1.2",
     "scipy>=1.14.1",
-    "trimesh>=4.5.0",
-    "matplotlib>=3.9.2",
-    "seaborn>=0.13.2",
     "Jinja2>=3.1.2",
 ]
 
 [project.optional-dependencies]
+# plotting and mesh handling are a small part of what chmpy does but most of
+# its install weight, so they are extras; chmpy.util.optional turns a missing
+# one into a message naming the extra to install
+plots = [
+    "matplotlib>=3.9.2",
+]
+mesh = [
+    "trimesh>=4.5.0",
+]
+ase = [
+    "ase>=3.22",
+]
+# everything, for anyone who had the pre-split behaviour
+all = [
+    "chmpy[plots,mesh,ase]",
+]
 docs = [
     "mkdocs",
     "mkdocs-material",

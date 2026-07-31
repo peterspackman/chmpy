@@ -8,10 +8,12 @@ from chmpy.crystal.fingerprint import (
     filtered_histogram_by_elements,
     fingerprint_histogram,
 )
+from chmpy.util.optional import have
 
 from .. import TEST_FILES
 
 
+@unittest.skipUnless(have("matplotlib"), "needs chmpy[plots]")
 class FingerprintTestCase(unittest.TestCase):
     def setUp(self):
         self.acetic_acid = Crystal.load(TEST_FILES["acetic_acid.cif"])

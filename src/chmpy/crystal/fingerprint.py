@@ -1,7 +1,7 @@
-import matplotlib.pyplot as plt
 import numpy as np
 
 from chmpy.core.element import Element
+from chmpy.util.optional import pyplot
 
 
 def sample_face_points(vertices, faces, samples_per_edge=4):
@@ -151,6 +151,8 @@ def fingerprint_histogram(mesh, bins=200, xrange=None, yrange=None, samples_per_
 def plot_fingerprint_histogram(
     hist, ax=None, filename=None, cmap="coolwarm", xlim=(0.5, 2.5), ylim=(0.5, 2.5)
 ):
+    plt = pyplot("plotting a fingerprint histogram")
+
     if ax is None:
         fig, ax = plt.subplots()
         fig.set_size_inches(4, 4)
@@ -180,6 +182,7 @@ def plot_filtered_histogram(
     xlim=(0.5, 2.5),
     ylim=(0.5, 2.5),
 ):
+    plt = pyplot("plotting a filtered fingerprint histogram")
     if ax is None:
         fig, ax = plt.subplots()
         fig.set_size_inches(4, 4)

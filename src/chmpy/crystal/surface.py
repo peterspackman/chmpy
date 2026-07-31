@@ -4,11 +4,19 @@ Includes promolecule density isosurfaces, void surfaces,
 stockholder weight (Hirshfeld) isosurfaces, and mesh scene generation.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import numpy as np
 from scipy.spatial import cKDTree as KDTree
-from trimesh import Trimesh
 
 from chmpy.core.molecule import Molecule
+from chmpy.util.optional import require
+
+if TYPE_CHECKING:  # only needed to spell the return types
+    from trimesh import Trimesh
+
 
 
 def _nearest_molecule_idx(vertices, el, pos):
@@ -106,7 +114,7 @@ def void_surface(crystal, *args, **kwargs) -> Trimesh:
     Returns:
         the mesh representing the promolecule density void isosurface
     """
-    import trimesh
+    trimesh = require("trimesh", "building a surface mesh")
 
     from chmpy import PromoleculeDensity
     from chmpy.mc import marching_cubes
@@ -184,7 +192,7 @@ def mesh_scene(crystal, **kwargs):
     Returns:
         trimesh.scene.Scene: trimesh scene object.
     """
-    from trimesh import Scene
+    Scene = require("trimesh", "building a mesh scene").Scene
 
     meshes = {}
     for i, m in enumerate(crystal.unit_cell_molecules()):
@@ -197,7 +205,7 @@ def mesh_scene(crystal, **kwargs):
         void_kwargs = kwargs.get("void_kwargs", {})
         meshes["void_surface"] = void_surface(crystal, **void_kwargs)
     if kwargs.get("axes", False):
-        from trimesh.creation import axis
+        axis = require("trimesh.creation", "drawing mesh axes").axis
 
         meshes["axes"] = axis(
             transform=crystal.unit_cell.direct_homogeneous.T, axis_length=1.0
@@ -240,7 +248,7 @@ def stockholder_weight_isosurfaces(crystal, kind="mol", **kwargs) -> list[Trimes
     Returns:
         A list of meshes representing the stockholder weight isosurfaces
     """
-    import trimesh
+    trimesh = require("trimesh", "building a surface mesh")
 
     from chmpy import StockholderWeight
     from chmpy.surface import stockholder_weight_isosurface

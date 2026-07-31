@@ -41,4 +41,4 @@ docstring-code-format = true
 
 [lint.isort]
 known-first-party = ["chmpy"]
-known-third-party = ["numpy", "scipy", "matplotlib", "seaborn", "trimesh", "jinja2"]
+known-third-party = ["numpy", "scipy", "matplotlib", "trimesh", "jinja2"]

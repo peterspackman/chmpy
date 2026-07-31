@@ -7,6 +7,8 @@ from scipy.sparse import dok_matrix
 from scipy.spatial import cKDTree as KDTree
 from scipy.spatial.distance import cdist
 
+from chmpy.util.optional import require
+
 from .element import Element
 
 LOG = logging.getLogger(__name__)
@@ -840,8 +842,8 @@ class Molecule:
                 weight isosurfaces
         """
 
-        import trimesh
-        from matplotlib.cm import get_cmap
+        trimesh = require("trimesh", "building a molecule mesh")
+        get_cmap = require("matplotlib.cm", "colouring a molecule mesh").get_cmap
 
         from chmpy import StockholderWeight
         from chmpy.surface import stockholder_weight_isosurface
@@ -946,7 +948,7 @@ class Molecule:
         Returns:
             trimesh.Trimesh: A mesh representing the promolecule density isosurface
         """
-        import trimesh
+        trimesh = require("trimesh", "building a molecule mesh")
 
         from chmpy import PromoleculeDensity
         from chmpy.surface import promolecule_density_isosurface

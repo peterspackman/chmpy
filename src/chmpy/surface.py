@@ -8,6 +8,7 @@ from collections import namedtuple
 import numpy as np
 
 from chmpy.mc import marching_cubes
+from chmpy.util.optional import require
 
 IsosurfaceMesh = namedtuple("IsosurfaceMesh", "vertices faces normals vertex_prop")
 
@@ -91,8 +92,10 @@ def _stockholder_mesh_occpy(s, isovalue, sep):
 
 def smooth_laplacian(vertices, faces, **kwargs):
     """Smooth vertices and faces using a Laplacian filter"""
-    from trimesh import Trimesh
-    from trimesh.smoothing import filter_humphrey
+    Trimesh = require("trimesh", "smoothing an isosurface").Trimesh
+    filter_humphrey = require(
+        "trimesh.smoothing", "smoothing an isosurface"
+    ).filter_humphrey
 
     kwargs.setdefault("iterations", 2)
     mesh = Trimesh(vertices, faces)

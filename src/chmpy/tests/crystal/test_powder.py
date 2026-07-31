@@ -25,6 +25,7 @@ from chmpy.crystal.powder import (
     structure_factors_fft,
 )
 from chmpy.crystal.scattering_factors import AVAILABLE, atomic_form_factor
+from chmpy.util.optional import have
 
 from .. import TEST_FILES
 
@@ -175,6 +176,7 @@ class PowderPatternTestCase(unittest.TestCase):
         self.assertIn("PowderPattern", repr(pattern))
         self.assertNotIn("\n", repr(pattern))  # concise, no array dump
 
+    @unittest.skipUnless(have("matplotlib"), "needs chmpy[plots]")
     def test_plot_returns_axes(self):
         import matplotlib
 
@@ -190,6 +192,7 @@ class PowderPatternTestCase(unittest.TestCase):
         self.assertIs(pattern.plot(ax=ax2), ax2)
         plt.close("all")
 
+    @unittest.skipUnless(have("matplotlib"), "needs chmpy[plots]")
     def test_plot_overlay(self):
         import matplotlib
 

@@ -35,6 +35,15 @@ pip install chmpy
 pip install git+https://github.com/peterspackman/chmpy.git
 ```
 
+Plotting and mesh handling are optional extras, so the default install stays
+small:
+
+``` bash
+pip install 'chmpy[plots]'   # matplotlib, for the plotting helpers
+pip install 'chmpy[mesh]'    # trimesh, for isosurfaces and meshes
+pip install 'chmpy[all]'     # everything
+```
+
 For development or modifications, install locally using pip:
 
 ``` bash

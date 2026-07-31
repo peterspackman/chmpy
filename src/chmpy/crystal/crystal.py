@@ -1,11 +1,12 @@
+from __future__ import annotations
+
 import logging
-from typing import Union
+from typing import TYPE_CHECKING
 
 import numpy as np
 import scipy.sparse.csgraph as csgraph
 from scipy.sparse import dok_matrix
 from scipy.spatial import cKDTree as KDTree
-from trimesh import Trimesh
 
 from chmpy.core.element import Element
 from chmpy.core.molecule import Molecule
@@ -14,6 +15,9 @@ from chmpy.util.num import cartesian_product
 from .asymmetric_unit import AsymmetricUnit
 from .space_group import SpaceGroup, SymmetryOperation
 from .unit_cell import UnitCell
+
+if TYPE_CHECKING:  # only needed to spell the return types
+    from trimesh import Trimesh
 
 LOG = logging.getLogger(__name__)
 
@@ -1053,7 +1057,7 @@ class Crystal:
         return uc_mass / uc_vol / 0.6022
 
     @classmethod
-    def load(cls, filename, **kwargs) -> Union["Crystal", dict]:
+    def load(cls, filename, **kwargs) -> Crystal | dict:
         from .io import load
 
         return load(filename, **kwargs)
@@ -1186,7 +1190,7 @@ class Crystal:
 
         return to_cif_data(self, data_block_name=data_block_name)
 
-    def to_translational_symmetry(self, supercell=(1, 1, 1)) -> "Crystal":
+    def to_translational_symmetry(self, supercell=(1, 1, 1)) -> Crystal:
         """
         Create a supercell of this crystal in space group P 1.
 
@@ -1307,7 +1311,7 @@ class Crystal:
         subgroup_result=None,
         tolerance: float = 1e-4,
         reconnect: bool = True,
-    ) -> "Crystal":
+    ) -> Crystal:
         """Create a new Crystal with reduced symmetry using a subgroup.
 
         The asymmetric unit is expanded to account for the reduced symmetry,
@@ -1429,7 +1433,7 @@ class Crystal:
         )
         return best
 
-    def to_standard_setting(self) -> "Crystal":
+    def to_standard_setting(self) -> Crystal:
         """Transform this crystal to the standard ITA setting.
 
         After to_subgroup(), the symmetry operations may be in a
@@ -1481,7 +1485,7 @@ class Crystal:
         # Basis transform present — need to rebuild the asymmetric unit
         return self._to_standard_setting_with_basis_transform(result)
 
-    def detect_symmetry(self, tolerance: float = 0.01) -> "Crystal":
+    def detect_symmetry(self, tolerance: float = 0.01) -> Crystal:
         """Detect the full symmetry of this crystal from atomic positions.
 
         Returns a new Crystal with the detected (possibly higher) symmetry.
@@ -1532,7 +1536,7 @@ class Crystal:
         )
         return Crystal(self.unit_cell, sg, asym)
 
-    def _to_standard_setting_with_basis_transform(self, result) -> "Crystal":
+    def _to_standard_setting_with_basis_transform(self, result) -> Crystal:
         """Handle to_standard_setting when a basis transform is needed.
 
         When the cell changes, the asymmetric unit must be reconstructed
@@ -1680,12 +1684,12 @@ class Crystal:
             self.space_group.international_tables_number, choice=choice
         )
 
-    def as_P1(self) -> "Crystal":
+    def as_P1(self) -> Crystal:
         """Create a copy of this crystal in space group P 1, with the new
         asymmetric_unit consisting of self.unit_cell_molecules()"""
         return self.as_P1_supercell((1, 1, 1))
 
-    def as_P1_supercell(self, size) -> "Crystal":
+    def as_P1_supercell(self, size) -> Crystal:
         """
         Create a supercell of this crystal in space group P 1.
 

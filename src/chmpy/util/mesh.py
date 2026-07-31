@@ -1,5 +1,7 @@
 import logging
 
+from chmpy.util.optional import require
+
 LOG = logging.getLogger(__name__)
 
 
@@ -34,7 +36,8 @@ def molecule_to_meshes(molecule, **kwargs):
     """
 
     import numpy as np
-    from trimesh.creation import cylinder, icosphere
+    creation = require("trimesh.creation", "building a molecule mesh")
+    cylinder, icosphere = creation.cylinder, creation.icosphere
 
     representation = kwargs.get("representation", "ball_stick")
     base_sphere = icosphere(subdivisions=3)

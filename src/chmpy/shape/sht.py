@@ -3,6 +3,7 @@ from scipy.fft import fft, ifft
 from scipy.special import roots_legendre
 
 from chmpy.util.num import spherical_to_cartesian_mgrid
+from chmpy.util.optional import pyplot, require
 
 from ._sht import (
     AssocLegendre,
@@ -585,8 +586,8 @@ def plot_sphere(name, grid, values):
     values: array_like
         scalar values of the function associated with each grid point
     """
-    import matplotlib.pyplot as plt
-    from matplotlib import cm
+    plt = pyplot("plotting spherical harmonics")
+    cm = require("matplotlib.cm", "plotting spherical harmonics")
 
     fig = plt.figure(figsize=plt.figaspect(1.0))
     theta, phi = grid
