@@ -61,6 +61,8 @@ intended features:
 - Easily generate spherical harmonic shape descriptors for atoms, molecules, or molecular fragments.
 - Efficiently calculate crystal slabs, periodic connectivity and more...
 - Automatic parallelization of some calculations using OpenMP (set the `OMP_NUM_THREADS` environment variable)
+- View structures directly in a terminal, with no graphical display, via
+  `chmpy-view` or `chmpy.tui.render`
 
 It should also serve as a simple, easy to read library for learning
 how to represent crystal structures, molecules etc. and evaluate

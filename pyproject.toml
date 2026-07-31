@@ -37,6 +37,7 @@ dependencies = [
     "numpy>=2.1.2",
     "scipy>=1.14.1",
     "Jinja2>=3.1.2",
+    "pillow>=8",
 ]
 
 [project.optional-dependencies]
@@ -71,6 +72,10 @@ dev = [
     "ruff>=0.6",
     "build>=1.2",
 ]
+
+[project.scripts]
+chmpy-view = "chmpy.tui.__main__:main"
+chmpy-convert = "chmpy.cmd.convert:main"
 
 [project.urls]
 homepage = "https://github.com/peterspackman/chmpy"

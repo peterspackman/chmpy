@@ -43,5 +43,6 @@ nav:
     - Home: index.md
     - Overview: 
         - Shape Descriptors: shape_descriptors.md
+        - Terminal Viewer: terminal_viewer.md
         - Notes on Parallelization: parallel.md
     - Programming Interface (API): reference/
