@@ -1,6 +1,7 @@
 """Isosurfaces for molecules in crystals or isolation."""
 
 import logging
+import os
 import time
 from collections import namedtuple
 
@@ -9,7 +10,83 @@ import numpy as np
 from chmpy.mc import marching_cubes
 
 IsosurfaceMesh = namedtuple("IsosurfaceMesh", "vertices faces normals vertex_prop")
+
 LOG = logging.getLogger(__name__)
+
+
+def _select_surface_backend():
+    """Pick 'occpy' if importable (and not disabled), otherwise 'numpy'."""
+    forced = os.environ.get("CHMPY_SURFACE_BACKEND", "").lower()
+    if forced == "numpy":
+        return "numpy"
+    try:
+        import occpy  # noqa: F401
+    except ImportError:
+        if forced == "occpy":
+            raise
+        return "numpy"
+    return "occpy"
+
+
+SURFACE_BACKEND = _select_surface_backend()
+
+
+def _occpy_molecule(elements, positions):
+    import occpy
+
+    el = np.ascontiguousarray(np.asarray(elements, dtype=np.int32))
+    pos = np.asfortranarray(np.asarray(positions, dtype=np.float64).T)
+    return occpy.Molecule(el, pos)
+
+
+def _occpy_iso_to_arrays(iso):
+    verts = np.ascontiguousarray(iso.vertices.T, dtype=np.float32)
+    faces = np.ascontiguousarray(iso.faces.T, dtype=np.int32)
+    normals = np.ascontiguousarray(iso.normals.T, dtype=np.float32)
+    extras = {}
+    for name in ("shape_index", "curvedness"):
+        if iso.properties.has_property(name):
+            extras[name] = np.asarray(iso.properties.get_float(name))
+    return verts, faces, normals, extras
+
+
+def _promolecule_mesh_occpy(promol, isovalue, sep):
+    import occpy
+
+    mol = _occpy_molecule(promol.elements, promol.positions)
+    calc = occpy.IsosurfaceCalculator()
+    calc.set_molecule(mol)
+    params = occpy.IsosurfaceGenerationParameters()
+    params.surface_kind = occpy.SurfaceKind.PromoleculeDensity
+    params.isovalue = float(isovalue)
+    params.separation = float(sep)
+    params.properties = [occpy.PropertyKind.ShapeIndex, occpy.PropertyKind.Curvedness]
+    calc.set_parameters(params)
+    if not calc.validate():
+        raise RuntimeError(f"occpy surface validation failed: {calc.error_message()}")
+    calc.compute()
+    return _occpy_iso_to_arrays(calc.isosurface())
+
+
+def _stockholder_mesh_occpy(s, isovalue, sep):
+    import occpy
+
+    mol_inside = _occpy_molecule(s.dens_a.elements, s.dens_a.positions)
+    mol_outside = _occpy_molecule(s.dens_b.elements, s.dens_b.positions)
+    calc = occpy.IsosurfaceCalculator()
+    calc.set_molecule(mol_inside)
+    calc.set_environment(mol_outside)
+    params = occpy.IsosurfaceGenerationParameters()
+    params.surface_kind = occpy.SurfaceKind.Hirshfeld
+    params.isovalue = float(isovalue)
+    params.separation = float(sep)
+    params.background_density = float(s.background)
+    params.properties = [occpy.PropertyKind.ShapeIndex, occpy.PropertyKind.Curvedness]
+    calc.set_parameters(params)
+    if not calc.validate():
+        raise RuntimeError(f"occpy surface validation failed: {calc.error_message()}")
+    calc.compute()
+    return _occpy_iso_to_arrays(calc.isosurface())
 
 
 def smooth_laplacian(vertices, faces, **kwargs):
@@ -42,28 +119,34 @@ def promolecule_density_isosurface(
             face normals and vertex properties
     """
     t1 = time.time()
-    l, u = promol.bb()
-    x_grid = np.arange(l[0], u[0], sep, dtype=np.float32)
-    y_grid = np.arange(l[1], u[1], sep, dtype=np.float32)
-    z_grid = np.arange(l[2], u[2], sep, dtype=np.float32)
-    x, y, z = np.meshgrid(x_grid, y_grid, z_grid)
-    separations = np.array((sep, sep, sep))
-    shape = x.shape
-    pts = np.c_[x.ravel(), y.ravel(), z.ravel()]
-    d = promol.rho(pts).reshape(shape)
-    verts, faces, normals, _ = marching_cubes(
-        d, isovalue, spacing=(sep, sep, sep), gradient_direction="descent"
-    )
-    LOG.debug("Separation (x,y,z): %s", separations)
-    verts = np.c_[verts[:, 1], verts[:, 0], verts[:, 2]] + l
+    extras = {}
+    if SURFACE_BACKEND == "occpy":
+        verts, faces, normals, extras = _promolecule_mesh_occpy(promol, isovalue, sep)
+    else:
+        l, u = promol.bb()
+        x_grid = np.arange(l[0], u[0], sep, dtype=np.float32)
+        y_grid = np.arange(l[1], u[1], sep, dtype=np.float32)
+        z_grid = np.arange(l[2], u[2], sep, dtype=np.float32)
+        x, y, z = np.meshgrid(x_grid, y_grid, z_grid)
+        shape = x.shape
+        pts = np.c_[x.ravel(), y.ravel(), z.ravel()]
+        d = promol.rho(pts).reshape(shape)
+        verts, faces, normals, _ = marching_cubes(
+            d, isovalue, spacing=(sep, sep, sep), gradient_direction="descent"
+        )
+        verts = np.c_[verts[:, 1], verts[:, 0], verts[:, 2]] + l
     LOG.debug("Surface centroid: %s", np.mean(verts, axis=0))
     LOG.debug("Mol centroid: %s", np.mean(promol.positions, axis=0))
     LOG.debug("Max (x,y,z): %s", np.max(verts, axis=0))
     LOG.debug("Min (x,y,z): %s", np.min(verts, axis=0))
-    vertex_props = {}
 
     if smoothing == "laplacian":
+        nverts_pre = len(verts)
         verts, faces = smooth_laplacian(verts, faces)
+        if len(verts) != nverts_pre:
+            extras = {}
+
+    vertex_props = dict(extras)
 
     if props:
         if extra_props is not None:
@@ -75,7 +158,10 @@ def promolecule_density_isosurface(
         vertex_props["d_norm_i"] = d_norm_i
         LOG.debug("d_i (min, max): (%.2f, %.2f)", np.min(d_i), np.max(d_i))
     t2 = time.time()
-    LOG.info("promolecule surface took %.3fs, %d pts", t2 - t1, len(pts))
+    LOG.info(
+        "promolecule surface took %.3fs (%s, %d verts)",
+        t2 - t1, SURFACE_BACKEND, len(verts),
+    )
     return IsosurfaceMesh(verts, faces, normals, vertex_props)
 
 
@@ -98,30 +184,36 @@ def stockholder_weight_isosurface(
             face normals and vertex properties
     """
     t1 = time.time()
-    l, u = s.bb()
-    x_grid = np.arange(l[0], u[0], sep, dtype=np.float32)
-    y_grid = np.arange(l[1], u[1], sep, dtype=np.float32)
-    z_grid = np.arange(l[2], u[2], sep, dtype=np.float32)
-    x, y, z = np.meshgrid(x_grid, y_grid, z_grid)
-    separations = np.array((sep, sep, sep))
-    shape = x.shape
-    pts = np.c_[x.ravel(), y.ravel(), z.ravel()]
-    pts = np.array(pts, dtype=np.float32)
-    weights = s.weights(pts).reshape(shape)
-    verts, faces, normals, _ = marching_cubes(
-        weights, isovalue, spacing=separations, gradient_direction="descent"
-    )
+    extras = {}
+    if SURFACE_BACKEND == "occpy":
+        verts, faces, normals, extras = _stockholder_mesh_occpy(s, isovalue, sep)
+    else:
+        l, u = s.bb()
+        x_grid = np.arange(l[0], u[0], sep, dtype=np.float32)
+        y_grid = np.arange(l[1], u[1], sep, dtype=np.float32)
+        z_grid = np.arange(l[2], u[2], sep, dtype=np.float32)
+        x, y, z = np.meshgrid(x_grid, y_grid, z_grid)
+        separations = np.array((sep, sep, sep))
+        shape = x.shape
+        pts = np.c_[x.ravel(), y.ravel(), z.ravel()]
+        pts = np.array(pts, dtype=np.float32)
+        weights = s.weights(pts).reshape(shape)
+        verts, faces, normals, _ = marching_cubes(
+            weights, isovalue, spacing=separations, gradient_direction="descent"
+        )
+        verts = np.c_[verts[:, 1], verts[:, 0], verts[:, 2]] + l
 
     if smoothing == "laplacian":
+        nverts_pre = len(verts)
         verts, faces = smooth_laplacian(verts, faces)
+        if len(verts) != nverts_pre:
+            extras = {}
 
-    LOG.debug("Separation (x,y,z): %s", separations)
-    verts = np.c_[verts[:, 1], verts[:, 0], verts[:, 2]] + l
     LOG.debug("Surface centroid: %s", np.mean(verts, axis=0))
     LOG.debug("Mol centroid: %s", np.mean(s.dens_a.positions, axis=0))
     LOG.debug("Max (x,y,z): %s", np.max(verts, axis=0))
     LOG.debug("Min (x,y,z): %s", np.min(verts, axis=0))
-    vertex_props = {}
+    vertex_props = dict(extras)
     if props:
         if extra_props is not None:
             for k, func in extra_props.items():
@@ -138,5 +230,8 @@ def stockholder_weight_isosurface(
         vertex_props["angle"] = np.abs(angles)
         LOG.debug("d_norm (min, max): (%.2f, %.2f)", np.min(d_norm), np.max(d_norm))
     t2 = time.time()
-    LOG.info("stockholder weight surface took %.3fs, %d pts", t2 - t1, len(pts))
+    LOG.info(
+        "stockholder weight surface took %.3fs (%s, %d verts)",
+        t2 - t1, SURFACE_BACKEND, len(verts),
+    )
     return IsosurfaceMesh(verts, faces, normals, vertex_props)
