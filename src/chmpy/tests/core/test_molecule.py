@@ -84,3 +84,72 @@ class MoleculeTestCase(unittest.TestCase):
         expected = (np.min(mol.positions, axis=0), np.max(mol.positions, axis=0))
         np.testing.assert_allclose(bbox, expected, atol=1e-5)
         np.testing.assert_allclose(mol.bbox_size, expected[1] - expected[0])
+
+
+class MolecularAxesTestCase(unittest.TestCase):
+    """`axes` returns the principal axes as rows, ordered by extent."""
+
+    @staticmethod
+    def bent_molecule():
+        # deliberately not aligned with x, y or z, so a frame that merely
+        # rotates the coordinates cannot pass by accident
+        positions = np.array(
+            [
+                (0.0, 0.0, 0.0),
+                (2.5, 0.4, 0.3),
+                (5.0, -0.3, 0.6),
+                (1.2, 1.1, -0.4),
+            ]
+        )
+        return Molecule.from_arrays(np.array([6, 6, 6, 1]), positions)
+
+    def test_axes_are_orthonormal_rows(self):
+        axes = self.bent_molecule().axes()
+        self.assertEqual(axes.shape, (3, 3))
+        np.testing.assert_allclose(axes @ axes.T, np.eye(3), atol=1e-12)
+
+    def test_rows_are_the_principal_axes(self):
+        """SVD puts them in the columns, so the rows are the transpose."""
+        mol = self.bent_molecule()
+        u, _, _ = np.linalg.svd((mol.positions - mol.center_of_mass).T)
+        # sign is arbitrary; the direction is what matters
+        np.testing.assert_allclose(np.abs(mol.axes()), np.abs(u.T), atol=1e-12)
+
+    def test_frame_diagonalises_the_second_moments(self):
+        """The defining property of the frame.
+
+        Projecting onto a basis that is not the principal one leaves the
+        moments coupled, which is exactly what a transposed frame does. The
+        moments are taken about the centre of mass, not the mean position,
+        since that is the point the axes are derived about.
+        """
+        frame = self.bent_molecule().positions_in_molecular_axis_frame()
+        moments = frame.T @ frame
+        off_diagonal = moments - np.diag(np.diag(moments))
+        self.assertLess(
+            np.abs(off_diagonal).max(), 1e-10, f"not a principal frame:\n{moments}"
+        )
+
+    def test_frame_is_ordered_by_extent(self):
+        spread = self.bent_molecule().positions_in_molecular_axis_frame().var(axis=0)
+        self.assertTrue(
+            np.all(np.diff(spread) <= 1e-12),
+            f"principal frame not ordered by extent: {spread}",
+        )
+
+    def test_homogeneous_matches_plain(self):
+        mol = self.bent_molecule()
+        homogeneous = np.c_[mol.positions, np.ones(len(mol))] @ mol.axes(
+            homogeneous=True
+        ).T
+        np.testing.assert_allclose(
+            homogeneous[:, :3],
+            mol.positions_in_molecular_axis_frame(),
+            atol=1e-12,
+        )
+
+    def test_orientation_preserves_geometry(self):
+        mol = self.bent_molecule()
+        before = mol.distance_matrix
+        after = mol.oriented().distance_matrix
+        np.testing.assert_allclose(before, after, atol=1e-12)

@@ -1071,8 +1071,25 @@ class Molecule:
             self.positions += origin
 
     def axes(self, homogeneous=False, method="pca"):
+        """The molecular axis frame, as a matrix whose *rows* are the axes.
+
+        For 'pca' the rows are the principal axes in order of decreasing
+        extent, so `(positions - center_of_mass) @ axes.T` gives coordinates
+        with the longest dimension of the molecule along x.
+
+        Args:
+            homogeneous (bool, optional): return a 4x4 transform that also
+                translates the centre of mass to the origin.
+            method (str, optional): only 'pca' is implemented.
+
+        Returns:
+            np.ndarray: (3, 3) rotation, or (4, 4) if `homogeneous`.
+        """
         if method == "pca":
-            axes, s, vh = np.linalg.svd((self.positions - self.center_of_mass).T)
+            # SVD of the (3, N) coordinate matrix puts the principal axes in
+            # the columns of u, so transpose to make them the rows
+            u, _, _ = np.linalg.svd((self.positions - self.center_of_mass).T)
+            axes = u.T
         else:
             raise ValueError(f"Unknown molecular axis method '{method}'")
         if homogeneous:
