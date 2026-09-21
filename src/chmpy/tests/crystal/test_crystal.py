@@ -7,6 +7,7 @@ from tempfile import TemporaryDirectory
 import numpy as np
 
 from chmpy.crystal import Crystal, SpaceGroup, UnitCell
+from chmpy.fmt.cif import Cif
 
 from .. import TEST_FILES
 from .test_asymmetric_unit import ice_ii_asym
@@ -230,4 +231,132 @@ class CifTestCase(unittest.TestCase):
         self.assertEqual(
             again.space_group.international_tables_number,
             crystal.space_group.international_tables_number,
+        )
+
+    def test_mmcif_names_and_cartesian_coordinates(self):
+        "mmCIF spells its data names differently and stores orthogonal coordinates"
+        crystal = Crystal.from_cif_string(
+            """data_mm
+_cell.length_a      10.0
+_cell.length_b      10.0
+_cell.length_c      10.0
+_cell.angle_alpha   90.0
+_cell.angle_beta    90.0
+_cell.angle_gamma   90.0
+_symmetry.Int_Tables_number  1
+loop_
+_atom_site.label_atom_id
+_atom_site.type_symbol
+_atom_site.Cartn_x
+_atom_site.Cartn_y
+_atom_site.Cartn_z
+O1 O 1.0 2.0 3.0
+H1 H 4.0 5.0 6.0
+"""
+        )
+        self.assertEqual(
+            [x.symbol for x in crystal.asymmetric_unit.elements], ["O", "H"]
+        )
+        np.testing.assert_allclose(
+            crystal.asymmetric_unit.positions,
+            [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]],
+        )
+
+    def test_to_cif_data_does_not_touch_the_crystal(self):
+        crystal = Crystal.load(TEST_FILES["acetic_acid.cif"])
+        before = {k: str(v) for k, v in crystal.properties["cif_data"].items()}
+        crystal.to_cif_data()
+        after = {k: str(v) for k, v in crystal.properties["cif_data"].items()}
+        self.assertEqual(before, after)
+
+    def test_moved_atoms_are_written_out(self):
+        "the crystal, not the file it came from, says where the atoms are"
+        crystal = Crystal.load(TEST_FILES["acetic_acid.cif"])
+        crystal.normalize_hydrogen_bondlengths()
+        again = Crystal.from_cif_string(crystal.to_cif_string())
+        np.testing.assert_allclose(
+            again.asymmetric_unit.positions, crystal.asymmetric_unit.positions
+        )
+
+    def test_changed_unit_cell_is_written_out(self):
+        crystal = Crystal.load(TEST_FILES["acetic_acid.cif"])
+        crystal.unit_cell = UnitCell.cubic(10.0)
+        again = Crystal.from_cif_string(crystal.to_cif_string())
+        np.testing.assert_allclose(again.unit_cell.parameters, [10, 10, 10, 90, 90, 90])
+
+    def test_stale_per_site_columns_are_dropped(self):
+        "a column that no longer has one value per site cannot be carried over"
+        crystal = Crystal.load(TEST_FILES["r3c_example.cif"])
+        asym = crystal.asymmetric_unit
+        self.assertIn("atom_site_U_iso_or_equiv", crystal.to_cif_data()[crystal.titl])
+
+        keep = slice(0, len(asym) - 2)
+        asym.positions = asym.positions[keep]
+        asym.labels = asym.labels[keep]
+        asym.elements = asym.elements[keep]
+        asym.atomic_numbers = asym.atomic_numbers[keep]
+        asym.properties["occupation"] = asym.properties["occupation"][keep]
+
+        cif_data = crystal.to_cif_data()[crystal.titl]
+        self.assertNotIn("atom_site_U_iso_or_equiv", cif_data)
+        again = Crystal.from_cif_string(crystal.to_cif_string())
+        self.assertEqual(len(again.asymmetric_unit), len(asym))
+        self.assertEqual(list(again.asymmetric_unit.labels), list(asym.labels))
+
+    def test_metadata_is_carried_through(self):
+        "what the file says that is not about the structure survives a rewrite"
+        crystal = Crystal.from_cif_string(
+            """data_meta
+_cell_length_a    5.0
+_cell_length_b    5.0
+_cell_length_c    5.0
+_cell_angle_alpha 90.0
+_cell_angle_beta  90.0
+_cell_angle_gamma 90.0
+_cell_formula_units_Z             4
+_symmetry_Int_Tables_number       1
+_chemical_name_common             'a made up thing'
+_diffrn_ambient_temperature       100(2)
+_refine_ls_R_factor_gt            0.0321
+loop_
+_publ_author_name
+'Bloggs, J.'
+'Doe, J.'
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+O1 O 0.0 0.0 0.0
+"""
+        )
+        crystal.normalize_hydrogen_bondlengths()
+        written = crystal.to_cif_data()["meta"]
+        self.assertEqual(written["chemical_name_common"], "a made up thing")
+        self.assertEqual(written["diffrn_ambient_temperature"], 100.0)
+        self.assertEqual(written["refine_ls_R_factor_gt"], 0.0321)
+        self.assertEqual(written["cell_formula_units_Z"], 4)
+        self.assertEqual(written["publ_author_name"], ["Bloggs, J.", "Doe, J."])
+        # and they survive being written out and read back
+        again = Cif.from_string(crystal.to_cif_string())["meta"]
+        self.assertEqual(again["publ_author_name"], ["Bloggs, J.", "Doe, J."])
+        self.assertEqual(again["chemical_name_common"], "a made up thing")
+
+    def test_space_group_data_comes_from_the_crystal(self):
+        crystal = Crystal.load(TEST_FILES["r3c_example.cif"])
+        written = crystal.to_cif_data()[crystal.titl]
+        self.assertEqual(
+            written["symmetry_Int_Tables_number"],
+            crystal.space_group.international_tables_number,
+        )
+        self.assertNotIn("symmetry_space_group_name_Hall", written)
+
+    def test_source_data_can_be_left_out(self):
+        crystal = Crystal.load(TEST_FILES["r3c_example.cif"])
+        written = crystal.to_cif_data(source_data=False)[crystal.titl]
+        self.assertNotIn("atom_site_U_iso_or_equiv", written)
+        again = Crystal.from_cif_string(crystal.to_cif_string(source_data=False))
+        np.testing.assert_allclose(
+            again.asymmetric_unit.positions, crystal.asymmetric_unit.positions
         )

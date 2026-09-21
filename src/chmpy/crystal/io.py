@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from chmpy.core.element import Element
-from chmpy.fmt.cif import Cif
+from chmpy.fmt.cif import Cif, CifBlock, canonical_data_name, is_scalar
 
 from .asymmetric_unit import AsymmetricUnit
 from .space_group import SpaceGroup, SymmetryOperation
@@ -175,17 +175,30 @@ def from_cif_data(cif_data, titl=None):
         elements = [Element[x] for x in labels]
     else:
         elements = [Element[x] for x in symbols]
-    x = np.asarray(cif_data.get("atom_site_fract_x", []))
-    y = np.asarray(cif_data.get("atom_site_fract_y", []))
-    z = np.asarray(cif_data.get("atom_site_fract_z", []))
-    occupation = np.asarray(cif_data.get("atom_site_occupancy", [1] * len(x)))
-    frac_pos = np.array([x, y, z]).T
+    lengths = [cif_data[f"cell_length_{k}"] for k in ("a", "b", "c")]
+    angles = [cif_data[f"cell_angle_{k}"] for k in ("alpha", "beta", "gamma")]
+    unit_cell = UnitCell.from_lengths_and_angles(lengths, angles, unit="degrees")
+
+    if "atom_site_fract_x" in cif_data:
+        frac_pos = np.array(
+            [np.asarray(cif_data[f"atom_site_fract_{k}"]) for k in "xyz"]
+        ).T
+    elif "atom_site_Cartn_x" in cif_data:
+        # mmCIF stores orthogonal coordinates rather than fractional ones
+        cart_pos = np.array(
+            [np.asarray(cif_data[f"atom_site_Cartn_{k}"], dtype=float) for k in "xyz"]
+        ).T
+        frac_pos = unit_cell.to_fractional(cart_pos)
+    else:
+        raise ValueError(
+            "Unable to determine atomic positions in CIF, need either "
+            "_atom_site_fract_{x,y,z} or _atom_site_Cartn_{x,y,z}"
+        )
+
+    occupation = np.asarray(cif_data.get("atom_site_occupancy", [1] * len(frac_pos)))
     asym = AsymmetricUnit(
         elements=elements, positions=frac_pos, labels=labels, occupation=occupation
     )
-    lengths = [cif_data[f"cell_length_{x}"] for x in ("a", "b", "c")]
-    angles = [cif_data[f"cell_angle_{x}"] for x in ("alpha", "beta", "gamma")]
-    unit_cell = UnitCell.from_lengths_and_angles(lengths, angles, unit="degrees")
 
     space_group = SpaceGroup(1)
     symop_data_names = (
@@ -195,12 +208,12 @@ def from_cif_data(cif_data, titl=None):
     number = space_group.international_tables_number
     for k in ("space_group_IT_number", "symmetry_Int_Tables_number"):
         if k in cif_data:
-            number = cif_data[k]
+            number = int(cif_data[k])
             break
 
     # Try to parse the Hermann-Mauguin symbol first
     hm_parsed = False
-    hm_symbol = cif_data.get("symmetry_space_group_name_H-M", "").strip()
+    hm_symbol = str(cif_data.get("symmetry_space_group_name_H-M") or "").strip()
     if hm_symbol:
         try:
             # Convert CIF Hermann-Mauguin notation to correct SpaceGroup
@@ -285,9 +298,13 @@ def _parse_hermann_mauguin_symbol(hm_symbol, sg_number):
     )
 
 
-def from_cif_file(filename, data_block_name=None):
-    """Initialize a crystal structure from a CIF file"""
-    cif = Cif.from_file(filename)
+def from_cif_file(filename, data_block_name=None, options=None):
+    """Initialize a crystal structure from a CIF file
+
+    ``options`` is a :class:`chmpy.fmt.cif.CifOptions`, for the rare file that
+    needs reading in a way other than plain CIF 1.1.
+    """
+    cif = Cif.from_file(filename, options=options)
     if data_block_name is not None:
         return from_cif_data(cif.data[data_block_name], titl=data_block_name)
 
@@ -320,9 +337,13 @@ def from_pdb_file(filename):
     return Crystal(uc, sg, asym)
 
 
-def from_cif_string(file_content, **kwargs):
-    data_block_name = kwargs.get("data_block_name", None)
-    cif = Cif.from_string(file_content)
+def from_cif_string(file_content, data_block_name=None, options=None, **kwargs):
+    """Initialize a crystal structure from the contents of a CIF
+
+    ``options`` is a :class:`chmpy.fmt.cif.CifOptions`, for the rare file that
+    needs reading in a way other than plain CIF 1.1.
+    """
+    cif = Cif.from_string(file_content, options=options)
     if data_block_name is not None:
         return from_cif_data(cif.data[data_block_name], titl=data_block_name)
 
@@ -427,44 +448,124 @@ def to_ase_atoms(crystal, **kwargs):
     return crystal_to_ase(crystal)
 
 
-def to_cif_data(crystal, data_block_name=None) -> dict:
-    "Convert a crystal structure to cif data dict"
+#: Data names a crystal structure cannot vouch for once it has been built.
+#: The space group is the crystal's own, and bond lengths and anisotropic
+#: displacements describe sites that may since have moved or gone.
+REPLACED_CIF_CATEGORIES = (
+    "symmetry_",
+    "space_group_",
+    "geom_",
+    "atom_site_aniso",
+)
+
+
+def _is_per_site(name, value):
+    "whether a carried over data name is a column with one value per atom site"
+    return canonical_data_name(name).startswith("atom_site") and not is_scalar(value)
+
+
+def _carried_over(source, structural, n_sites):
+    """The parts of a source CIF that are still true of the crystal.
+
+    Anything the crystal describes itself is dropped in favour of its own
+    state; the rest -- who published it, what it is, how it was measured --
+    is carried through untouched.
+    """
+    regenerated = {canonical_data_name(k) for k in structural}
+    kept = {}
+    for name, value in source.items():
+        canonical = canonical_data_name(name)
+        if canonical in regenerated:
+            continue  # written from the crystal instead
+        if canonical.startswith(REPLACED_CIF_CATEGORIES):
+            continue
+        if _is_per_site(name, value) and len(value) != n_sites:
+            continue  # no longer one value per site
+        kept[name] = value
+    return kept
+
+
+#: the atom site columns a crystal structure always writes, in order
+CORE_ATOM_SITE_NAMES = (
+    "atom_site_label",
+    "atom_site_type_symbol",
+    "atom_site_fract_x",
+    "atom_site_fract_y",
+    "atom_site_fract_z",
+    "atom_site_occupancy",
+)
+SYMMETRY_LOOP_NAMES = ("symmetry_equiv_pos_site_id", "symmetry_equiv_pos_as_xyz")
+
+
+def to_cif_data(crystal, data_block_name=None, source_data=True) -> CifBlock:
+    """Convert a crystal structure to CIF data.
+
+    The crystal is the source of truth for the cell, the symmetry and the
+    atom sites: these are always written from its current state, so a
+    structure altered since it was read is written as it is now, not as it
+    was on disk.
+
+    When the crystal was read from a CIF, the parts of that file which are
+    not about the structure -- bibliography, chemical identity, experimental
+    and refinement details -- are carried through unchanged, along with any
+    extra per-site column that still has one value per site.  Pass
+    ``source_data=False`` for just the structure.
+    """
     version = "1.0a1"
     if data_block_name is None:
         data_block_name = crystal.titl
-    if "cif_data" in crystal.properties:
-        cif_data = crystal.properties["cif_data"]
-        cif_data["audit_creation_method"] = (
-            f"chmpy python library version {version}"
-        )
-        cif_data["atom_site_fract_x"] = crystal.asymmetric_unit.positions[:, 0]
-        cif_data["atom_site_fract_y"] = crystal.asymmetric_unit.positions[:, 1]
-        cif_data["atom_site_fract_z"] = crystal.asymmetric_unit.positions[:, 2]
-    else:
-        cif_data = {
-            "audit_creation_method": f"chmpy python library version {version}",
-            "symmetry_equiv_pos_site_id": list(
-                range(1, len(crystal.symmetry_operations) + 1)
-            ),
-            "symmetry_equiv_pos_as_xyz": [str(x) for x in crystal.symmetry_operations],
-            "cell_length_a": crystal.unit_cell.a,
-            "cell_length_b": crystal.unit_cell.b,
-            "cell_length_c": crystal.unit_cell.c,
-            "cell_angle_alpha": crystal.unit_cell.alpha_deg,
-            "cell_angle_beta": crystal.unit_cell.beta_deg,
-            "cell_angle_gamma": crystal.unit_cell.gamma_deg,
-            "atom_site_label": crystal.asymmetric_unit.labels,
-            "atom_site_type_symbol": [
-                x.symbol for x in crystal.asymmetric_unit.elements
-            ],
-            "atom_site_fract_x": crystal.asymmetric_unit.positions[:, 0],
-            "atom_site_fract_y": crystal.asymmetric_unit.positions[:, 1],
-            "atom_site_fract_z": crystal.asymmetric_unit.positions[:, 2],
-            "atom_site_occupancy": crystal.asymmetric_unit.properties.get(
-                "occupation", np.ones(len(crystal.asymmetric_unit))
-            ),
-        }
-    return {data_block_name: cif_data}
+    asym = crystal.asymmetric_unit
+    cell = crystal.unit_cell
+    space_group = crystal.space_group
+    symmetry_operations = crystal.symmetry_operations
+    positions = asym.positions
+
+    structural = {
+        "audit_creation_method": f"chmpy python library version {version}",
+        "cell_length_a": cell.a,
+        "cell_length_b": cell.b,
+        "cell_length_c": cell.c,
+        "cell_angle_alpha": cell.alpha_deg,
+        "cell_angle_beta": cell.beta_deg,
+        "cell_angle_gamma": cell.gamma_deg,
+        "cell_volume": cell.volume(),
+        "symmetry_space_group_name_H-M": space_group.symbol,
+        "symmetry_Int_Tables_number": space_group.international_tables_number,
+        "symmetry_equiv_pos_site_id": list(range(1, len(symmetry_operations) + 1)),
+        "symmetry_equiv_pos_as_xyz": [str(x) for x in symmetry_operations],
+        "atom_site_label": list(asym.labels),
+        "atom_site_type_symbol": [x.symbol for x in asym.elements],
+        "atom_site_fract_x": positions[:, 0],
+        "atom_site_fract_y": positions[:, 1],
+        "atom_site_fract_z": positions[:, 2],
+        "atom_site_occupancy": asym.properties.get("occupation", np.ones(len(asym))),
+    }
+
+    source = crystal.properties.get("cif_data") if source_data else None
+    carried = _carried_over(source, structural, len(asym)) if source else {}
+    # a per-site column belongs in the atom site loop, the rest is metadata
+    # and reads more naturally before the structure
+    per_site = {k: v for k, v in carried.items() if _is_per_site(k, v)}
+    metadata = {k: v for k, v in carried.items() if k not in per_site}
+
+    block = CifBlock(name=data_block_name)
+    block.update(metadata)
+    block.update(structural)
+    block.update(per_site)
+
+    # say outright which columns form which loop, rather than leaving the
+    # writer to guess from the data names
+    block.loops = [
+        list(SYMMETRY_LOOP_NAMES),
+        list(CORE_ATOM_SITE_NAMES) + list(per_site),
+    ]
+    placed = {n for loop in block.loops for n in loop}
+    for loop in getattr(source, "loops", ()):
+        group = [n for n in loop if n in metadata and n not in placed]
+        if group:
+            block.loops.append(group)
+            placed.update(group)
+    return {data_block_name: block}
 
 
 def to_cif_file(crystal, filename, **kwargs):

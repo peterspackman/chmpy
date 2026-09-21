@@ -1185,10 +1185,10 @@ class Crystal:
 
         return to_ase_atoms(self, **kwargs)
 
-    def to_cif_data(self, data_block_name=None) -> dict:
+    def to_cif_data(self, data_block_name=None, **kwargs) -> dict:
         from .io import to_cif_data
 
-        return to_cif_data(self, data_block_name=data_block_name)
+        return to_cif_data(self, data_block_name=data_block_name, **kwargs)
 
     def to_translational_symmetry(self, supercell=(1, 1, 1)) -> Crystal:
         """
