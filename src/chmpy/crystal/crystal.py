@@ -359,6 +359,7 @@ class Crystal:
 
         if hasattr(self, "_unit_cell_molecules"):
             return self._unit_cell_molecules
+        self._warn_if_disordered("molecules")
         uc_graph, edge_cells = self.unit_cell_connectivity(
             tolerance=bond_tolerance, **kwargs
         )
@@ -1906,6 +1907,72 @@ class Crystal:
                 v_xh = BONDLENGTHS[el] * v_xh / norm
                 pos_cart[h, :] = pos_cart[at, :] + v_xh
         self.asymmetric_unit.positions = self.to_fractional(pos_cart)
+
+    def _warn_if_disordered(self, what):
+        """Say so, once, before deriving ``what`` from overlapping alternatives.
+
+        A partially occupied site means several structures are superimposed,
+        so a molecule built across them is not a real one -- the usual sign
+        is a methyl carbon carrying six hydrogens.
+        """
+        if self.properties.get("_warned_disordered"):
+            return
+        occupation = self.asymmetric_unit.properties.get("occupation")
+        if occupation is None or not np.any(np.asarray(occupation) < 1.0 - 1e-3):
+            return
+        self.properties["_warned_disordered"] = True
+        LOG.warning(
+            "%s has partially occupied sites, so the %s derived from it span "
+            "every disorder component at once. Use Crystal.disorder_components() "
+            "to separate them first.",
+            self.titl,
+            what,
+        )
+
+    @property
+    def disorder(self):
+        """How this structure's sites are shared between alternatives.
+
+        Returns:
+            chmpy.crystal.disorder.Disorder: the disorder assemblies found,
+            and any partially occupied site that could not be placed in one
+        """
+        from .disorder import analyse_disorder
+
+        return analyse_disorder(self)
+
+    @property
+    def is_disordered(self) -> bool:
+        """Whether any site in this structure is shared between alternatives.
+
+        A disordered structure is several structures superimposed, so its
+        molecules, surfaces and energies are not physically meaningful until
+        :meth:`disorder_components` has separated them.
+        """
+        return self.disorder.is_disordered
+
+    def disorder_components(self, **kwargs) -> list[Crystal]:
+        """Split this structure into ordered ones, one per disorder component.
+
+        Each keeps every fully occupied site plus one alternative from each
+        disorder assembly.  An already ordered crystal comes back as a
+        single-item list.
+
+        Args:
+            **kwargs: passed to :func:`chmpy.crystal.disorder.disorder_components`,
+                notably ``descend=True`` to lower the symmetry where the
+                alternatives are related by it, and ``strict=False`` to build
+                components even when some site could not be assigned
+
+        Returns:
+            list[Crystal]: the ordered structures, most occupied first
+
+        >>> c = Crystal.load("disordered.cif")  # doctest: +SKIP
+        >>> major, minor = c.disorder_components()  # doctest: +SKIP
+        """
+        from .disorder import disorder_components
+
+        return disorder_components(self, **kwargs)
 
     def assign_atom_types(self, force_field="UFF", **kwargs):
         from .force_field import assign_atom_types
