@@ -12,16 +12,12 @@ def parse_tmol_string(contents, filename=None):
     """Convert provided turbomole coord file contents into an array of
     atomic numbers and cartesian positions
 
-    Parameters
-    ----------
-    contents: str
-        text contents of the .xyz file to read
+    Args:
+        contents: text contents of the turbomole coord file to read
 
-    Returns
-    -------
-    tuple of :obj:`np.ndarray`
-        array of (N) atomic numbers and (N, 3) Cartesian positions
-        read from the given file
+    Returns:
+        array of (N) atomic numbers and (N, 3) Cartesian positions read from
+        the given file
     """
     lines = contents.splitlines()
     angstroms = "angs" in lines[0]
@@ -54,16 +50,12 @@ def parse_tmol_file(filename):
     """Convert a provided turbomole coord file into an array of
     atomic numbers and cartesian positions
 
-    Parameters
-    ----------
-    filename: str
-        path to the turbomole file to read
+    Args:
+        filename: path to the turbomole file to read
 
-    Returns
-    -------
-    tuple of :obj:`np.ndarray`
-        array of (N) atomic numbers and (N, 3) Cartesian positions
-        read from the given file
+    Returns:
+        array of (N) atomic numbers and (N, 3) Cartesian positions read from
+        the given file
     """
     path = Path(filename)
     return parse_tmol_string(path.read_text(), filename=str(path.absolute()))

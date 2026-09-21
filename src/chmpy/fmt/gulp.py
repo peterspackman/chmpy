@@ -21,17 +21,12 @@ def parse_value(string, with_units=False):
     """parse a value from a GULP output file to its appropriate type
     e.g. int, float, str etc. Will handle units with a space.
 
-    Parameters
-    ----------
-    string: str
-        the string containing the value to parse
+    Args:
+        string: the string containing the value to parse
+        with_uncertainty: return a tuple including uncertainty if a numeric
+            type is expected
 
-    with_uncertainty: bool, optional
-        return a tuple including uncertainty if a numeric type is expected
-
-    Returns
-    -------
-    value
+    Returns:
         the value coerced into the appropriate type
 
     >>> parse_value("2.3 kj/mol", with_units=True)
@@ -141,14 +136,10 @@ def parse_drv_file(drv_path: Path) -> dict[str, Any]:
     Line 4+2*natoms: gradients strain eV
     Remaining lines: strain gradients
 
-    Parameters
-    ----------
-    drv_path : Path
-        Path to the .drv file
+    Args:
+        drv_path: Path to the .drv file
 
-    Returns
-    -------
-    Dict[str, Any]
+    Returns:
         Dictionary containing 'energy', 'gradients', and 'stress_raw'
     """
     if not drv_path.exists():

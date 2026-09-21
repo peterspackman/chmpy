@@ -25,14 +25,12 @@ class Tonto(AbstractExecutable):
         extra_inputs=(),
         extra_outputs=(),
     ):
-        """
-        Parameters
-        ----------
-        input_file : str
-            string of tonto input format
-        output_file : str, optional
-            output_file to store tonto output in,
-            by default will be returned as the result
+        """Set up a Tonto job.
+
+        Args:
+            input_file: string of tonto input format
+            output_file: output_file to store tonto output in, by default
+                will be returned as the result
         """
         assert isinstance(input_file, str)
 

@@ -175,7 +175,7 @@ class Molecule:
         molecule and another. May use the distance between
         centres-of-mass, centroids, or nearest atoms.
 
-        Parameters
+        Args:
             other (Molecule): the molecule to calculate distance to
             method (str, optional): one of 'centroid', 'center_of_mass', 'nearest_atom'
         """

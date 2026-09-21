@@ -12,16 +12,12 @@ def parse_xyz_string(contents, filename=None):
     """Convert provided xmol .xyz file contents into an array of
     atomic numbers and cartesian positions
 
-    Parameters
-    ----------
-    contents: str
-        text contents of the .xyz file to read
+    Args:
+        contents: text contents of the .xyz file to read
 
-    Returns
-    -------
-    tuple of :obj:`np.ndarray`
-        array of (N) atomic numbers and (N, 3) Cartesian positions
-        read from the given file
+    Returns:
+        array of (N) atomic numbers and (N, 3) Cartesian positions read from
+        the given file
     """
     lines = contents.splitlines()
     natom = int(lines[0].strip())
@@ -47,16 +43,12 @@ def parse_traj_string(contents, filename=None):
     """Convert provided xmol .xyz file contents into list of arrays of
     atomic numbers and cartesian positions
 
-    Parameters
-    ----------
-    contents: str
-        text contents of the .xyz file to read
+    Args:
+        contents: text contents of the .xyz file to read
 
-    Returns
-    -------
-    list of tuple of :obj:`np.ndarray`
-        list of (N) :obj:`Element` and (N, 3) Cartesian positions
-        read from the given file
+    Returns:
+        list of (N) :obj:`Element` and (N, 3) Cartesian positions read from
+        the given file
     """
     lines = contents.splitlines()
     i = 0
@@ -84,16 +76,12 @@ def parse_xyz_file(filename):
     """Convert a provided xmol .xyz file into an array of
     atomic numbers and cartesian positions
 
-    Parameters
-    ----------
-    filename: str
-        path to the .xyz file to read
+    Args:
+        filename: path to the .xyz file to read
 
-    Returns
-    -------
-    tuple of :obj:`np.ndarray`
-        array of (N) atomic numbers and (N, 3) Cartesian positions
-        read from the given file
+    Returns:
+        array of (N) atomic numbers and (N, 3) Cartesian positions read from
+        the given file
     """
     path = Path(filename)
     return parse_xyz_string(path.read_text(), filename=str(path.absolute()))
@@ -103,16 +91,12 @@ def parse_traj_file(filename):
     """Convert a provided xmol .xyz file into an array of
     atomic numbers and cartesian positions
 
-    Parameters
-    ----------
-    filename: str
-        path to the .xyz file to read
+    Args:
+        filename: path to the .xyz file to read
 
-    Returns
-    -------
-    tuple of :obj:`np.ndarray`
-        array of (N) atomic numbers and (N, 3) Cartesian positions
-        read from the given file
+    Returns:
+        array of (N) atomic numbers and (N, 3) Cartesian positions read from
+        the given file
     """
     path = Path(filename)
     return parse_traj_string(path.read_text(), filename=str(path.absolute()))

@@ -9,19 +9,15 @@ LOG = logging.getLogger(__name__)
 
 
 def parse_gen_string(contents, filename=None):
-    """Convert provided xmol .xyz file contents into an array of
+    """Convert provided DFTB+ .gen file contents into an array of
     atomic numbers and cartesian positions
 
-    Parameters
-    ----------
-    contents: str
-        text contents of the .xyz file to read
+    Args:
+        contents: text contents of the .gen file to read
 
-    Returns
-    -------
-    tuple of :obj:`np.ndarray`
-        List[Element], (N, 3) positions, (4, 3) lattice vectors, bool (if fractional)
-        read from the given file
+    Returns:
+        List[Element], (N, 3) positions, (4, 3) lattice vectors, bool (if
+        fractional) read from the given file
     """
     lines = contents.splitlines()
     natom_str, kind = lines[0].split()
@@ -51,18 +47,14 @@ def parse_gen_string(contents, filename=None):
 
 def parse_gen_file(filename):
     """Convert a provided DFTB+ .gen file into an array of
-    atomic numbers, positions and
+    atomic numbers, positions and lattice vectors
 
-    Parameters
-    ----------
-    filename: str
-        path to the .xyz file to read
+    Args:
+        filename: path to the .gen file to read
 
-    Returns
-    -------
-    tuple of :obj:`np.ndarray`
-        List[Element], (N, 3) positions, (4, 3) lattice vectors, bool (if fractional)
-        read from the given file
+    Returns:
+        List[Element], (N, 3) positions, (4, 3) lattice vectors, bool (if
+        fractional) read from the given file
     """
     path = Path(filename)
     return parse_gen_string(path.read_text(), filename=str(path.absolute()))

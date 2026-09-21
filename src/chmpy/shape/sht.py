@@ -536,6 +536,7 @@ class SHT:
     def faces(self):
         """
         Generate the triangular faces for the grid vertices.
+
         Returns:
             list: A list of lists representing the faces, where each inner list
                 contains the indices of the vertices that form a triangular face.
@@ -577,14 +578,10 @@ def test_func(theta, phi):
 def plot_sphere(name, grid, values):
     """Plot a function on a spherical surface.
 
-    Parameters
-    ----------
-    name: str
-        used for the title and the output filename
-    grid: array_like
-        theta, phi values from an angular grid on a sphere
-    values: array_like
-        scalar values of the function associated with each grid point
+    Args:
+        name: used for the title and the output filename
+        grid: theta, phi values from an angular grid on a sphere
+        values: scalar values of the function associated with each grid point
     """
     plt = pyplot("plotting spherical harmonics")
     cm = require("matplotlib.cm", "plotting spherical harmonics")

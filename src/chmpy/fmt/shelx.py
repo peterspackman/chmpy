@@ -75,14 +75,11 @@ SHELX_LINE_KEYS = {
 def parse_shelx_file_content(file_content):
     """Read a SHELX formatted crystal structure from
     a string
-    Parameters
-    ----------
-    file_content: str
-        text contents of the SHELX .res file to read
 
-    Returns
-    -------
-    dict
+    Args:
+        file_content: text contents of the SHELX .res file to read
+
+    Returns:
         dictionary of parsed shelx data
     """
     contents = file_content.split("\n")
@@ -111,14 +108,11 @@ def parse_shelx_file_content(file_content):
 
 def parse_shelx_file(filename):
     """Read a SHELX formatted .res file.
-    Parameters
-    ----------
-    filename: str
-        path to the shelx .res file to read
 
-    Returns
-    -------
-    dict
+    Args:
+        filename: path to the shelx .res file to read
+
+    Returns:
         dictionary of parsed shelx data
     """
     return parse_shelx_file_content(Path(filename).read_text())
@@ -135,14 +129,10 @@ def _atom_lines(atoms):
 
 def to_res_contents(shelx_data):
     """
-    Parameters
-    ----------
-    shelx_data: dict
-        dictionary of data to write into a SHELX .res format
+    Args:
+        shelx_data: dictionary of data to write into a SHELX .res format
 
-    Returns
-    -------
-    str
+    Returns:
         the string encoded contents of this shelx_data
     """
     SHELX_FORMATTERS = {

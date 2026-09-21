@@ -24,14 +24,12 @@ class Gaussian(AbstractExecutable):
         working_directory=".",
         output_file=None,
     ):
-        """
-        Parameters
-        ----------
-        input_file : str
-            string of gaussian input format
-        output_file : str, optional
-            output_file to store gaussian output in,
-            by default will be returned as the result
+        """Set up a Gaussian job.
+
+        Args:
+            input_file: string of gaussian input format
+            output_file: output_file to store gaussian output in, by default
+                will be returned as the result
         """
         assert isinstance(input_file, str)
 
