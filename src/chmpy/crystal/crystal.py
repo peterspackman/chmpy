@@ -205,16 +205,32 @@ class Crystal:
         tree = KDTree(translated)
         dist = tree.sparse_distance_matrix(tree, max_distance=tolerance)
         mask = np.ones(len(uc_pos), dtype=bool)
-        # because crystals may have partially occupied sites
-        # on special positions, we need to merge some sites
-        # expected_natoms = np.sum(occupation)
+        # sites that coincide have to be merged: a site on a special position
+        # is generated once per symmetry operation that leaves it alone, and
+        # two different asymmetric sites may share one position
+        representative = np.arange(len(uc_pos))
         for (i, j), _ in dist.items():
             if not (i < j):
                 continue
-            occupation[i] += occupation[j]
+            representative[j] = representative[i]
             mask[j] = False
-        occupation = occupation[mask]
-        if np.any(occupation > 1.0):
+        while True:  # resolve chains of merges into a single representative
+            compressed = representative[representative]
+            if np.array_equal(compressed, representative):
+                break
+            representative = compressed
+
+        # An atom's own symmetry images are the same atom, not more of it, so
+        # each asymmetric site contributes its occupancy to a merged position
+        # once; only a genuinely shared site -- two asymmetric sites on the
+        # same position -- adds up.
+        _, first_of_site = np.unique(representative * natom + asym, return_index=True)
+        occupation = np.bincount(
+            representative[first_of_site],
+            weights=occupation[first_of_site],
+            minlength=len(uc_pos),
+        )[mask]
+        if np.any(occupation > 1.0 + 1e-6):
             LOG.debug("Some unit cell site occupations are > 1.0")
         self._unit_cell_atom_dict = {
             "asym_atom": asym[mask],
@@ -1049,12 +1065,25 @@ class Crystal:
 
     @property
     def density(self):
-        "Calculated density of this crystal structure in g/cm^3"
+        """Calculated density of this crystal structure in g/cm^3
+
+        Partially occupied sites contribute their fraction of an atom, so a
+        structure modelled with two alternatives for a group weighs what the
+        average unit cell weighs rather than the sum of both alternatives.
+        """
         if "density" in self.properties:
             return self.properties["density"]
-        uc_mass = sum(Element[x].mass for x in self.unit_cell_atoms()["element"])
+        uc_atoms = self.unit_cell_atoms()
+        masses = np.fromiter(
+            (Element[x].mass for x in uc_atoms["element"]),
+            dtype=float,
+            count=len(uc_atoms["element"]),
+        )
+        occupation = uc_atoms.get("occupation")
+        if occupation is not None:
+            masses = masses * occupation
         uc_vol = self.unit_cell.volume()
-        return uc_mass / uc_vol / 0.6022
+        return masses.sum() / uc_vol / 0.6022
 
     @classmethod
     def load(cls, filename, **kwargs) -> Crystal | dict:

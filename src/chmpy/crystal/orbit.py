@@ -196,6 +196,9 @@ class AtomOrbitTable:
 
         # Track which sites have been assigned
         assigned = np.zeros(n_uc, dtype=bool)
+        # an atom's own symmetry images are the same atom, not more of it, so
+        # each asymmetric site adds its occupancy to a merged position once
+        counted = set()
 
         for old_i in range(n_sites):
             new_i = old_to_new[old_i]
@@ -211,8 +214,10 @@ class AtomOrbitTable:
                 uc_symop_codes[new_i] = symop_codes[old_i]
                 assigned[new_i] = True
 
-            # Always accumulate occupations
-            uc_occupations[new_i] += all_occupations[old_i]
+            key = (int(new_i), int(asym_indices[old_i]))
+            if key not in counted:
+                counted.add(key)
+                uc_occupations[new_i] += all_occupations[old_i]
 
         # Update orbit_uc_idx with new indices
         flat_orbit = orbit_uc_idx.ravel()

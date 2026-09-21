@@ -360,3 +360,113 @@ O1 O 0.0 0.0 0.0
         np.testing.assert_allclose(
             again.asymmetric_unit.positions, crystal.asymmetric_unit.positions
         )
+
+
+class OccupancyTestCase(unittest.TestCase):
+    """Partial occupancies and special positions, which interact.
+
+    A site on a special position is generated once per symmetry operation
+    that leaves it alone, so those copies have to be merged -- but they are
+    the same atom, not more of it.
+    """
+
+    CELL = """data_{name}
+_cell_length_a 10.0
+_cell_length_b 10.0
+_cell_length_c 10.0
+_cell_angle_alpha 90.0
+_cell_angle_beta 90.0
+_cell_angle_gamma 90.0
+_symmetry_Int_Tables_number {number}
+loop_
+_symmetry_equiv_pos_as_xyz
+{symops}
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_occupancy
+"""
+    P1 = {"number": 1, "symops": "x,y,z"}
+    P_1 = {"number": 2, "symops": "x,y,z\n-x,-y,-z"}
+
+    def crystal(self, name, rows, setting=None):
+        setting = setting or self.P1
+        return Crystal.from_cif_string(
+            self.CELL.format(name=name, **setting) + "\n".join(rows) + "\n"
+        )
+
+    def expected_density(self, n_carbon):
+        "g/cm^3 for n carbons in a 1000 cubic angstrom cell"
+        from chmpy.core.element import Element
+
+        return n_carbon * Element["C"].mass / 1000.0 / 0.6022
+
+    def test_density_weights_by_occupancy(self):
+        whole = self.crystal("whole", ["C1 C 0.1 0.2 0.3 1.0"])
+        half = self.crystal("half", ["C1 C 0.1 0.2 0.3 0.5"])
+        self.assertAlmostEqual(whole.density, self.expected_density(1))
+        self.assertAlmostEqual(half.density, self.expected_density(0.5))
+
+    def test_two_alternatives_weigh_one_atom(self):
+        "a group modelled in two places is still one group per unit cell"
+        crystal = self.crystal(
+            "split", ["C1A C 0.10 0.20 0.30 0.7", "C1B C 0.12 0.22 0.30 0.3"]
+        )
+        self.assertAlmostEqual(crystal.density, self.expected_density(1))
+
+    def test_special_position_is_not_counted_twice(self):
+        "an atom on the inversion centre is one atom, not two"
+        crystal = self.crystal("special", ["C1 C 0.0 0.0 0.0 1.0"], setting=self.P_1)
+        atoms = crystal.unit_cell_atoms()
+        self.assertEqual(len(atoms["element"]), 1)
+        np.testing.assert_allclose(atoms["occupation"], [1.0])
+        self.assertAlmostEqual(crystal.density, self.expected_density(1))
+
+    def test_general_position_is_counted_once_per_symop(self):
+        crystal = self.crystal("general", ["C1 C 0.1 0.2 0.3 1.0"], setting=self.P_1)
+        atoms = crystal.unit_cell_atoms()
+        self.assertEqual(len(atoms["element"]), 2)
+        np.testing.assert_allclose(atoms["occupation"], [1.0, 1.0])
+        self.assertAlmostEqual(crystal.density, self.expected_density(2))
+
+    def test_two_sites_sharing_one_position_do_add_up(self):
+        "substitutional disorder is different: two atoms, one place"
+        crystal = self.crystal(
+            "shared", ["NA1 Na 0.1 0.2 0.3 0.6", "K1 K 0.1 0.2 0.3 0.4"]
+        )
+        atoms = crystal.unit_cell_atoms()
+        self.assertEqual(len(atoms["element"]), 1)
+        np.testing.assert_allclose(atoms["occupation"], [1.0])
+
+    def test_site_multiplicity_agrees_with_the_unit_cell(self):
+        """The stabilizer subgroup gives the Wyckoff multiplicity directly.
+
+        No table of Wyckoff positions is needed to get this right.
+        """
+        from chmpy.crystal.site_symmetry import SiteSymmetryTable
+
+        crystal = self.crystal(
+            "mixed",
+            ["C1 C 0.0 0.0 0.0 1.0", "C2 C 0.1 0.2 0.3 1.0"],
+            setting=self.P_1,
+        )
+        table = SiteSymmetryTable.from_crystal(crystal)
+        atoms = crystal.unit_cell_atoms()
+        self.assertEqual(table.site_symmetries[0].multiplicity, 1)
+        self.assertEqual(table.site_symmetries[1].multiplicity, 2)
+        self.assertEqual(table.total_multiplicity(), len(atoms["element"]))
+
+    def test_structure_factors_scale_with_occupancy(self):
+        from chmpy.crystal.powder import generate_hkl, structure_factors
+
+        whole = self.crystal("whole", ["C1 C 0.1 0.2 0.3 1.0"])
+        half = self.crystal("half", ["C1 C 0.1 0.2 0.3 0.5"])
+        hkl, d = generate_hkl(whole.unit_cell, 2.0)
+        np.testing.assert_allclose(
+            structure_factors(half, hkl, d),
+            0.5 * structure_factors(whole, hkl, d),
+            rtol=1e-10,
+        )
