@@ -409,6 +409,72 @@ class TestExpandAsymmetricUnit(unittest.TestCase):
         self.assertIn(10, expanded_counts)
 
 
+class TestExpandAsymmetricUnitProperties(unittest.TestCase):
+    """Per site properties have to survive the descent to a subgroup.
+
+    Occupancies above all: a split orbit keeps its occupancy, because each
+    of the new sites carries 1/n of the parent multiplicity, so the number
+    of atoms per unit cell is unchanged.
+    """
+
+    def setUp(self):
+        self.crystal = Crystal.from_cif_string(
+            """data_partial
+_cell_length_a 10.0
+_cell_length_b 10.0
+_cell_length_c 10.0
+_cell_angle_alpha 90.0
+_cell_angle_beta 90.0
+_cell_angle_gamma 90.0
+_symmetry_Int_Tables_number 2
+loop_
+_symmetry_equiv_pos_as_xyz
+x,y,z
+-x,-y,-z
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_occupancy
+C1 C 0.10 0.20 0.30 1.00
+O1 O 0.30 0.40 0.10 0.60
+"""
+        )
+
+    def expanded(self):
+        sg = self.crystal.space_group
+        symops = sg.symmetry_operations
+        table = SpaceGroupTable.from_space_group(sg)
+        subgroup = SubgroupEnumerator.from_space_group(sg).find_by_index(2)[0]
+        return expand_asymmetric_unit(
+            self.crystal.asymmetric_unit, symops, subgroup.symop_indices, table
+        ), subgroup
+
+    def test_occupancies_are_carried_over(self):
+        expanded, _ = self.expanded()
+        occupation = expanded.properties.get("occupation")
+        self.assertIsNotNone(occupation)
+        self.assertEqual(len(occupation), len(expanded))
+        for label, occ in zip(expanded.labels, occupation, strict=True):
+            expected = 1.00 if str(label).startswith("C") else 0.60
+            self.assertAlmostEqual(float(occ), expected)
+
+    def test_atom_count_per_unit_cell_is_unchanged(self):
+        expanded, subgroup = self.expanded()
+        lowered = Crystal(
+            self.crystal.unit_cell,
+            SpaceGroup(subgroup.space_group_number),
+            expanded,
+        )
+        self.assertAlmostEqual(lowered.density, self.crystal.density)
+        self.assertEqual(
+            len(lowered.unit_cell_atoms()["element"]),
+            len(self.crystal.unit_cell_atoms()["element"]),
+        )
+
+
 class TestCrystalAPI(unittest.TestCase):
     """Tests for the Crystal-level subgroup API."""
 

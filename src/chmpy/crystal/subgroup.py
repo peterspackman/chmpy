@@ -1119,6 +1119,9 @@ def expand_asymmetric_unit(
     new_elements = []
     new_positions = []
     new_labels = []
+    # which site of the original each new one came from, so that per site
+    # properties -- occupancies above all -- travel with it
+    new_sources = []
 
     for i in unique_indices:
         elem = asymmetric_unit.elements[i]
@@ -1158,6 +1161,7 @@ def expand_asymmetric_unit(
             new_elements.append(elem)
             new_positions.append(pos.copy())
             new_labels.append(str(label_base))
+            new_sources.append(i)
             continue
 
         # Find coset representatives: we need n_copies distinct images.
@@ -1167,6 +1171,7 @@ def expand_asymmetric_unit(
         new_elements.append(elem)
         new_positions.append(pos.copy())
         new_labels.append(str(label_base))
+        new_sources.append(i)
 
         for g_idx in range(n_parent):
             raw_pos = symops[g_idx].apply(pos.reshape(1, 3)).flatten()
@@ -1194,11 +1199,20 @@ def expand_asymmetric_unit(
                 new_positions.append(new_pos)
                 suffix = chr(ord('a') + len(seen_positions) - 1)
                 new_labels.append(f"{label_base}{suffix}")
+                new_sources.append(i)
 
                 if len(seen_positions) >= n_copies:
                     break
 
     positions_array = np.array(new_positions)
+    # A split orbit keeps its occupancy: each of the n_copies new sites has
+    # 1/n_copies of the parent multiplicity, so the atom count per unit cell
+    # is unchanged.
+    n_original = len(asymmetric_unit.elements)
+    properties = {}
+    for name, value in asymmetric_unit.properties.items():
+        value = np.asarray(value)
+        properties[name] = value[new_sources] if len(value) == n_original else value
     return AsymmetricUnit(
-        new_elements, positions_array, labels=new_labels
+        new_elements, positions_array, labels=new_labels, **properties
     )
