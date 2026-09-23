@@ -27,7 +27,9 @@ rather than by finite differences, which makes it a reference for checking
 from __future__ import annotations
 
 import logging
+import subprocess
 import tempfile
+from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
@@ -79,10 +81,12 @@ class GulpCalculator(Calculator):
         **kwargs,
     ):
         super().__init__(**kwargs)
-        if not which("gulp"):
+        if not available():
             raise ImportError(
-                "GULP was not found on PATH; this calculator runs the `gulp` "
-                "executable, which chmpy does not ship"
+                "no working GULP was found on PATH; this calculator runs the "
+                "`gulp` executable, which chmpy does not ship. A `gulp` that is "
+                "on PATH but is the JavaScript build tool of the same name does "
+                "not count."
             )
         if not potentials or not potentials.strip():
             raise ValueError(
@@ -215,9 +219,35 @@ def library_calculator(name: str, **kwargs) -> GulpCalculator:
     return GulpCalculator(potentials=f"library {name}", **kwargs)
 
 
+@lru_cache(maxsize=1)
 def available() -> bool:
-    "Whether the `gulp` executable can be found"
-    return bool(which("gulp"))
+    """Whether a working GULP is on PATH.
+
+    Not merely whether something named `gulp` is. The JavaScript build tool of
+    the same name is installed on most CI images and on plenty of developer
+    machines, it sits in `/usr/local/bin/gulp`, and it answers to the name
+    happily enough that every test trusting the name runs and then fails
+    somewhere far less obvious.
+
+    So ask the binary what it is: run it with no input, which makes GULP print
+    its banner and exit, and look for its name in what comes back.
+    """
+    executable = which("gulp")
+    if not executable:
+        return False
+    try:
+        finished = subprocess.run(
+            [executable],
+            input="",
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    banner = f"{finished.stdout}{finished.stderr}".upper()
+    return "GENERAL UTILITY LATTICE PROGRAM" in banner
 
 
 def _find_library(name: str) -> Path | None:

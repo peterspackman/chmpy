@@ -99,7 +99,13 @@ class Gulp(AbstractExecutable):
             self.post_process()
             LOG.error("output: %s", self.output_contents)
             LOG.error("Directory contents\n%s", list_directory(self.working_directory))
-            copytree(self.working_directory, "failed_job")
+            # keep the run for inspection, but never let saving it become the
+            # error that is reported: a second failure used to raise
+            # FileExistsError over the top of the one worth reading
+            try:
+                copytree(self.working_directory, "failed_job", dirs_exist_ok=True)
+            except OSError as copy_error:
+                LOG.error("could not save the failed job: %s", copy_error)
             raise e
 
     def cleanup(self):

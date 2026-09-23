@@ -219,3 +219,24 @@ def test_a_potential_that_matches_nothing_is_an_error():
     )
     with pytest.raises(gulp.PropertyNotAvailable, match="exactly zero"):
         calculator.energy(argon_pair(4.0))
+
+
+def test_availability_is_not_decided_by_the_name_alone(tmp_path, monkeypatch):
+    """A `gulp` on PATH is not necessarily GULP.
+
+    The JavaScript build tool of the same name is on most CI images, in
+    /usr/local/bin/gulp. Trusting the name means every test here runs against
+    it and fails somewhere far from the cause.
+    """
+    impostor = tmp_path / "gulp"
+    impostor.write_text("#!/bin/sh\necho '[12:00:00] Local gulp not found'\nexit 1\n")
+    impostor.chmod(0o755)
+    monkeypatch.setenv("PATH", str(tmp_path))
+
+    gulp.available.cache_clear()
+    try:
+        assert gulp.available() is False
+        with pytest.raises(ImportError, match="JavaScript build tool"):
+            gulp.GulpCalculator(potentials=DIATOMIC_POTENTIALS)
+    finally:
+        gulp.available.cache_clear()
