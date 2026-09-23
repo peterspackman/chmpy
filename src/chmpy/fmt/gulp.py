@@ -174,6 +174,20 @@ def parse_drv_file(drv_path: Path) -> dict[str, Any]:
 
     line_idx += 1
 
+    # Everything after the energy is optional. GULP writes no gradient section
+    # at all when the run declared nothing variable -- an isolated molecule
+    # with `noflag`, for instance -- and says so only in a warning, so a parser
+    # that assumes the section is there fails with an index error a long way
+    # from the cause.
+    if line_idx >= len(lines):
+        return {
+            "energy": energy,
+            "gradients": None,
+            "stress_raw": None,
+            "natoms": 0,
+            "force_constants": None,
+        }
+
     # Parse coordinates header: "coordinates cartesian Angstroms     48"
     coord_header = lines[line_idx].strip()
     natoms = int(coord_header.split()[-1])
@@ -183,10 +197,22 @@ def parse_drv_file(drv_path: Path) -> dict[str, Any]:
     line_idx += natoms
 
     # Parse gradients header: "gradients cartesian eV/Ang     48"
-    lines[line_idx].strip()
+    if line_idx >= len(lines) or not lines[line_idx].strip().startswith("gradients"):
+        return {
+            "energy": energy,
+            "gradients": None,
+            "stress_raw": None,
+            "natoms": natoms,
+            "force_constants": None,
+        }
     line_idx += 1
 
     # Parse gradients (GULP outputs gradients directly)
+    if line_idx + natoms > len(lines):
+        raise ValueError(
+            f"the .drv file promises {natoms} gradient rows but holds "
+            f"{len(lines) - line_idx}"
+        )
     gradients = np.zeros((natoms, 3))
     for i in range(natoms):
         parts = lines[line_idx].split()
@@ -262,3 +288,37 @@ def parse_drv_file(drv_path: Path) -> dict[str, Any]:
         "natoms": natoms,
         "force_constants": force_constants,
     }
+
+
+def parse_elastic_constants(contents: str) -> np.ndarray | None:
+    """The elastic constant matrix GULP prints under the `property` keyword.
+
+    GULP computes these analytically, which makes them a reference for a
+    finite-difference calculation rather than another estimate of the same
+    kind.
+
+    Args:
+        contents: the text of a GULP output file
+
+    Returns:
+        (6, 6) elastic constants in GPa, or None if the output has none
+    """
+    marker = "Elastic Constant Matrix"
+    start = contents.find(marker)
+    if start < 0:
+        return None
+
+    rows = []
+    for line in contents[start:].splitlines():
+        fields = line.split()
+        # a data row is an index 1-6 followed by six numbers
+        if len(fields) == 7 and fields[0].isdigit() and 1 <= int(fields[0]) <= 6:
+            try:
+                rows.append([float(x) for x in fields[1:]])
+            except ValueError:
+                continue
+        if len(rows) == 6:
+            break
+    if len(rows) != 6:
+        return None
+    return np.array(rows)

@@ -16,6 +16,10 @@ EXTRAS = {
     "matplotlib": "plots",
     "trimesh": "mesh",
     "ase": "ase",
+    "vesin": "mlip",
+    "torch": "mlip",
+    "metatomic": "mlip",
+    "metatensor": "mlip",
 }
 
 

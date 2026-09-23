@@ -54,6 +54,15 @@ mesh = [
 ase = [
     "ase>=3.22",
 ]
+# machine-learned potentials: chmpy.calc runs without these -- its neighbour
+# lists fall back to numpy and any ASE calculator can be wrapped -- but the
+# native metatomic backend and the faster pair enumeration need them.
+# Deliberately not in `all`: metatomic-torch pulls in torch, which is a far
+# larger thing than anyone asking for `all` is likely to expect
+mlip = [
+    "vesin>=0.3",
+    "metatomic-torch>=0.1",
+]
 # everything, for anyone who had the pre-split behaviour
 all = [
     "chmpy[plots,mesh,ase]",
