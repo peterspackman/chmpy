@@ -58,3 +58,6 @@ aims_opt_full/
 
 # mkdocs output
 site/
+
+# benchmark inputs and outputs: structures are third-party, results go stale
+benchmarks/data/
