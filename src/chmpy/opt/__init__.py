@@ -14,6 +14,7 @@ from .coordinates import Atomic, AtomicStrain, Coordinates, Strain
 from .curvature import LimitedMemoryBFGS
 from .elastic import ElasticResult, elastic_tensor
 from .hessian import stretch_hessian
+from .lattice import LatticeEnergy, lattice_energy
 from .relax import Stage, coordinates_for, relax, two_stage
 from .strain import (
     cartesian_rotations,
@@ -29,6 +30,7 @@ __all__ = [
     "AtomicStrain",
     "Coordinates",
     "ElasticResult",
+    "LatticeEnergy",
     "LimitedMemoryBFGS",
     "Relaxation",
     "Stage",
@@ -44,6 +46,7 @@ __all__ = [
     "elastic_tensor",
     "invariant_elastic_basis",
     "invariant_strain_basis",
+    "lattice_energy",
     "relax",
     "stretch_hessian",
     "two_stage",
