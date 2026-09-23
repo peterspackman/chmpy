@@ -88,8 +88,14 @@ class ElasticTensor:
         # Put it in a more useful representation
         try:
             self.s_voigt = np.linalg.inv(self.c_voigt)
-        except np.linalg.LinalgError as e:
-            raise ValueError(f"Error inverting s_voigt: {e}") from e
+        except np.linalg.LinAlgError as e:
+            # the name here used to be `LinalgError`, which numpy does not
+            # have, so a singular tensor raised AttributeError from inside the
+            # handler rather than the message below
+            raise ValueError(
+                f"the elastic tensor is singular, so it has no "
+                f"compliance matrix: {e}"
+            ) from e
 
         vm = np.array(((0, 5, 4), (5, 1, 3), (4, 3, 2)))
 
@@ -110,6 +116,52 @@ class ElasticTensor:
             for l in range(3)
         ]
         self.elasticity_tensor = np.array(smat)
+
+    @property
+    def eigenvalues(self) -> np.ndarray:
+        "The six eigenvalues of the Voigt matrix, in the tensor's own units"
+        return np.linalg.eigvalsh(self.c_voigt)
+
+    def is_stable(self, tolerance: float = 0.0) -> bool:
+        """Whether the tensor satisfies the Born stability criteria.
+
+        A crystal is mechanically stable exactly when the strain energy
+        `e.C.e / 2` is positive for every non-zero strain, which is to say when
+        the Voigt matrix is positive definite. That one statement covers the
+        lists of inequalities usually quoted per crystal system.
+
+        Args:
+            tolerance: smallest eigenvalue that still counts as positive
+
+        Returns:
+            True if the structure is mechanically stable
+        """
+        return bool(self.eigenvalues.min() > tolerance)
+
+    def symmetrised(self, rotations):
+        """The part of this tensor that a set of point operations allows.
+
+        Finite differences leave small components where symmetry forbids any.
+        They are noise, and they put a spurious anisotropy into every modulus
+        derived from the tensor.
+
+        Args:
+            rotations: (M, 3, 3) Cartesian point operations, e.g. from
+                `chmpy.opt.strain.cartesian_rotations`
+
+        Returns:
+            ElasticTensor: with the symmetry-forbidden components removed
+        """
+        from chmpy.opt.strain import (
+            elastic_from_voigt,
+            elastic_to_voigt,
+            invariant_elastic_basis,
+            project_elastic,
+        )
+
+        basis = invariant_elastic_basis(rotations)
+        projected = project_elastic(elastic_from_voigt(self.c_voigt), basis)
+        return ElasticTensor(elastic_to_voigt(projected))
 
     @classmethod
     def from_string(cls, s):

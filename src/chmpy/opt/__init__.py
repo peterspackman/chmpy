@@ -3,7 +3,8 @@
 `relax` is the entry point for the usual case. Underneath, a `Coordinates`
 object says what the degrees of freedom are -- Cartesian atoms, a
 symmetry-adapted cell strain, a crystal's asymmetric unit -- and `TrustRegion`
-drives them.
+drives them. `elastic_tensor` uses the same machinery to strain a cell and
+watch the stress come back.
 
 `XtbOptimizer` and the GULP drivers are a separate thing: they hand the whole
 problem to an external program.
@@ -11,6 +12,7 @@ problem to an external program.
 
 from .coordinates import Atomic, AtomicStrain, Coordinates, Strain
 from .curvature import LimitedMemoryBFGS
+from .elastic import ElasticResult, elastic_tensor
 from .hessian import stretch_hessian
 from .relax import Stage, coordinates_for, relax, two_stage
 from .strain import (
@@ -26,6 +28,7 @@ __all__ = [
     "Atomic",
     "AtomicStrain",
     "Coordinates",
+    "ElasticResult",
     "LimitedMemoryBFGS",
     "Relaxation",
     "Stage",
@@ -38,6 +41,7 @@ __all__ = [
     "XtbOptimizer",
     "cartesian_rotations",
     "coordinates_for",
+    "elastic_tensor",
     "invariant_elastic_basis",
     "invariant_strain_basis",
     "relax",
