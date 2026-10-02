@@ -530,5 +530,123 @@ class AimsOutputSyntheticMoleculeTestCase(unittest.TestCase):
         )
 
 
+class AimsOutputSinglePointTestCase(unittest.TestCase):
+    """Real FHI-aims 250822 output: Si (8 atoms), light/PBE, forces + analytical stress."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.output = AimsOutput.from_file(TEST_FILES["si_scf_light_pbe.aims.out"])
+
+    def test_run_status(self):
+        self.assertTrue(self.output.finished_normally)
+        self.assertTrue(self.output.scf_converged)
+        self.assertFalse(self.output.is_optimization)
+        self.assertFalse(self.output.geometry_converged)
+
+    def test_energies(self):
+        self.assertAlmostEqual(self.output.final_energy, -63210.5861591854, places=6)
+        self.assertAlmostEqual(
+            self.output.total_energy_corrected, -63210.5861591854, places=6
+        )
+        self.assertAlmostEqual(self.output.free_energy, -63210.5861591854, places=6)
+
+    def test_forces_are_per_atom_vectors(self):
+        forces = self.output.forces
+        self.assertEqual(forces.shape, (8, 3))
+        np.testing.assert_allclose(
+            forces[0],
+            [0.794529960070752e-08, 0.628051339149789e-08, 0.102397004538678e-08],
+        )
+        np.testing.assert_allclose(
+            forces[7],
+            [0.180171916911746e-09, -0.785855488610781e-08, 0.306929698179483e-08],
+        )
+
+    def test_stress_tensor(self):
+        stress = self.output.stress
+        self.assertEqual(stress.shape, (3, 3))
+        np.testing.assert_allclose(
+            np.diag(stress), [-0.01490136, -0.01490135, -0.01490135]
+        )
+        np.testing.assert_allclose(stress, stress.T)
+
+
+class AimsOutputRunStatusTestCase(unittest.TestCase):
+    """Edge cases for termination and SCF status, on small synthetic snippets."""
+
+    def test_truncated_run_did_not_finish(self):
+        text = TEST_FILES["si_scf_light_pbe.aims.out"].read_text()
+        truncated = text[: text.index("Have a nice day")]
+        self.assertFalse(AimsOutput.from_string(truncated).finished_normally)
+
+    def test_scf_failure_after_earlier_success(self):
+        text = "  Self-consistency cycle converged.\n  SCF cycle not converged.\n"
+        self.assertFalse(AimsOutput.from_string(text).scf_converged)
+
+    def test_cpscf_convergence_is_not_scf_convergence(self):
+        text = "  CP-self-consistency cycle converged.\n"
+        self.assertIsNone(AimsOutput.from_string(text).scf_converged)
+
+    def test_optimisation_output_without_forces_or_stress(self):
+        output = AimsOutput.from_string(SYNTHETIC_PERIODIC_OPT)
+        self.assertIsNone(output.forces)
+        self.assertIsNone(output.stress)
+        self.assertEqual(output.converged, output.geometry_converged)
+
+
+STRESS_BOX = """
+  |{title:^67}|
+  |                  Cartesian components [eV/A**3]                   |
+  +-------------------------------------------------------------------+
+  |                x                y                z                |
+  |                                                                   |
+  |  x        {v:>11.8f}       0.00000000       0.00000000           |
+  |  y         0.00000000      {v:>11.8f}       0.00000000           |
+  |  z         0.00000000       0.00000000      {v:>11.8f}           |
+  |                                                                   |
+  +-------------------------------------------------------------------+
+"""
+
+
+class AimsOutputVariantsTestCase(unittest.TestCase):
+    """Header variants seen across the FHI-aims regression references."""
+
+    def test_constrained_relaxation_force_header(self):
+        text = (
+            "  Total atomic forces (unitary forces were cleaned, then relaxation "
+            "constraints were applied) [eV/Ang]:\n"
+            "  |    1          0.100000000000000E+00          0.0E+00          0.0E+00\n"
+            "  |    2         -0.100000000000000E+00          0.0E+00          0.0E+00\n"
+        )
+        forces = AimsOutput.from_string(text).forces
+        np.testing.assert_allclose(forces, [[0.1, 0, 0], [-0.1, 0, 0]])
+
+    def test_free_energy_force_header(self):
+        text = (
+            "  Total atomic forces (derivative of free energy) [eV/Ang]:\n"
+            "  |    1          0.0E+00          0.0E+00         -0.110594325914662E+01\n"
+        )
+        forces = AimsOutput.from_string(text).forces
+        np.testing.assert_allclose(forces, [[0, 0, -1.10594325914662]])
+
+    def test_partial_vdw_free_stress_is_not_the_total(self):
+        total = STRESS_BOX.format(
+            title="Analytical stress tensor - Symmetrized", v=-0.5
+        )
+        no_vdw = STRESS_BOX.format(
+            title="Analytical stress tensor w/o vdW correction - Symmetrized", v=-0.9
+        )
+        stress = AimsOutput.from_string(total + no_vdw).stress
+        np.testing.assert_allclose(np.diag(stress), [-0.5] * 3)
+
+    def test_symmetrized_stress_wins_over_unsymmetrized(self):
+        raw = STRESS_BOX.format(title="Analytical stress tensor", v=-0.2)
+        symmetrized = STRESS_BOX.format(
+            title="Analytical stress tensor - Symmetrized", v=-0.3
+        )
+        stress = AimsOutput.from_string(raw + symmetrized).stress
+        np.testing.assert_allclose(np.diag(stress), [-0.3] * 3)
+
+
 if __name__ == "__main__":
     unittest.main()

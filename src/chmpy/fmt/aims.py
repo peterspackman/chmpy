@@ -449,6 +449,29 @@ class OptimizationStep:
         return Crystal(uc, sg, asym)
 
 
+_FLOAT = r"-?\d+\.\d+(?:E[+-]\d+)?"
+_FINAL_ENERGY_PATTERNS = {
+    "total_energy_corrected": re.compile(
+        rf"\|\s*Total energy corrected\s*:\s*({_FLOAT})\s*eV"
+    ),
+    # Per-iteration lines print "... Ha  ... eV"; only the final summary has a single value.
+    "free_energy": re.compile(rf"\|\s*Electronic free energy\s*:\s*({_FLOAT})\s*eV"),
+}
+# Anchored so the DFPT message "CP-self-consistency cycle converged." does not match.
+_SCF_CONVERGED = re.compile(r"(?<![-\w])Self-consistency cycle converged")
+_SCF_NOT_CONVERGED = re.compile(r"SCF cycle not converged")
+# Variants: "(unitary forces cleaned)", "(unitary forces were cleaned, then relaxation
+# constraints were applied)", "(derivative of free energy)"; the last block printed wins.
+_FORCES_HEADER = re.compile(r"Total atomic forces \([^)]*\) \[eV/Ang\]:")
+_FORCE_ROW = re.compile(rf"^\s*\|\s*\d+\s+({_FLOAT})\s+({_FLOAT})\s+({_FLOAT})")
+# Exact box titles: the unsymmetrized analytical tensor is always followed by the
+# symmetrized one, and "... w/o vdW correction - Symmetrized" is only a partial tensor.
+_STRESS_HEADER = re.compile(
+    r"^\s*\|\s+(Analytical stress tensor - Symmetrized|Numerical stress tensor)\s+\|"
+)
+_STRESS_ROW = re.compile(rf"^\s*\|\s*([xyz])\s+({_FLOAT})\s+({_FLOAT})\s+({_FLOAT})")
+
+
 @dataclass
 class AimsOutput:
     """Parser for FHI-aims output files (aims.out).
@@ -458,10 +481,22 @@ class AimsOutput:
 
     Attributes:
         filename: Path to the aims.out file
-        converged: Whether the calculation converged
+        converged: Whether a geometry optimization converged (always False for
+            single points; kept for compatibility, prefer ``geometry_converged``)
+        geometry_converged: Same as ``converged``
+        finished_normally: Whether aims reached its normal end ("Have a nice day")
+        scf_converged: Whether the last SCF cycle converged (None if no SCF status
+            was printed)
         is_optimization: Whether this was a geometry optimization
         is_periodic: Whether this is a periodic calculation
-        final_energy: Final total energy in eV
+        final_energy: Final total energy (uncorrected) in eV
+        total_energy_corrected: Final corrected total energy in eV (meaningful
+            for periodic metals with smearing)
+        free_energy: Final electronic free energy in eV
+        forces: (n, 3) array of the last total atomic forces in eV/Angstrom (in
+            QM/MM runs n includes pseudocores that aims adds to the QM region)
+        stress: (3, 3) array of the last stress tensor (analytical symmetrized or
+            numerical) in eV/Angstrom^3
         n_atoms: Number of atoms
         n_steps: Number of optimization steps (0 for single-point)
         steps: List of OptimizationStep objects for optimization runs
@@ -479,9 +514,15 @@ class AimsOutput:
 
     filename: str | None = None
     converged: bool = False
+    finished_normally: bool = False
+    scf_converged: bool | None = None
     is_optimization: bool = False
     is_periodic: bool = False
     final_energy: float | None = None
+    total_energy_corrected: float | None = None
+    free_energy: float | None = None
+    forces: np.ndarray | None = None
+    stress: np.ndarray | None = None
     n_atoms: int = 0
     n_steps: int = 0
     steps: list = field(default_factory=list)
@@ -514,9 +555,15 @@ class AimsOutput:
         output._parse(contents)
         return output
 
+    @property
+    def geometry_converged(self):
+        """Whether a geometry optimization converged (same as ``converged``)."""
+        return self.converged
+
     def _parse(self, contents):
         """Parse the aims.out file contents."""
         lines = contents.splitlines()
+        self._parse_results(lines)
 
         # Patterns for extracting data
         energy_pattern = re.compile(
@@ -665,6 +712,37 @@ class AimsOutput:
         # If no steps were parsed but we have a final structure, this is a single-point
         if not self.steps and self.final_structure:
             self.n_steps = 0
+
+    def _parse_results(self, lines):
+        """Run status, final energies, and the last force and stress blocks."""
+        for i, line in enumerate(lines):
+            if "Have a nice day" in line:
+                self.finished_normally = True
+            if _SCF_CONVERGED.search(line):
+                self.scf_converged = True
+            elif _SCF_NOT_CONVERGED.search(line):
+                self.scf_converged = False
+            for attr, pattern in _FINAL_ENERGY_PATTERNS.items():
+                match = pattern.search(line)
+                if match:
+                    setattr(self, attr, float(match.group(1)))
+            if _FORCES_HEADER.search(line):
+                rows = []
+                for j in range(i + 1, len(lines)):
+                    match = _FORCE_ROW.match(lines[j])
+                    if not match:
+                        break
+                    rows.append([float(x) for x in match.groups()])
+                if rows:
+                    self.forces = np.array(rows)
+            if _STRESS_HEADER.match(line):
+                rows = {}
+                for row in lines[i + 1 : i + 12]:
+                    match = _STRESS_ROW.match(row)
+                    if match:
+                        rows[match.group(1)] = [float(x) for x in match.groups()[1:]]
+                if len(rows) == 3:
+                    self.stress = np.array([rows["x"], rows["y"], rows["z"]])
 
     def get_trajectory(self):
         """Get the optimization trajectory as a list of Molecule or Crystal objects.
