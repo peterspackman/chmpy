@@ -224,3 +224,23 @@ def test_a_progress_hook_sees_every_step():
     assert [event.step for event in events] == outcome.history
     assert all("E=" in event.message for event in events)
     assert all(event.total == 50 for event in events)
+
+
+class BiasedForces(HarmonicField):
+    """Reports forces with a constant error, so near the minimum the gradient
+    points the wrong way relative to the energy."""
+
+    def compute(self, system, want):
+        result = super().compute(system, want)
+        return Result(energy=result.energy, forces=result.forces + 0.05)
+
+
+def test_a_gradient_inconsistent_with_the_energy_stops_early(caplog):
+    system, field = harmonic()
+    calc = BiasedForces(field.hessian, field.centre)
+    with caplog.at_level("WARNING"):
+        outcome = TrustRegion(Atomic(system), calc).run(fmax=1e-6, steps=500)
+    assert not outcome.converged
+    assert outcome.stalled
+    assert outcome.steps < 100
+    assert "check_gradients" in caplog.text

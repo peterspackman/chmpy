@@ -230,6 +230,8 @@ class TrustRegion:
         radius = options.delta0
         restarts = 0
         stalled = False
+        inconsistent = False
+        floor_rejections = 0
         history = []
         converged = self._converged(result, tolerances)
 
@@ -334,9 +336,26 @@ class TrustRegion:
                 step=entry,
             )
 
+            # rejected steps at the minimum radius, after every restart, mean
+            # the energy rises along the gradient: nothing left to try
+            if accept:
+                floor_rejections = 0
+            elif radius <= options.delta_min and restarts >= options.max_restarts:
+                floor_rejections += 1
+                if floor_rejections >= FLOOR_REJECTIONS:
+                    stalled = inconsistent = True
+                    break
+
         coordinates.set(x)
         _warn_if_forbidden(coordinates.measures(result), fmax)
-        if stalled:
+        if inconsistent:
+            LOG.warning(
+                "the optimiser stopped: %d steps in a row at the minimum trust "
+                "radius raised the energy, so the gradient does not match the "
+                "energy. Check the calculator with `calculator.check_gradients`.",
+                FLOOR_REJECTIONS,
+            )
+        elif stalled:
             LOG.warning(
                 "the optimiser stalled: the model proposes no step at all, which "
                 "usually means the parameterisation has run into a bound it "
@@ -389,6 +408,9 @@ class TrustRegion:
             if name in tolerances
         )
 
+
+#: consecutive rejections at the minimum radius, after all restarts, to stop
+FLOOR_REJECTIONS = 10
 
 #: warn when the symmetry-forbidden force exceeds this multiple of fmax
 FORBIDDEN_WARNING = 10.0
