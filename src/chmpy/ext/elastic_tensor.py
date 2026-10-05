@@ -93,8 +93,7 @@ class ElasticTensor:
             # have, so a singular tensor raised AttributeError from inside the
             # handler rather than the message below
             raise ValueError(
-                f"the elastic tensor is singular, so it has no "
-                f"compliance matrix: {e}"
+                f"the elastic tensor is singular, so it has no compliance matrix: {e}"
             ) from e
 
         vm = np.array(((0, 5, 4), (5, 1, 3), (4, 3, 2)))

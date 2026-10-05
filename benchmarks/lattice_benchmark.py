@@ -195,7 +195,10 @@ def run_one(crystal, model, calculator, info, args):
                     crystal, model, info, args.fmax, args.smax, args.steps
                 )
         except Exception as error:  # a failure on one structure is data, not a stop
-            values = {"energy": float("nan"), "error": f"{type(error).__name__}: {error}"}
+            values = {
+                "energy": float("nan"),
+                "error": f"{type(error).__name__}: {error}",
+            }
         elapsed = time.perf_counter() - started
         calls = counter.calls
         counter.release()
@@ -231,10 +234,22 @@ def main():
     model = calculator.ase_calculator
 
     fields = [
-        "name", "z", "reference", "chmpy", "ase", "difference",
-        "chmpy_interaction", "ase_interaction", "chmpy_strain", "ase_strain",
-        "chmpy_calls", "ase_calls", "chmpy_seconds", "ase_seconds",
-        "chmpy_converged", "ase_converged",
+        "name",
+        "z",
+        "reference",
+        "chmpy",
+        "ase",
+        "difference",
+        "chmpy_interaction",
+        "ase_interaction",
+        "chmpy_strain",
+        "ase_strain",
+        "chmpy_calls",
+        "ase_calls",
+        "chmpy_seconds",
+        "ase_seconds",
+        "chmpy_converged",
+        "ase_converged",
     ]
     handle = open(args.out, "w", newline="")
     writer = csv.DictWriter(handle, fieldnames=fields)
@@ -259,8 +274,10 @@ def main():
             "chmpy": ours,
             "ase": theirs,
             "difference": ours - theirs,
-            "chmpy_interaction": row["chmpy"].get("interaction", float("nan")) * EV_TO_KJ_PER_MOL,
-            "ase_interaction": row["ase"].get("interaction", float("nan")) * EV_TO_KJ_PER_MOL,
+            "chmpy_interaction": row["chmpy"].get("interaction", float("nan"))
+            * EV_TO_KJ_PER_MOL,
+            "ase_interaction": row["ase"].get("interaction", float("nan"))
+            * EV_TO_KJ_PER_MOL,
             "chmpy_strain": row["chmpy"].get("strain", float("nan")) * EV_TO_KJ_PER_MOL,
             "ase_strain": row["ase"].get("strain", float("nan")) * EV_TO_KJ_PER_MOL,
             "chmpy_calls": row["chmpy"]["calls"],

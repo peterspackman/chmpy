@@ -50,7 +50,9 @@ def require(module, purpose=None):
         else:
             # no extra provides it, so naming one would send the reader off to
             # install something that does not exist
-            detail = f"which chmpy does not depend on. Install it with:  pip install {top}"
+            detail = (
+                f"which chmpy does not depend on. Install it with:  pip install {top}"
+            )
         raise ImportError(f"{wanted} {module}, {detail}") from exc
 
 
