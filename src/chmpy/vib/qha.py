@@ -17,9 +17,10 @@ is minimised by damped Newton steps:
   thermal stress cannot carry the cell to a region where the crystal has
   come apart, which a fixed applied stress does.
 
-Imaginary modes at any cell stop the calculation: the harmonic free energy is
-not defined there, and dropping the modes would make the finite differences
-measure which modes were dropped.
+Imaginary modes mean the harmonic free energy is not defined. Dropping them
+would make the finite differences measure which modes were dropped, so a
+trial cell with imaginary modes is a rejected step, and imaginary modes at
+the current cell or the cells its gradient needs stop the calculation.
 
     result = qha_structure(crystal, calculator, temperature=293.0)
     tensor = elastic_tensor(result.structure, calculator)  # quasi-static C
@@ -334,7 +335,17 @@ def qha_structure(
         step *= min(1.0, max_step / max(float(np.abs(step).max()), 1e-300))
         for _ in range(6):
             trial = q + step
-            trial_G = surface.value(trial)
+            try:
+                trial_G = surface.value(trial)
+                if trial_G < G:
+                    # the next gradient needs the neighbouring cells too; they
+                    # are cached, so this costs nothing for an accepted step
+                    surface.vibrational_gradient(trial)
+            except ImaginaryModes as unstable:
+                # the step left the region where the crystal is dynamically
+                # stable; that is a step to shorten, not a failure
+                LOG.info("rejected a trial cell: %s", unstable)
+                trial_G = np.inf
             if trial_G < G:
                 q, G = trial, trial_G
                 break

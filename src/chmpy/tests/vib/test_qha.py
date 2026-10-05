@@ -179,3 +179,25 @@ def test_imaginary_modes_stop_the_calculation():
     static = relax(start, potential, fmax=1e-7, smax=1e-6, steps=800).structure
     with pytest.raises(ImaginaryModes, match="imaginary modes"):
         qha_structure(static, potential, 30.0, mesh=(3, 3, 3), cutoff=9.0)
+
+
+def test_an_unstable_trial_cell_is_a_rejected_step(calc, monkeypatch, caplog):
+    """A step that lands where the crystal is dynamically unstable is shortened,
+    not fatal; only an unstable current cell stops the calculation."""
+    from chmpy.vib import qha
+
+    static = relax(hcp_argon(), calc, fmax=1e-7, smax=1e-6, steps=800).structure
+    original = qha._FreeEnergySurface.vibrational
+    limit = 0.012
+
+    def unstable_beyond_limit(self, q):
+        if np.abs(q).max() > limit + self.strain:
+            raise qha.ImaginaryModes("unstable")
+        return original(self, q)
+
+    monkeypatch.setattr(qha._FreeEnergySurface, "vibrational", unstable_beyond_limit)
+    with caplog.at_level("WARNING"):
+        result = qha_structure(static, calc, 40.0, mesh=MESH, cutoff=CUTOFF, fmax=1e-6)
+    assert not result.converged
+    assert np.abs(result.strain).max() <= limit + 0.005 + 1e-9
+    assert result.history[-1]["gradient_gpa"] < result.history[0]["gradient_gpa"]
