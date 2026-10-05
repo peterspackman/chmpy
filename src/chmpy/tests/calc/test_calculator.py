@@ -4,6 +4,7 @@ import pytest
 from chmpy.calc import (
     Calculator,
     LennardJones,
+    PairPotential,
     PropertyNotAvailable,
     Result,
     System,
@@ -253,3 +254,28 @@ def test_an_undecided_calculator_assumes_full_precision():
     calc = FromASequence([-192.5])
     _feed(calc)
     assert calc.energy_noise(-192.5) < 1e-12
+
+
+class _TwoRadii(PairPotential):
+    cutoff = 6.0
+
+    def pair(self, r, zi, zj):
+        sigma = 0.5 * (
+            np.where(zi == 18, 3.4, 3.9) + np.where(zj == 18, 3.4, 3.9)
+        )
+        x = (sigma / r) ** 6
+        return 0.01 * 4 * (x * x - x), 0.01 * 4 * (-12 * x * x + 6 * x) / r
+
+
+def test_the_cutoff_shift_is_per_element_pair():
+    """Shifted energy is the same whatever order the pairs come in."""
+    fractional = np.array([[0, 0, 0], [0.5, 0.52, 0.48], [0.5, 0, 0.5], [0, 0.5, 0.5]])
+    cell = np.eye(3) * 6.0
+    forward = System([18, 36, 18, 36], fractional @ cell, cell, True)
+    order = [1, 0, 3, 2]
+    reversed_ = System(
+        np.array([18, 36, 18, 36])[order], (fractional @ cell)[order], cell, True
+    )
+    assert _TwoRadii().energy(forward) == pytest.approx(
+        _TwoRadii().energy(reversed_), abs=1e-12
+    )

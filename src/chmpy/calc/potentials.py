@@ -80,10 +80,9 @@ class PairPotential(Calculator):
 
         energy, denergy_dr = self.pair(r, zi, zj)
         if self.shift_energy and len(r):
-            at_cutoff, _ = self.pair(
-                np.full(1, self.cutoff), zi[:1] * 0 + zi[:1], zj[:1]
-            )
-            energy = energy - at_cutoff[0]
+            # each pair is shifted by its own elements' value at the cutoff
+            at_cutoff, _ = self.pair(np.full(len(r), self.cutoff), zi, zj)
+            energy = energy - at_cutoff
 
         n = len(system)
         forces = stress = energies = None
