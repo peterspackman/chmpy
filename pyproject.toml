@@ -61,7 +61,7 @@ ase = [
 # larger thing than anyone asking for `all` is likely to expect
 mlip = [
     "vesin>=0.3",
-    "metatomic-torch>=0.1",
+    "metatomic-torch>=0.1.17",
 ]
 # everything, for anyone who had the pre-split behaviour
 all = [

@@ -1,6 +1,6 @@
-"""The native metatomic backend, against metatomic's own ASE calculator.
+"""The native metatomic backend, against UPET's own ASE calculator.
 
-Skipped unless metatomic, torch and a PET-MAD checkpoint are all present.
+Skipped unless metatomic, torch, upet and a PET-MAD checkpoint are all present.
 """
 
 import numpy as np
@@ -10,29 +10,35 @@ from chmpy.calc import Calculator, System
 
 pytest.importorskip("torch")
 pytest.importorskip("metatomic.torch")
-pytest.importorskip("pet_mad")
+pytest.importorskip("upet")
+
+MODEL = "pet-mad-s"
 
 
-@pytest.fixture(scope="module")
-def pet():
-    """PET-MAD, loaded once. Skips if the checkpoint is not already cached."""
+def _quietly(load):
     import warnings
-
-    from pet_mad.calculator import PETMADCalculator
 
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            return PETMADCalculator(version="latest")
+            return load()
     except Exception as exc:  # no network, no cached checkpoint
-        pytest.skip(f"PET-MAD is not available: {exc}")
+        pytest.skip(f"{MODEL} is not available: {exc}")
+
+
+@pytest.fixture(scope="module")
+def pet():
+    """UPET's ASE calculator, loaded once."""
+    from upet.ase import UPETCalculator
+
+    return _quietly(lambda: UPETCalculator(MODEL, device="cpu"))
 
 
 @pytest.fixture(scope="module")
 def native(pet):
-    from chmpy.calc.adapters.metatomic import MetatomicCalculator
+    from chmpy.calc.adapters.metatomic import upet
 
-    return MetatomicCalculator(pet._model)
+    return _quietly(lambda: upet(MODEL, device="cpu"))
 
 
 def argon(a=5.3, seed=0):
@@ -113,7 +119,7 @@ def test_per_atom_energies_sum_to_the_total(native):
     assert float(result.energies.sum()) == pytest.approx(result.energy, abs=1e-5)
 
 
-def test_the_backends_agree_on_a_geometry_neither_of_them_chose(native, pet):
+def test_the_backends_agree_on_a_geometry_neither_of_them_chose(pet):
     """Rule out the neighbour lists as a source of energy differences.
 
     Two optimisers that stop at different points inside the same tolerance box
@@ -129,8 +135,35 @@ def test_the_backends_agree_on_a_geometry_neither_of_them_chose(native, pet):
     atoms.calc = pet
     LBFGS(FrechetCellFilter(atoms), logfile=None).run(fmax=0.05, steps=5)
 
+    # compare in float64: in float32 the backends differ by ~1e-6 eV from
+    # summation order alone
+    from upet.ase import UPETCalculator
+
+    from chmpy.calc.adapters.metatomic import upet
+
     elsewhere = System.from_ase(atoms)
-    ours = native(elsewhere.copy(), ("energy",)).energy
-    theirs = Calculator.from_ase(pet)(elsewhere.copy(), ("energy",)).energy
-    # one unit in the last place of a float32 energy of this magnitude
-    assert abs(ours - theirs) <= 4 * abs(ours) * np.finfo(np.float32).eps
+    ours = _quietly(lambda: upet(MODEL, device="cpu", dtype="float64"))
+    theirs = _quietly(lambda: UPETCalculator(MODEL, device="cpu", dtype="float64"))
+    assert ours(elsewhere.copy(), ("energy",)).energy == pytest.approx(
+        Calculator.from_ase(theirs)(elsewhere.copy(), ("energy",)).energy,
+        abs=1e-12,
+    )
+
+
+def test_double_precision_is_honoured(pet):
+    """dtype="float64" converts the model, not just the inputs."""
+    from chmpy.calc.adapters.metatomic import upet
+
+    double = _quietly(lambda: upet(MODEL, device="cpu", dtype="float64"))
+    single = _quietly(lambda: upet(MODEL, device="cpu"))
+    system = argon()
+    assert str(double.dtype) == "torch.float64"
+    assert double.energy_precision < 1e-12
+    assert double.energy(system) == pytest.approx(single.energy(system), abs=1e-3)
+
+
+def test_a_model_name_without_a_size_is_refused():
+    from chmpy.calc.adapters.metatomic import upet
+
+    with pytest.raises(ValueError, match="pet-mad-s"):
+        upet("petmad")

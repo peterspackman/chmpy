@@ -35,9 +35,10 @@ MAX_STEPS = 300
 
 
 def load_pet_mad():
-    from pet_mad.calculator import PETMADCalculator
+    """UPET's ASE calculator for PET-MAD, so both stacks run the same model."""
+    from upet.ase import UPETCalculator
 
-    return PETMADCalculator(version="latest")
+    return UPETCalculator("pet-mad-s", version="latest")
 
 
 def symmetry_error(space_group, cell, fractional, numbers):
@@ -197,9 +198,11 @@ def main():
         print(header)
         print("-" * len(header))
         for row in (
-            run_chmpy(crystal, pet._model, symmetry=True),
-            run_chmpy(crystal, pet._model, symmetry=True, hessian="identity"),
-            run_chmpy(crystal, pet._model, symmetry=False),
+            run_chmpy(crystal, pet.calculator._model, symmetry=True),
+            run_chmpy(
+                crystal, pet.calculator._model, symmetry=True, hessian="identity"
+            ),
+            run_chmpy(crystal, pet.calculator._model, symmetry=False),
             run_ase(crystal, pet, "LBFGS", fix_symmetry=True),
             run_ase(crystal, pet, "LBFGS", fix_symmetry=False),
             run_ase(crystal, pet, "FIRE", fix_symmetry=True),

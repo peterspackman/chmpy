@@ -32,11 +32,9 @@ def load_model(name):
     """Return a chmpy Calculator for a named model."""
     warnings.filterwarnings("ignore")
     if name == "pet-mad":
-        from pet_mad.calculator import PETMADCalculator
+        from chmpy.calc.adapters.metatomic import upet
 
-        from chmpy.calc.adapters.metatomic import MetatomicCalculator
-
-        return MetatomicCalculator(PETMADCalculator(version="latest")._model)
+        return upet("pet-mad-s")
     if name.startswith("mace-polar"):
         from mace.calculators import mace_polar
 
@@ -44,9 +42,7 @@ def load_model(name):
 
         size = name.rsplit("-", 1)[-1] if name != "mace-polar" else "s"
         return Calculator.from_ase(
-            mace_polar(
-                model=f"polar-1-{size}", device="cpu", default_dtype="float64"
-            )
+            mace_polar(model=f"polar-1-{size}", device="cpu", default_dtype="float64")
         )
     if name.startswith("mace-off"):
         from mace.calculators import mace_off
@@ -104,14 +100,20 @@ def main():
     parser.add_argument("--max-atoms", type=int, default=100)
     parser.add_argument("--strain", type=float, default=0.02)
     parser.add_argument("--fmax", type=float, default=0.01)
-    parser.add_argument("--ion-fmax", type=float, default=0.005,
-                        help="ionic relaxation tolerance at each strain; must sit\n                              well below the calculator's force noise")
+    parser.add_argument(
+        "--atom-fmax",
+        type=float,
+        default=0.005,
+        help="atomic relaxation tolerance at each strain; must sit\n                              well below the calculator's force noise",
+    )
     parser.add_argument("--smax", type=float, default=0.05)
     parser.add_argument("--out", type=Path, default=Path("elastic_benchmark.csv"))
     parser.add_argument("--only", nargs="*", help="limit to these refcodes")
-    parser.add_argument("--info", action="store_true",
-                        help="pass charge/spin/external_field, which polarisable "
-                             "models require")
+    parser.add_argument(
+        "--info",
+        action="store_true",
+        help="pass charge/spin/external_field, which polarisable models require",
+    )
     args = parser.parse_args()
 
     model_inputs = (
@@ -151,27 +153,52 @@ def main():
     with open(args.out, "w", newline="") as handle:
         writer = csv.writer(handle)
         writer.writerow(
-            ["refcode", "lattice", "n_atoms", "calls", "seconds", "converged",
-             "K_ours", "G_ours", "K_exp", "G_exp", "K_ref", "G_ref",
-             "rmse_vs_exp", "rmse_vs_ref", "forbidden_ref", "symmetry_residual",
-             "frame_unambiguous"]
+            [
+                "refcode",
+                "lattice",
+                "n_atoms",
+                "calls",
+                "seconds",
+                "converged",
+                "K_ours",
+                "G_ours",
+                "K_exp",
+                "G_exp",
+                "K_ref",
+                "G_ref",
+                "rmse_vs_exp",
+                "rmse_vs_ref",
+                "forbidden_ref",
+                "symmetry_residual",
+                "frame_unambiguous",
+            ]
         )
         for refcode, crystal, n_atoms in jobs:
             lattice = crystal.space_group.lattice_type
             try:
                 started = time.perf_counter()
                 relaxation = relax(
-                    crystal, calc, info=model_inputs,
-                    fmax=args.fmax, smax=args.smax, steps=300,
+                    crystal,
+                    calc,
+                    info=model_inputs,
+                    fmax=args.fmax,
+                    smax=args.smax,
+                    steps=300,
                 )
                 result = elastic_tensor(
-                    relaxation.structure, calc, strain=args.strain,
-                    info=model_inputs, fmax=args.ion_fmax, steps=150,
+                    relaxation.structure,
+                    calc,
+                    strain=args.strain,
+                    info=model_inputs,
+                    fmax=args.atom_fmax,
+                    steps=150,
                 )
                 elapsed = time.perf_counter() - started
             except Exception as exc:
-                print(f"{refcode:12s} {lattice:13s} {n_atoms:4d}  failed: "
-                      f"{type(exc).__name__}: {str(exc)[:50]}")
+                print(
+                    f"{refcode:12s} {lattice:13s} {n_atoms:4d}  failed: "
+                    f"{type(exc).__name__}: {str(exc)[:50]}"
+                )
                 continue
 
             ours = result.c_voigt
@@ -195,18 +222,34 @@ def main():
             def fmt(x, width=7):
                 return f"{x:{width}.2f}" if x is not None else " " * (width - 1) + "-"
 
-            print(f"{refcode:12s} {lattice:13s} {n_atoms:4d} "
-                  f"{result.evaluations + relaxation.evaluations:6d} {elapsed:6.1f}s "
-                  f"{fmt(k_ours)} {fmt(g_ours)} {fmt(k_exp)} {fmt(g_exp)} "
-                  f"{fmt(k_ref)} {100 * result.noise_fraction:6.1f}%")
+            print(
+                f"{refcode:12s} {lattice:13s} {n_atoms:4d} "
+                f"{result.evaluations + relaxation.evaluations:6d} {elapsed:6.1f}s "
+                f"{fmt(k_ours)} {fmt(g_ours)} {fmt(k_exp)} {fmt(g_exp)} "
+                f"{fmt(k_ref)} {100 * result.noise_fraction:6.1f}%"
+            )
 
-            writer.writerow([
-                refcode, lattice, n_atoms,
-                result.evaluations + relaxation.evaluations, round(elapsed, 2),
-                relaxation.converged, k_ours, g_ours, k_exp, g_exp, k_ref, g_ref,
-                rmse_exp, rmse_ref, forbidden, result.symmetry_residual,
-                lattice in UNAMBIGUOUS,
-            ])
+            writer.writerow(
+                [
+                    refcode,
+                    lattice,
+                    n_atoms,
+                    result.evaluations + relaxation.evaluations,
+                    round(elapsed, 2),
+                    relaxation.converged,
+                    k_ours,
+                    g_ours,
+                    k_exp,
+                    g_exp,
+                    k_ref,
+                    g_ref,
+                    rmse_exp,
+                    rmse_ref,
+                    forbidden,
+                    result.symmetry_residual,
+                    lattice in UNAMBIGUOUS,
+                ]
+            )
             handle.flush()
 
     print(f"\nwrote {args.out}")

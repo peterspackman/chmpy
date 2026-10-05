@@ -46,10 +46,16 @@ class MetatomicCalculator(Calculator):
             model needs them
 
     Examples:
-        Relaxing a crystal with PET-MAD::
+        Relaxing a crystal with PET-MAD, loaded through UPET::
 
-            calc = MetatomicCalculator("pet-mad-latest.pt")
+            from chmpy.calc.adapters.metatomic import upet
+
+            calc = upet("pet-mad-s", dtype="float64")
             result = relax(crystal, calc, fmax=0.01, smax=0.05)
+
+        or from an exported model file::
+
+            calc = MetatomicCalculator("pet-mad-s.pt")
     """
 
     provides = {"energy", "forces", "stress", "energies"}
@@ -76,7 +82,15 @@ class MetatomicCalculator(Calculator):
         self.device = self.torch.device(
             _pick_device(self.metatomic, capabilities.supported_devices, device)
         )
-        self.dtype = dtype or getattr(self.torch, capabilities.dtype)
+        self.dtype = _as_torch_dtype(self.torch, dtype) or getattr(
+            self.torch, capabilities.dtype
+        )
+        if self.dtype != getattr(self.torch, capabilities.dtype):
+            # the model validates inputs against its declared dtype, so update
+            # that as well as the weights (as metatomic's ASE calculator does)
+            capabilities.dtype = str(self.dtype).removeprefix("torch.")
+            self.model._capabilities.dtype = capabilities.dtype
+            self.model = self.model.to(dtype=self.dtype)
         self.model = self.model.to(self.device)
         # the model states its own precision, so there is nothing to infer: a
         # float32 model cannot resolve energy differences below about 1e-7
@@ -146,12 +160,8 @@ class MetatomicCalculator(Calculator):
 
     def _run(self, systems, want):
         metatomic = self.metatomic
-        output = metatomic.ModelOutput(
-            quantity="energy",
-            unit="eV",
-            per_atom=ENERGIES in want,
-            explicit_gradients=[],
-        )
+        output = metatomic.ModelOutput(unit="eV", explicit_gradients=[])
+        output.sample_kind = "atom" if ENERGIES in want else "system"
         options = metatomic.ModelEvaluationOptions(
             length_unit="angstrom",
             outputs={self.energy_key: output},
@@ -316,15 +326,44 @@ def _energy_key(capabilities) -> str:
     return candidates[0]
 
 
-def pet_mad(version: str = "latest", **kwargs) -> MetatomicCalculator:
-    """The PET-MAD model, as a calculator.
+def upet(
+    model: str = "pet-mad-s", version: str = "latest", **kwargs
+) -> MetatomicCalculator:
+    """Load a UPET model (PET-MAD etc.) as a `MetatomicCalculator`.
+
+    The checkpoint is downloaded and cached by UPET on first use.
 
     Args:
-        version: the PET-MAD version to load
-        **kwargs: passed to `MetatomicCalculator`
+        model: the name UPET gives it, `<family>-<size>`: "pet-mad-s",
+            "pet-mad-xs", "pet-omat-l", ... `upet.list_upet()` lists them.
+        version: the model version, or "latest"
+        **kwargs: passed to `MetatomicCalculator`, e.g. `dtype="float64"`,
+            `device="cuda"`
 
     Returns:
         MetatomicCalculator
     """
-    pet = require("pet_mad.calculator", "loading PET-MAD")
-    return MetatomicCalculator(pet.PETMADCalculator(version=version)._model, **kwargs)
+    import warnings
+
+    upet_module = require("upet", "loading a UPET model")
+    family, _, size = model.rpartition("-")
+    if not family:
+        raise ValueError(
+            f"expected a UPET model name like 'pet-mad-s', got {model!r}; "
+            "upet.list_upet() lists them"
+        )
+    with warnings.catch_warnings():
+        # metatrain warns about its own conventions on every load
+        warnings.simplefilter("ignore", UserWarning)
+        loaded = upet_module.get_upet(model=family, size=size, version=version)
+    return MetatomicCalculator(loaded, **kwargs)
+
+
+def _as_torch_dtype(torch, dtype):
+    "Accept a torch dtype or its name, as UPET and ASE users write it"
+    if dtype is None or not isinstance(dtype, str):
+        return dtype
+    resolved = getattr(torch, dtype.removeprefix("torch."), None)
+    if not isinstance(resolved, torch.dtype):
+        raise ValueError(f"{dtype!r} is not a torch dtype")
+    return resolved
