@@ -21,15 +21,17 @@ from .strain import (
     invariant_elastic_basis,
     invariant_strain_basis,
 )
-from .symmetry import SymmetryAdapted
+from .symmetry import AtomMap, InvariantAtomic, SymmetryAdapted, map_atoms
 from .trust_region import Relaxation, Step, TrustRegion, TrustRegionOptions
 from .xtb import XtbEnergyEvaluator, XtbOptimizer
 
 __all__ = [
     "Atomic",
     "AtomicStrain",
+    "AtomMap",
     "Coordinates",
     "ElasticResult",
+    "InvariantAtomic",
     "LatticeEnergy",
     "LimitedMemoryBFGS",
     "Relaxation",
@@ -47,6 +49,7 @@ __all__ = [
     "invariant_elastic_basis",
     "invariant_strain_basis",
     "lattice_energy",
+    "map_atoms",
     "relax",
     "stretch_hessian",
     "two_stage",

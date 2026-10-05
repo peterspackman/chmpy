@@ -1,34 +1,24 @@
-"""Elastic constants, by straining and re-relaxing.
+"""Elastic constants by finite strain.
 
-The elastic tensor is the second derivative of the energy with respect to
-strain, `C_ij = (1/V) d2E / de_i de_j`, and it is computed here the way it is
-measured: deform the cell by a small strain, let the atoms settle, and read the
-stress that comes back.
+`C_ij = (1/V) d2E / de_i de_j` is computed by straining the cell in each
+direction, relaxing the atoms at fixed cell, and differencing the stress.
 
-Two things are easy to get wrong and are handled here.
-
-**The ions have to relax.** The clamped-ion tensor -- strain the cell and read
-the stress without letting the atoms move -- is a different and much stiffer
-quantity, sometimes by a factor of two for a molecular crystal, where a strain
-is taken up mostly by molecules rearranging rather than by bonds stretching.
-`relax_ions=True` (the default) runs a fixed-cell relaxation at every strained
-geometry, which is what makes this expensive and what makes it right.
-
-**The result has to respect the point group.** Finite differences and a finite
-ionic relaxation leave a bit of the tensor outside the subspace the symmetry
-allows -- a monoclinic crystal comes back with small non-zero constants where
-its group forbids any. Those components are noise, and leaving them in puts a
-spurious anisotropy into every modulus derived from the tensor. The tensor is
-projected onto the invariant subspace of the crystal's point group, computed in
-`chmpy.opt.strain` rather than looked up from a table of crystal systems, and
-the size of that projection is reported as `symmetry_residual` -- a free and
-rather sensitive check on whether the strain step and the relaxation tolerance
-were tight enough.
-
-The ionic relaxation itself runs in P1. That is deliberate: a general strain
-breaks the crystal's symmetry, so constraining the atoms to the parent group's
-asymmetric unit would hold them in places the strained structure does not
-require them to be, and the tensor would come out too stiff.
+* **Relaxed atoms.** `relax_atoms=True` (the default) relaxes the atoms at
+  every strained geometry. Clamped-atom constants can be much stiffer,
+  particularly for molecular crystals.
+* **Strain selection.** Since `C (R e R^T) = R (C e) R^T`, one strain gives
+  the response for its whole point-group orbit. Only strains not already
+  covered are applied (2 for cubic, 3 for hexagonal, 6 for triclinic), and the
+  tensor is a least-squares fit over all rotated responses.
+* **Subgroup relaxation.** A strain keeps the operations with
+  `R eps R^T = eps`, and the atoms relax within that subgroup
+  (`chmpy.opt.symmetry.InvariantAtomic`). This cannot find a lower-symmetry
+  minimum if the reference is a saddle point in P1; `tensor.is_stable()` will
+  usually flag that, and `symmetry=False` relaxes in P1.
+* **Projection.** The result is projected onto the tensors the point group
+  allows. `symmetry_residual` reports the larger of the fit misfit and the
+  size of that projection, and `asymmetry` the largest `|C_ij - C_ji|`;
+  both are noise estimates.
 """
 
 from __future__ import annotations
@@ -42,13 +32,16 @@ from chmpy.calc.result import EV_PER_ANGSTROM3_TO_GPA
 from chmpy.calc.system import System
 
 from .coordinates import Atomic
+from .progress import reporter
 from .strain import (
     cartesian_rotations,
     elastic_from_voigt,
     elastic_to_voigt,
     invariant_elastic_basis,
     project_elastic,
+    to_vector,
 )
+from .symmetry import InvariantAtomic, crystal_atom_map
 from .trust_region import TrustRegion
 
 LOG = logging.getLogger(__name__)
@@ -83,7 +76,7 @@ class ElasticResult:
     Attributes:
         tensor: the `chmpy.ext.elastic_tensor.ElasticTensor`, in GPa
         evaluations: calculator evaluations used
-        relaxed_ions: whether the atoms were relaxed at each strain
+        relaxed_atoms: whether the atoms were relaxed at each strain
         residual_stress: largest stress component of the reference structure in
             GPa. Elastic constants are defined at equilibrium; a large value
             here means the answer is not the quantity it is called.
@@ -91,23 +84,24 @@ class ElasticResult:
             in GPa. The two are computed from different strain columns and must
             agree for a conservative model, so their difference is noise. This
             estimate exists for every crystal system.
-        symmetry_residual: how much the symmetry projection changed the tensor,
-            in GPa. Components symmetry forbids are noise too, and this is the
-            more sensitive of the two measures -- but a triclinic crystal
-            forbids nothing, so it is identically zero there.
+        symmetry_residual: how far the measured stresses are from what the
+            point group allows, in GPa (fit misfit or projection size, whichever
+            is larger). Always zero for triclinic.
         n_independent: independent elastic constants the point group allows
         strain: the engineering strain used
+        strains: Voigt indices actually applied
     """
 
     tensor: object
     evaluations: int
-    relaxed_ions: bool
+    relaxed_atoms: bool
     residual_stress: float
     asymmetry: float
     symmetry_residual: float
     n_independent: int
     strain: float
     relaxations: list = field(default_factory=list)
+    strains: tuple = (0, 1, 2, 3, 4, 5)
 
     @property
     def c_voigt(self) -> np.ndarray:
@@ -126,7 +120,7 @@ class ElasticResult:
         Two measurements come free with the calculation, and the larger is
         taken. Above a few percent the tensor is not converged: the strain was
         too small for the stress response to clear the calculator's noise, or
-        the ionic relaxation was not run hard enough, or both.
+        the atomic relaxation was not run hard enough, or both.
         """
         largest = float(np.abs(self.c_voigt).max())
         return self.noise / largest if largest > 0 else 0.0
@@ -134,7 +128,7 @@ class ElasticResult:
     def __repr__(self) -> str:
         return (
             f"<ElasticResult {self.n_independent} independent constants, "
-            f"{self.evaluations} evaluations, "
+            f"{len(self.strains)} strains, {self.evaluations} evaluations, "
             f"symmetry residual {self.symmetry_residual:.3g} GPa>"
         )
 
@@ -180,13 +174,13 @@ def elastic_tensor(
     calculator,
     *,
     strain: float = DEFAULT_STRAIN,
-    relax_ions: bool = True,
+    relax_atoms: bool = True,
     symmetry: bool = True,
     rotations=None,
     info=None,
     fmax: float = 0.01,
     steps: int = 200,
-    logger=None,
+    progress=None,
 ) -> ElasticResult:
     """Compute the elastic tensor of a relaxed structure.
 
@@ -203,16 +197,22 @@ def elastic_tensor(
             the stress response to clear the calculator's noise is the usual
             reason an elastic tensor comes out wrong, and how small is too
             small depends on the calculator, not on the structure.
-        relax_ions: relax the atoms at each strained cell. Leave this on unless
-            you specifically want clamped-ion constants.
-        symmetry: project the result onto the tensors the point group allows
-        rotations: (M, 3, 3) Cartesian point operations to symmetrise with.
-            Taken from a `Crystal`'s space group when not given.
+        relax_atoms: relax the atoms at each strained cell. Leave this on unless
+            you specifically want clamped-atom constants.
+        symmetry: use the point group to choose the strains, relax the atoms
+            within the subgroup each strain preserves, and project the result
+            onto the tensors the point group allows. When False, all six
+            strains are applied and the atoms relax in P1.
+        rotations: (M, 3, 3) Cartesian point operations. Taken from a
+            `Crystal`'s space group by default. With a `System` they are used
+            for strain selection and projection only; the atoms relax in P1.
         info: model inputs that are not geometry, carried on every `System`
             the calculator sees
-        fmax: force convergence for the ionic relaxations, eV/A
-        steps: iteration cap for each ionic relaxation
-        logger: called with a line per strain point, e.g. `print`
+        fmax: force convergence for the atomic relaxations, eV/A
+        steps: iteration cap for each atomic relaxation
+        progress: True to print progress, or a callable given a
+            `chmpy.opt.progress.Progress` per event. Each strain point is a
+            stage; the atomic relaxation at it is nested inside.
 
     Returns:
         ElasticResult
@@ -223,6 +223,12 @@ def elastic_tensor(
 
     rotations = _rotations_for(structure, rotations, symmetry)
     basis = invariant_elastic_basis(rotations)
+    atom_map = (
+        crystal_atom_map(structure, system)
+        if symmetry and hasattr(structure, "space_group")
+        else None
+    )
+    strains = independent_strains(rotations)
 
     reference_cell = np.array(system.cell)
     reference_scaled = system.scaled_positions
@@ -237,28 +243,40 @@ def elastic_tensor(
             residual,
         )
 
+    report = reporter(progress)
+    report(
+        "elastic",
+        "setup",
+        f"elastic tensor: {len(strains)} of 6 strains needed "
+        f"(Voigt {', '.join(str(index) for index in strains)}), "
+        f"{len(basis)} independent constants",
+    )
+
     attempts = AUTO_STRAINS if strain == "auto" else (float(strain),)
     for attempt, size in enumerate(attempts):
-        raw, relaxations, evaluations = _strain_sweep(
+        responses, relaxations = _strain_sweep(
             system,
             calculator,
             reference_cell,
             reference_scaled,
+            strains,
             size,
-            relax_ions,
+            relax_atoms,
             fmax,
             steps,
-            logger,
+            report,
+            atom_map,
         )
+        raw, misfit = fit_elastic(responses, rotations)
         asymmetry = float(np.abs(raw - raw.T).max())
         voigt = 0.5 * (raw + raw.T)
 
-        symmetry_residual = 0.0
+        symmetry_residual = misfit
         if symmetry:
             projected = elastic_to_voigt(
                 project_elastic(elastic_from_voigt(voigt), basis)
             )
-            symmetry_residual = float(np.abs(projected - voigt).max())
+            symmetry_residual = max(misfit, float(np.abs(projected - voigt).max()))
             voigt = projected
 
         largest = float(np.abs(voigt).max())
@@ -272,6 +290,12 @@ def elastic_tensor(
             100 * noise / largest,
             attempts[attempt + 1],
         )
+        report(
+            "elastic",
+            "auto strain",
+            f"strain {size:g} left {100 * noise / largest:.0f}% noise; "
+            f"trying {attempts[attempt + 1]:g}",
+        )
 
     if not converged:
         _warn_about_noise(noise, largest, size, fmax)
@@ -281,13 +305,14 @@ def elastic_tensor(
     return ElasticResult(
         tensor=ElasticTensor(voigt),
         evaluations=calculator.stats.calls - started,
-        relaxed_ions=relax_ions,
+        relaxed_atoms=relax_atoms,
         residual_stress=residual,
         asymmetry=asymmetry,
         symmetry_residual=symmetry_residual,
         n_independent=len(basis),
         strain=size,
         relaxations=relaxations,
+        strains=tuple(strains),
     )
 
 
@@ -312,7 +337,7 @@ def _warn_about_noise(noise, largest, strain, fmax) -> None:
         "the elastic tensor carries %.2f GPa of noise, %.0f%% of its largest "
         "constant: it has not converged and should not be used. The strain "
         "(now %.3f) is the usual cause -- the stress response has to clear the "
-        "calculator's own noise -- followed by the ionic relaxation (now "
+        "calculator's own noise -- followed by the atomic relaxation (now "
         "fmax=%.3f eV/A, which for a noisy model works as a step budget rather "
         'than a tolerance). `strain="auto"` searches for a workable value.',
         noise,
@@ -322,27 +347,118 @@ def _warn_about_noise(noise, largest, strain, fmax) -> None:
     )
 
 
+def independent_strains(rotations) -> list[int]:
+    """The Voigt strains to apply, skipping any already spanned by the
+    point-group orbits of earlier ones. Cubic gives `[0, 3]`, hexagonal
+    `[0, 2, 3]`, triclinic all six.
+
+    Args:
+        rotations: (M, 3, 3) Cartesian point operations, or empty for none
+
+    Returns:
+        Voigt indices, in increasing order
+    """
+    rotations = _with_identity(rotations)
+    chosen, span, rank = [], np.zeros((0, 6)), 0
+    for index in range(6):
+        strain = voigt_strain(index, 1.0)
+        orbit = to_vector(np.einsum("rij,jk,rlk->ril", rotations, strain, rotations))
+        extended = np.vstack([span, orbit])
+        extended_rank = np.linalg.matrix_rank(extended, tol=1e-8)
+        if extended_rank == rank:
+            continue
+        chosen.append(index)
+        span, rank = extended, extended_rank
+        if rank == 6:
+            break
+    return chosen
+
+
+def fit_elastic(responses, rotations):
+    """Least-squares Voigt tensor from strain responses and their rotations.
+
+    Each `(index, response)` is the stress per unit engineering strain along
+    Voigt direction `index`; each rotation adds the pair `(R e R^T, R s R^T)`.
+
+    Returns:
+        (raw (6, 6) tensor, largest residual of the fit). The residual is
+        nonzero only when responses disagree with the symmetry.
+    """
+    rotations = _with_identity(rotations)
+    strains, stresses = [], []
+    for index, response in responses:
+        strain = voigt_strain(index, 1.0)
+        stress = _tensor_from_voigt(response)
+        for rotation in rotations:
+            strains.append(_engineering_voigt(rotation @ strain @ rotation.T))
+            stresses.append(_stress_voigt(rotation @ stress @ rotation.T))
+    strains, stresses = np.array(strains).T, np.array(stresses).T
+    tensor = stresses @ np.linalg.pinv(strains)
+    misfit = float(np.abs(tensor @ strains - stresses).max(initial=0.0))
+    return tensor, misfit
+
+
+def _with_identity(rotations) -> np.ndarray:
+    rotations = np.asarray(rotations, dtype=float).reshape(-1, 3, 3)
+    return rotations if len(rotations) else np.eye(3)[None]
+
+
+def _tensor_from_voigt(voigt) -> np.ndarray:
+    "A stress tensor from (xx, yy, zz, yz, xz, xy)"
+    xx, yy, zz, yz, xz, xy = voigt
+    return np.array([[xx, xy, xz], [xy, yy, yz], [xz, yz, zz]])
+
+
+def _stress_voigt(tensor) -> np.ndarray:
+    return np.array(
+        [
+            tensor[0, 0],
+            tensor[1, 1],
+            tensor[2, 2],
+            tensor[1, 2],
+            tensor[0, 2],
+            tensor[0, 1],
+        ]
+    )
+
+
+def _engineering_voigt(tensor) -> np.ndarray:
+    "A strain tensor as engineering Voigt, with the factor of two on shears"
+    return _stress_voigt(tensor) * np.array([1, 1, 1, 2, 2, 2])
+
+
 def _strain_sweep(
     system,
     calculator,
     reference_cell,
     reference_scaled,
+    strains,
     strain,
-    relax_ions,
+    relax_atoms,
     fmax,
     steps,
-    logger,
+    report,
+    atom_map,
 ):
-    """Stress response to a strain in each Voigt direction.
+    """Central-difference stress response along each chosen Voigt direction.
 
-    Returns the raw `dsigma_i / de_j` in GPa, before symmetrisation, so the
-    caller can read the asymmetry as a noise estimate.
+    Returns `(index, dsigma/de)` pairs in GPa, unsymmetrised.
     """
-    started = calculator.stats.calls
-    columns, relaxations, carried = [], [], None
-    for index in range(6):
-        responses = []
-        for sign in (1, -1):
+    responses, relaxations, carried = [], [], None
+    total = 2 * len(strains)
+    for position, index in enumerate(strains):
+        kept = None
+        if atom_map is not None:
+            kept = atom_map.preserving_strain(voigt_strain(index, 1.0), reference_cell)
+            # +/- of one strain share a parameterisation; different strains
+            # generally don't (in P1 they all do)
+            carried = None
+        stresses = []
+        for half, sign in enumerate((1, -1)):
+            point = 2 * position + half
+            stage = f"voigt {index} {'+' if sign > 0 else '-'}{strain:g}"
+            symmetry = f", {len(kept)} operations kept" if kept is not None else ""
+            report("elastic", stage, f"{stage}{symmetry}", index=point, total=total)
             deformation = np.eye(3) + voigt_strain(index, sign * strain)
             strained = System(
                 system.numbers,
@@ -352,44 +468,57 @@ def _strain_sweep(
                 dict(system.info),
             )
             outcome = None
-            if relax_ions:
-                outcome, carried = _settle(strained, calculator, fmax, steps, carried)
+            if relax_atoms:
+                outcome, carried = _settle(
+                    strained,
+                    calculator,
+                    fmax,
+                    steps,
+                    carried,
+                    kept,
+                    report.nested("elastic", stage),
+                )
                 if outcome is not None:
                     relaxations.append(outcome)
-            responses.append(calculator(strained, ("energy", "stress")).stress_voigt)
-            if logger is not None:
-                settled = (
-                    f"{outcome.steps} ion steps"
-                    if outcome is not None
-                    else "no internal freedoms"
-                    if relax_ions
-                    else "clamped ions"
-                )
-                logger(
-                    f"  voigt {index} {'+' if sign > 0 else '-'}{strain:g}  {settled}"
-                )
-        columns.append((responses[0] - responses[1]) / (2.0 * strain))
-    raw = np.array(columns).T * EV_PER_ANGSTROM3_TO_GPA
-    return raw, relaxations, calculator.stats.calls - started
+            stresses.append(calculator(strained, ("energy", "stress")).stress_voigt)
+            settled = (
+                f"{outcome.steps} relaxation steps"
+                if outcome is not None
+                else "no internal freedoms"
+                if relax_atoms
+                else "clamped atoms"
+            )
+            report(
+                "elastic",
+                stage,
+                f"{stage}: {settled}",
+                index=point,
+                total=total,
+                done=True,
+            )
+        response = (stresses[0] - stresses[1]) / (2.0 * strain)
+        responses.append((index, response * EV_PER_ANGSTROM3_TO_GPA))
+    return responses, relaxations
 
 
-def _settle(system, calculator, fmax, steps, carried):
-    """Relax the atoms of a strained cell, reusing the last force constants.
+def _settle(system, calculator, fmax, steps, carried, atom_map=None, report=None):
+    """Relax the atoms of a strained cell at fixed cell.
 
-    The curvature of the internal coordinates barely changes between one strain
-    point and the next, so the model learned at the first is a good starting
-    point for all twelve. The model object itself is handed on, rather than a
-    copy of its matrix, so it keeps accumulating across the whole calculation.
+    `carried` is the curvature model from the previous strain point, reused
+    when the parameterisation matches. With an `atom_map` the atoms relax
+    within those operations.
     """
-    coordinates = Atomic(system)
+    coordinates = (
+        InvariantAtomic(system, atom_map) if atom_map is not None else Atomic(system)
+    )
     if coordinates.n_dof == 0:
         return None, carried
     reuse = carried if carried is not None and carried.n == coordinates.n_dof else None
     optimiser = TrustRegion(coordinates, calculator, model=reuse)
-    outcome = optimiser.run(fmax=fmax, steps=steps)
+    outcome = optimiser.run(fmax=fmax, steps=steps, progress=report)
     if not outcome.converged:
         LOG.warning(
-            "the ionic relaxation at one strain point did not converge "
+            "the atomic relaxation at one strain point did not converge "
             "(fmax %.4g eV/A after %d steps); the elastic constants will be "
             "too stiff",
             outcome.measures.get("fmax", float("nan")),

@@ -27,7 +27,7 @@ from chmpy.calc.result import ENERGY, FORCES, STRESS
 from chmpy.calc.system import System
 from chmpy.crystal.symmetry_operation import decode_symm_int
 
-from .coordinates import Strain
+from .coordinates import Coordinates, Strain
 from .strain import cartesian_rotations, invariant_strain_basis
 
 
@@ -129,6 +129,7 @@ class SymmetryAdapted(Strain):
             else np.zeros((0, 3, 3))
         )
         super().__init__(system, basis=basis)
+        self.atom_map = crystal_atom_map(crystal, self.system, tolerance)
 
     # -- construction --------------------------------------------------------
 
@@ -295,9 +296,7 @@ class SymmetryAdapted(Strain):
         return self.get()
 
     def measures(self, result) -> dict:
-        if len(self.basis) == 0:
-            return {"fmax": result.fmax}
-        return {"fmax": result.fmax, "smax": result.smax}
+        return symmetric_measures(result, self.atom_map, self.system.cell, self.basis)
 
     # -- results -------------------------------------------------------------
 
@@ -347,3 +346,294 @@ def _fixes(operation, position, tolerance: float = 1e-6) -> bool:
     image = operation.rotation @ position + operation.translation
     difference = image - position
     return bool(np.abs(difference - np.round(difference)).max() < tolerance)
+
+
+# -- symmetry on a P1 system ---------------------------------------------------
+#
+# These work from a list of operations and a P1 `System` rather than a
+# `Crystal`, so they handle subgroups in non-standard settings (e.g. what a
+# strained cell keeps), which have no space group table entry.
+
+
+def cartesian_operations(rotations, cell) -> np.ndarray:
+    """Fractional rotations as Cartesian ones, `A^T R A^-T`, with lattice
+    vectors as the rows of `A`.
+
+    Unlike `chmpy.opt.strain.cartesian_rotations` this keeps duplicates, so the
+    result lines up with an `AtomMap`.
+    """
+    direct = np.asarray(cell, dtype=float).T
+    return np.einsum(
+        "ij,gjk,kl->gil", direct, np.asarray(rotations, float), np.linalg.inv(direct)
+    )
+
+
+class AtomMap:
+    """How each of a set of symmetry operations permutes a system's atoms.
+
+    Operation `g` takes atom `i` onto atom `permutation[g, i]` in the cell
+    displaced by the integer lattice vector `shifts[g, i]`:
+
+        R_g x_i + t_g = x_(permutation[g, i]) + shifts[g, i]
+
+    in fractional coordinates.
+
+    Attributes:
+        rotations: (G, 3, 3) fractional rotation parts
+        translations: (G, 3) fractional translation parts
+        permutation: (G, N) image atom of each atom under each operation
+        shifts: (G, N, 3) integer lattice shift of each image
+    """
+
+    def __init__(self, rotations, translations, permutation, shifts):
+        self.rotations = np.asarray(rotations, dtype=float)
+        self.translations = np.asarray(translations, dtype=float)
+        self.permutation = np.asarray(permutation, dtype=np.int64)
+        self.shifts = np.asarray(shifts, dtype=np.int64)
+
+    @classmethod
+    def identity(cls, n_atoms: int) -> AtomMap:
+        "The trivial group, for a structure with no symmetry to use"
+        return cls(
+            np.eye(3)[None],
+            np.zeros((1, 3)),
+            np.arange(n_atoms)[None],
+            np.zeros((1, n_atoms, 3)),
+        )
+
+    def __len__(self) -> int:
+        return len(self.rotations)
+
+    def __repr__(self) -> str:
+        return f"<AtomMap {len(self)} operations on {self.permutation.shape[1]} atoms>"
+
+    def subset(self, keep) -> AtomMap:
+        "The operations selected by a boolean mask or an index array"
+        keep = np.asarray(keep)
+        return AtomMap(
+            self.rotations[keep],
+            self.translations[keep],
+            self.permutation[keep],
+            self.shifts[keep],
+        )
+
+    def cartesian(self, cell) -> np.ndarray:
+        "(G, 3, 3) Cartesian rotations in a given cell"
+        return cartesian_operations(self.rotations, cell)
+
+    def symmetrise(self, vectors, cell) -> np.ndarray:
+        """Symmetric part of per-atom vectors (e.g. forces).
+
+        Group average of `v_i -> R_g v_i` placed on atom `g(i)`, i.e. the
+        orthogonal projection onto the invariant subspace.
+
+        Args:
+            vectors: (N, 3) Cartesian vectors, one per atom
+            cell: (3, 3) lattice vectors as rows, to make the rotations
+                Cartesian in
+
+        Returns:
+            (N, 3) symmetric part
+        """
+        vectors = np.asarray(vectors, dtype=float)
+        rotated = np.einsum("gij,nj->gni", self.cartesian(cell), vectors)
+        symmetric = np.zeros_like(vectors)
+        np.add.at(symmetric, self.permutation.ravel(), rotated.reshape(-1, 3))
+        return symmetric / len(self)
+
+    def preserving_strain(self, strain, cell, tolerance: float = 1e-8) -> AtomMap:
+        """The operations with `R eps R^T = eps`, i.e. those a strained cell keeps.
+
+        Fractional coordinates are unchanged by a strain, so the permutations
+        and shifts carry over.
+        """
+        strain = np.asarray(strain, dtype=float)
+        rotated = np.einsum(
+            "gij,jk,glk->gil", self.cartesian(cell), strain, self.cartesian(cell)
+        )
+        scale = max(float(np.abs(strain).max()), 1e-300)
+        kept = np.abs(rotated - strain).max(axis=(1, 2)) <= tolerance * scale
+        return self.subset(kept)
+
+
+def symmetric_measures(result, atom_map, cell, basis=None) -> dict:
+    """Convergence measures for a symmetry-constrained relaxation.
+
+    `fmax` and `smax` are taken on the symmetric parts of the forces and
+    stress, since those are all the relaxation can change. Models that are not
+    exactly equivariant (e.g. PET) leave a small symmetry-forbidden force that
+    would otherwise make tight tolerances unreachable. Its size is reported as
+    `forbidden` but is not a convergence criterion.
+
+    Args:
+        result: a calculator `Result` with forces, and stress if `basis` is given
+        atom_map: the operations the relaxation preserves
+        cell: the current lattice vectors
+        basis: (k, 3, 3) the allowed strains, or None at fixed cell
+
+    Returns:
+        {"fmax", "forbidden"}, plus "smax" when the cell varies
+    """
+    from chmpy.calc.result import EV_PER_ANGSTROM3_TO_GPA
+
+    symmetric = atom_map.symmetrise(result.forces, cell)
+    measures = {
+        "fmax": float(np.abs(symmetric).max(initial=0.0)),
+        "forbidden": float(np.abs(result.forces - symmetric).max(initial=0.0)),
+    }
+    if basis is not None and len(basis):
+        # projection onto the (orthonormal) allowed strain basis
+        stress = np.einsum(
+            "k,kab->ab", np.einsum("kab,ab->k", basis, result.stress), basis
+        )
+        measures["smax"] = float(np.abs(stress).max()) * EV_PER_ANGSTROM3_TO_GPA
+    return measures
+
+
+def map_atoms(system, operations, tolerance: float = 1e-2) -> AtomMap:
+    """Find how each operation permutes the atoms of a periodic system.
+
+    Args:
+        system: a periodic `System`
+        operations: `SymmetryOperation`s, or `(rotation, translation)` pairs,
+            in the fractional coordinates of `system.cell`
+        tolerance: max distance in Angstroms between an image and its match;
+            the default matches `Crystal.unit_cell_atoms`
+
+    Raises:
+        ValueError: if an operation is not a symmetry of the structure
+    """
+    from scipy.spatial import cKDTree
+
+    if not system.periodic:
+        raise ValueError("an AtomMap needs a periodic system")
+    cell = np.asarray(system.cell)
+    numbers = np.asarray(system.numbers)
+    fractional = np.asarray(system.scaled_positions)
+    tree = cKDTree(_wrap(fractional), boxsize=1.0)
+
+    rotations, translations, permutations, shifts = [], [], [], []
+    for operation in operations:
+        if hasattr(operation, "rotation"):
+            rotation, translation = operation.rotation, operation.translation
+        else:
+            rotation, translation = operation
+        rotation = np.asarray(rotation, dtype=float)
+        translation = np.asarray(translation, dtype=float)
+
+        images = fractional @ rotation.T + translation
+        _, match = tree.query(_wrap(images))
+        difference = images - fractional[match]
+        shift = np.round(difference)
+        miss = np.linalg.norm((difference - shift) @ cell, axis=1)
+        wrong_element = numbers[match] != numbers
+        if miss.max(initial=0.0) > tolerance or wrong_element.any():
+            raise ValueError(
+                f"the structure is not symmetric under the operation with "
+                f"rotation {rotation.astype(int).tolist()} and translation "
+                f"{np.round(translation, 4).tolist()}: an image misses its "
+                f"nearest atom by {miss.max():.3g} A (tolerance {tolerance} A)"
+                + (", or lands on a different element" if wrong_element.any() else "")
+            )
+        if len(np.unique(match)) != len(match):
+            raise ValueError(
+                "two atoms map onto the same site; the structure has "
+                f"overlapping atoms closer than {tolerance} A"
+            )
+        rotations.append(rotation)
+        translations.append(translation)
+        permutations.append(match)
+        shifts.append(shift.astype(np.int64))
+
+    return AtomMap(rotations, translations, permutations, shifts)
+
+
+def crystal_atom_map(crystal, system, tolerance: float = 1e-2) -> AtomMap:
+    "A crystal's space group, as it acts on a P1 system built from that crystal"
+    return map_atoms(system, crystal.space_group.symmetry_operations, tolerance)
+
+
+def _wrap(fractional) -> np.ndarray:
+    """Fractional coordinates strictly in [0, 1), as cKDTree requires
+    (`x - floor(x)` can round to 1.0 for tiny negative `x`)."""
+    wrapped = np.asarray(fractional) - np.floor(fractional)
+    wrapped[wrapped >= 1.0] = 0.0
+    return wrapped
+
+
+class InvariantAtomic(Coordinates):
+    """Cartesian atomic positions at a fixed cell, restricted by a symmetry.
+
+    One degree of freedom per symmetry-unique atom and allowed site direction;
+    the rest of each orbit follows by symmetry. Like `SymmetryAdapted` but
+    needs only a P1 `System` and an `AtomMap`, so it works for any subgroup.
+    A unit amplitude moves each atom in the orbit by 1 Angstrom.
+
+    Args:
+        system: the structure to vary
+        atom_map: the operations to preserve, from `map_atoms`
+    """
+
+    wanted = frozenset({ENERGY, FORCES})
+
+    def __init__(self, system, atom_map: AtomMap):
+        super().__init__(system)
+        self.atom_map = atom_map
+        self.reference_positions = np.array(system.positions)
+        cartesian = atom_map.cartesian(system.cell)
+        permutation = atom_map.permutation
+
+        dof, atom, vector = [], [], []
+        seen = np.zeros(len(system), dtype=bool)
+        n_dof = 0
+        for representative in range(len(system)):
+            if seen[representative]:
+                continue
+            images = permutation[:, representative]
+            stabiliser = cartesian[images == representative]
+            basis = site_displacement_basis(stabiliser)
+            # any operation reaching a given image will do: they differ by a
+            # stabiliser element, which leaves `basis` fixed
+            members, first = np.unique(images, return_index=True)
+            seen[members] = True
+            for column in basis.T:
+                dof.extend([n_dof] * len(members))
+                atom.extend(members)
+                vector.extend(cartesian[first] @ column)
+                n_dof += 1
+
+        self._n_dof = n_dof
+        self._dof = np.array(dof, dtype=np.int64)
+        self._atom = np.array(atom, dtype=np.int64)
+        self._vector = np.array(vector, dtype=float).reshape(-1, 3)
+        self.amplitudes = np.zeros(n_dof)
+
+    @property
+    def n_dof(self) -> int:
+        return self._n_dof
+
+    def get(self) -> np.ndarray:
+        return self.amplitudes.copy()
+
+    def set(self, x) -> None:
+        self.amplitudes = np.asarray(x, dtype=float).copy()
+        moved = self._vector * self.amplitudes[self._dof, None]
+        displacement = np.zeros_like(self.reference_positions)
+        np.add.at(displacement, self._atom, moved)
+        self.system.set_positions(self.reference_positions + displacement)
+
+    def gradient(self, result) -> np.ndarray:
+        along = np.einsum("ed,ed->e", self._vector, -result.forces[self._atom])
+        return np.bincount(self._dof, weights=along, minlength=self._n_dof)
+
+    def scale(self) -> np.ndarray:
+        return np.ones(self._n_dof)
+
+    def measures(self, result) -> dict:
+        return symmetric_measures(result, self.atom_map, self.system.cell)
+
+    def __repr__(self) -> str:
+        return (
+            f"<InvariantAtomic {self._n_dof} dof under {len(self.atom_map)} "
+            f"operations for {len(self.system)} atoms>"
+        )

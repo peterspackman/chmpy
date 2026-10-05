@@ -33,6 +33,7 @@ import numpy as np
 
 from chmpy.util.unit import EV_TO_KJ_PER_MOL
 
+from .progress import reporter
 from .relax import relax
 
 LOG = logging.getLogger(__name__)
@@ -125,7 +126,7 @@ def lattice_energy(
     fmax: float = 0.01,
     smax: float = 0.05,
     steps: int = 300,
-    logger=None,
+    progress=None,
     **kwargs,
 ) -> LatticeEnergy:
     """The lattice energy of a molecular crystal.
@@ -145,7 +146,9 @@ def lattice_energy(
         fmax: force convergence, eV/A
         smax: stress convergence for the crystal, GPa
         steps: iteration cap for each relaxation
-        logger: called with a line per stage
+        progress: True to print progress, or a callable given a
+            `chmpy.opt.progress.Progress` per event. The crystal and each
+            molecule are stages; their relaxation steps are nested inside.
         **kwargs: passed to `relax`
 
     Returns:
@@ -162,10 +165,33 @@ def lattice_energy(
     )
     z = len(in_cell)
 
+    report = reporter(progress)
+    stages = (["crystal"] if relax_crystal else []) + (
+        [f"molecule {index}" for index in range(len(unique))] if relax_molecules else []
+    )
+
+    def announce(stage, message, done=False):
+        report(
+            "lattice energy",
+            stage,
+            message,
+            index=stages.index(stage),
+            total=len(stages),
+            done=done,
+        )
+
     unconverged = []
     if relax_crystal:
+        announce("crystal", f"relaxing the crystal ({crystal}, Z={z})")
         outcome = relax(
-            crystal, calculator, info=info, fmax=fmax, smax=smax, steps=steps, **kwargs
+            crystal,
+            calculator,
+            info=info,
+            fmax=fmax,
+            smax=smax,
+            steps=steps,
+            progress=report.nested("lattice energy", "crystal"),
+            **kwargs,
         )
         if not outcome.converged:
             unconverged.append("crystal")
@@ -184,8 +210,7 @@ def lattice_energy(
         # number rather than an error
         _check_still_molecular(crystal, z)
         unique = crystal.symmetry_unique_molecules()
-        if logger is not None:
-            logger(f"crystal: {outcome}")
+        announce("crystal", f"crystal: {outcome!r}", done=True)
     else:
         from chmpy.calc.system import System
 
@@ -195,8 +220,16 @@ def lattice_energy(
     for index, molecule in enumerate(unique):
         frozen.append(_molecule_energy(molecule, calculator, box, info))
         if relax_molecules:
+            stage = f"molecule {index}"
+            announce(stage, f"relaxing {stage} ({molecule.molecular_formula})")
             outcome = relax(
-                molecule, calculator, info=info, fmax=fmax, steps=steps, **kwargs
+                molecule,
+                calculator,
+                info=info,
+                fmax=fmax,
+                steps=steps,
+                progress=report.nested("lattice energy", stage),
+                **kwargs,
             )
             if not outcome.converged:
                 unconverged.append(f"molecule {index}")
@@ -208,8 +241,7 @@ def lattice_energy(
                 )
             relaxed.append(outcome.energy)
             molecules.append(outcome.structure)
-            if logger is not None:
-                logger(f"molecule {index}: {outcome}")
+            announce(stage, f"{stage}: {outcome!r}", done=True)
         else:
             relaxed.append(frozen[-1])
             molecules.append(molecule)

@@ -215,10 +215,12 @@ def test_external_pressure_compresses_the_cell():
     assert result.pressure == pytest.approx(2.0, abs=0.05)
 
 
-def test_a_logger_sees_every_step():
+def test_a_progress_hook_sees_every_step():
     system = argon(5.2, rattle=0.1, seed=9)
-    lines = []
-    TrustRegion(Atomic(system), LennardJones()).run(
-        fmax=1e-3, steps=50, logger=lines.append
+    events = []
+    outcome = TrustRegion(Atomic(system), LennardJones()).run(
+        fmax=1e-3, steps=50, progress=events.append
     )
-    assert lines and all("E=" in line for line in lines)
+    assert [event.step for event in events] == outcome.history
+    assert all("E=" in event.message for event in events)
+    assert all(event.total == 50 for event in events)

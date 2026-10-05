@@ -287,7 +287,7 @@ def invariant_elastic_basis(rotations, tolerance: float = 1e-8) -> np.ndarray:
 def project_elastic(tensor, basis) -> np.ndarray:
     """The part of an elastic tensor its symmetry allows.
 
-    Finite differences and a finite ionic relaxation leave a little of the
+    Finite differences and a finite atomic relaxation leave a little of the
     tensor outside the invariant subspace. Projecting it back is not cosmetic:
     the components that symmetry forbids are pure noise, and leaving them in
     puts a spurious anisotropy into every modulus derived from the tensor.

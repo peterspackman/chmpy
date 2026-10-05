@@ -225,3 +225,55 @@ def test_a_non_periodic_structure_is_refused():
     system = System([18, 18], [[0, 0, 0], [3.8, 0, 0]])
     with pytest.raises(ValueError, match="need a periodic structure"):
         force_constants(system, LennardJones())
+
+
+def _counted(calc):
+    calls = []
+
+    class Counting(type(calc)):
+        def forces(self, system):
+            calls.append(1)
+            return super().forces(system)
+
+    counting = Counting.__new__(Counting)
+    counting.__dict__.update(calc.__dict__)
+    return counting, calls
+
+
+@pytest.mark.parametrize("supercell", [None, (2, 2, 3)], ids=["cubic", "2x2x3"])
+def test_symmetry_reduces_the_displacements_and_not_the_answer(argon, supercell):
+    """fcc needs one displacement (two with a 2x2x3 supercell, which keeps
+    only the tetragonal operations)."""
+    relaxed, calc, _, _ = argon
+    counting, calls = _counted(calc)
+    reduced = force_constants(relaxed, counting, supercell=supercell, cutoff=8.0)
+    n_reduced = len(calls)
+    calls.clear()
+    full = force_constants(
+        relaxed, counting, supercell=supercell, cutoff=8.0, symmetry=False
+    )
+
+    assert n_reduced == (2 if supercell is None else 4)
+    assert len(calls) == 24
+    np.testing.assert_allclose(reduced.blocks, full.blocks, atol=1e-10)
+
+
+def test_symmetric_force_constants_in_a_hexagonal_cell():
+    """Special positions in a 120-degree cell, where fractional rotations are
+    not orthogonal."""
+    from chmpy.tests.opt.test_elastic import TwoSpecies
+
+    cell = UnitCell.from_lengths_and_angles((4.0, 4.0, 20.0), np.radians((90, 90, 120)))
+    crystal = Crystal(
+        cell,
+        SpaceGroup(166),
+        AsymmetricUnit([Element[18], Element[36]], np.array([[0, 0, 0.25], [0, 0, 0]])),
+    )
+    calc = TwoSpecies()
+    relaxed = relax(crystal, calc, fmax=1e-7, smax=1e-6, steps=800).structure
+    reduced = force_constants(relaxed, calc, supercell=(2, 2, 1))
+    full = force_constants(relaxed, calc, supercell=(2, 2, 1), symmetry=False)
+    for q in ([0, 0, 0], [0.5, 0, 0], [0.25, 0.1, 0.3], [1 / 3, 1 / 3, 0]):
+        np.testing.assert_allclose(
+            reduced.frequencies(q, "cm-1"), full.frequencies(q, "cm-1"), atol=1e-2
+        )

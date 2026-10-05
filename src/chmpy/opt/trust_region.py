@@ -44,6 +44,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from .curvature import for_size
+from .progress import reporter
 
 LOG = logging.getLogger(__name__)
 
@@ -189,8 +190,7 @@ class TrustRegion:
         fmax: float = 0.01,
         smax: float = 0.05,
         steps: int = 200,
-        callback=None,
-        logger=None,
+        progress=None,
     ) -> Relaxation:
         """Relax until converged or out of steps.
 
@@ -199,13 +199,13 @@ class TrustRegion:
             smax: stress convergence in GPa, on the largest component. Ignored
                 when the coordinates hold no cell degrees of freedom.
             steps: maximum iterations
-            callback: called with each `Step`
-            logger: a callable given a one-line summary of each step, e.g.
-                `print`
+            progress: True to print a line per step, or a callable given a
+                `chmpy.opt.progress.Progress` for each, carrying the `Step`
 
         Returns:
             Relaxation
         """
+        report = reporter(progress)
         options = self.options
         coordinates = self.coordinates
         tolerances = {"fmax": fmax, "smax": smax}
@@ -325,12 +325,17 @@ class TrustRegion:
                 reanchored,
             )
             history.append(entry)
-            if logger is not None:
-                logger(_format(entry))
-            if callback is not None:
-                callback(entry)
+            report(
+                "relax",
+                "step",
+                _format(entry),
+                index=iteration - 1,
+                total=steps,
+                step=entry,
+            )
 
         coordinates.set(x)
+        _warn_if_forbidden(coordinates.measures(result), fmax)
         if stalled:
             LOG.warning(
                 "the optimiser stalled: the model proposes no step at all, which "
@@ -382,6 +387,29 @@ class TrustRegion:
             value <= tolerances[name]
             for name, value in measures.items()
             if name in tolerances
+        )
+
+
+#: warn when the symmetry-forbidden force exceeds this multiple of fmax
+FORBIDDEN_WARNING = 10.0
+
+
+def _warn_if_forbidden(measures, fmax) -> None:
+    """Warn if a symmetric relaxation ends with a large forbidden force.
+
+    Some is expected from models that are not exactly equivariant; a lot may
+    mean the structure wants lower symmetry, which a constrained relaxation
+    cannot find.
+    """
+    forbidden = measures.get("forbidden", 0.0)
+    if forbidden > FORBIDDEN_WARNING * fmax:
+        LOG.warning(
+            "symmetry-forbidden force of %.3g eV/A remains (%.0fx fmax=%g); the "
+            "structure may prefer lower symmetry. Try relaxing with "
+            "symmetry=False to check.",
+            forbidden,
+            forbidden / fmax,
+            fmax,
         )
 
 

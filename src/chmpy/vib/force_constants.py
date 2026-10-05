@@ -26,7 +26,8 @@ fixed and documented in `symmetrise`:
 * permutation, `Phi_ab(i,j,S) = Phi_ba(j,i,-S)`;
 * the acoustic sum rule, `sum_(j,S) Phi_ab(i,j,S) = 0`, which is the statement
   that translating the whole crystal costs nothing;
-* the space group, which is applied by `chmpy.vib.symmetry`.
+* the space group, which reduces what is measured in the first place; see
+  `force_constants`.
 """
 
 from __future__ import annotations
@@ -38,6 +39,7 @@ import numpy as np
 
 from chmpy.calc.system import System
 from chmpy.core import Element
+from chmpy.opt.progress import reporter
 
 LOG = logging.getLogger(__name__)
 
@@ -162,9 +164,15 @@ def force_constants(
     displacement: float = DEFAULT_DISPLACEMENT,
     cutoff: float | None = None,
     info=None,
-    logger=None,
+    progress=None,
+    symmetry: bool = True,
 ) -> ForceConstants:
     """Measure force constants by displacing atoms in a supercell.
+
+    With symmetry, one atom per orbit is displaced, along only as many
+    directions as its site symmetry needs to span all three (one on a cubic
+    site, three on a general position). The other blocks follow from
+    `Phi(g(r), g(k)) = R_g Phi(r, k) R_g^T`.
 
     Args:
         structure: a `Crystal` or a periodic `System`, already relaxed
@@ -175,7 +183,10 @@ def force_constants(
             one is not given; defaults to a third of the smallest supercell
             width that `supercell` provides
         info: model inputs that are not geometry, carried on every `System`
-        logger: called with a line per displacement
+        progress: True to print a line per displacement, or a callable given
+            a `chmpy.opt.progress.Progress` for each
+        symmetry: use a `Crystal`'s space group to reduce the displacements.
+            A `System` carries no symmetry and every atom is displaced.
 
     Returns:
         ForceConstants
@@ -192,28 +203,154 @@ def force_constants(
     if np.any(repeats < 1):
         raise ValueError(f"supercell repetitions must be positive, got {repeats}")
 
-    big, origin, cell_index = _build_supercell(system, repeats)
+    atom_map = _symmetry_for(structure, system, repeats, symmetry)
+    big, origin, _ = _build_supercell(system, repeats)
     n = len(system)
+    n_cells = int(np.prod(repeats))
+    cartesian = atom_map.cartesian(system.cell)
 
-    blocks = np.zeros((n, n, int(np.prod(repeats)), 3, 3))
+    # plan the displacements first so progress can report a total
+    plan, measured = [], np.zeros(n, dtype=bool)
+    for representative in range(n):
+        if measured[representative]:
+            continue
+        images = atom_map.permutation[:, representative]
+        stabiliser = np.flatnonzero(images == representative)
+        plan.append(
+            (representative, stabiliser, _directions_to_displace(cartesian[stabiliser]))
+        )
+        measured[images] = True
+    total = sum(len(directions) for _, _, directions in plan)
 
+    report = reporter(progress)
+    report(
+        "force constants",
+        "setup",
+        f"force constants: {total} displacements of {len(plan)} of {n} atoms, "
+        f"{len(atom_map)} operations, supercell {repeats.tolist()} "
+        f"({len(big)} atoms)",
+    )
+
+    blocks = np.zeros((n, n, n_cells, 3, 3))
     scratch = big.copy()
-    for atom in range(n):
-        for axis in range(3):
+    done = 0
+    for representative, stabiliser, directions in plan:
+        rows, responses = [], []
+        for direction in directions:
+            stage = f"atom {representative} along {np.round(direction, 4).tolist()}"
+            report("force constants", stage, stage, index=done, total=total)
+            done += 1
             shifted = []
             for sign in (1, -1):
                 positions = np.array(big.positions)
-                positions[origin[atom], axis] += sign * displacement
+                positions[origin[representative]] += sign * displacement * direction
                 scratch.set_positions(positions)
                 shifted.append(calculator.forces(scratch))
-            # Phi_ab(i, j) = -dF_jb/du_ia
-            derivative = -(shifted[0] - shifted[1]) / (2 * displacement)
-            for image, (j, cell) in enumerate(cell_index):
-                blocks[atom, j, cell, axis, :] = derivative[image]
-            if logger is not None:
-                logger(f"  atom {atom} axis {axis}")
+            # d . Phi(r, k) = -dF_k / du along d, for every supercell atom k
+            response = -(shifted[0] - shifted[1]) / (2 * displacement)
+            # each site-symmetry operation s gives another equation:
+            # (R^T d) . Phi(r, k) = (d . Phi(r, s(k))) R
+            for operation in stabiliser:
+                rotation = cartesian[operation]
+                target = _supercell_image(atom_map, operation, representative, repeats)
+                rows.append(rotation.T @ direction)
+                responses.append(response[target] @ rotation)
+
+        # least squares for every supercell atom at once
+        solved = np.einsum(
+            "am,mkb->kab", np.linalg.pinv(np.array(rows)), np.array(responses)
+        )
+        _fill_orbit(blocks, solved, atom_map, cartesian, representative, repeats)
 
     return symmetrise(_assemble(system, repeats, blocks))
+
+
+def _symmetry_for(structure, system, repeats, symmetry):
+    """The space-group operations usable with this supercell.
+
+    Only operations that map the supercell lattice onto itself are kept, since
+    the measured blocks are sums over supercell images (e.g. a 2x2x3 cell of a
+    cubic crystal keeps the tetragonal subgroup).
+    """
+    from chmpy.opt.symmetry import AtomMap, crystal_atom_map
+
+    if not symmetry or not hasattr(structure, "space_group"):
+        return AtomMap.identity(len(system))
+    atom_map = crystal_atom_map(structure, system)
+    scaled = atom_map.rotations * repeats[None, None, :] / repeats[None, :, None]
+    keep = np.all(np.abs(scaled - np.round(scaled)) < 1e-8, axis=(1, 2))
+    if not keep.all():
+        LOG.info(
+            "supercell %s keeps %d of %d operations",
+            repeats.tolist(),
+            int(keep.sum()),
+            len(keep),
+        )
+    return atom_map.subset(keep)
+
+
+def _directions_to_displace(stabiliser) -> list:
+    """Axes to displace along so their site-symmetry images span 3D."""
+    directions, span = [], np.zeros((0, 3))
+    for direction in np.eye(3):
+        images = np.einsum("gij,j->gi", stabiliser, direction)
+        extended = np.vstack([span, images])
+        if np.linalg.matrix_rank(extended, tol=1e-8) > np.linalg.matrix_rank(
+            span, tol=1e-8
+        ):
+            directions.append(direction)
+            span = extended
+        if np.linalg.matrix_rank(span, tol=1e-8) == 3:
+            break
+    return directions
+
+
+def _supercell_image(atom_map, operation, atom, repeats) -> np.ndarray:
+    """Where an operation sends every supercell atom, relative to `g(atom)`.
+
+    Supercell atom `k` (primitive atom `j`, cell `c`) goes to `perm(j)` in cell
+    `shift(j) + R c`; subtracting `shift(atom)` puts `g(atom)` in cell zero.
+
+    Returns:
+        (n * n_cells,) supercell index of the image of each supercell atom
+    """
+    n = atom_map.permutation.shape[1]
+    rotation = np.rint(atom_map.rotations[operation]).astype(np.int64)
+    permutation = atom_map.permutation[operation]
+    shifts = atom_map.shifts[operation]
+
+    cells = _cell_offsets(repeats)
+    images = (
+        shifts[None, :, :]
+        + (cells @ rotation.T)[:, None, :]
+        - shifts[atom][None, None, :]
+    )
+    images = np.mod(images, repeats)
+    flat = np.ravel_multi_index(images.reshape(-1, 3).T, repeats).reshape(len(cells), n)
+    return (flat * n + permutation[None, :]).ravel()
+
+
+def _fill_orbit(blocks, solved, atom_map, cartesian, representative, repeats):
+    """Write `Phi(g(r), g(k)) = R Phi(r, k) R^T` for every image of `r`,
+    using the first operation that reaches each image."""
+    n = atom_map.permutation.shape[1]
+    images = atom_map.permutation[:, representative]
+    _, first = np.unique(images, return_index=True)
+    for operation in first:
+        rotation = cartesian[operation]
+        target = _supercell_image(atom_map, operation, representative, repeats)
+        rotated = np.einsum("ij,kjl,ml->kim", rotation, solved, rotation)
+        atom = images[operation]
+        blocks[atom, target % n, target // n] = rotated
+
+
+def _cell_offsets(repeats) -> np.ndarray:
+    "(n_cells, 3) integer cell offsets, in the supercell's flat order"
+    return (
+        np.array(np.meshgrid(*[np.arange(r) for r in repeats], indexing="ij"))
+        .reshape(3, -1)
+        .T
+    )
 
 
 def _as_system(structure, info=None) -> System:

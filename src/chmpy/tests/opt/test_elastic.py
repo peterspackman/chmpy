@@ -1,4 +1,4 @@
-"""Elastic constants: symmetry, ionic relaxation, and an independent check."""
+"""Elastic constants: symmetry, atomic relaxation, and an independent check."""
 
 import numpy as np
 import pytest
@@ -115,8 +115,8 @@ def test_a_central_pair_potential_satisfies_the_cauchy_relation(relaxed_argon):
 def test_relaxing_the_ions_can_only_soften(binary):
     """C_clamped - C_relaxed is positive semidefinite. It is a theorem."""
     structure, calc = binary
-    relaxed = elastic_tensor(structure, calc, strain=0.002, relax_ions=True, fmax=1e-6)
-    clamped = elastic_tensor(structure, calc, strain=0.002, relax_ions=False)
+    relaxed = elastic_tensor(structure, calc, strain=0.002, relax_atoms=True, fmax=1e-6)
+    clamped = elastic_tensor(structure, calc, strain=0.002, relax_atoms=False)
 
     difference = clamped.c_voigt - relaxed.c_voigt
     assert np.linalg.eigvalsh(difference).min() > -1e-6
@@ -124,10 +124,10 @@ def test_relaxing_the_ions_can_only_soften(binary):
     assert relaxed.c_voigt[5, 5] < 0.5 * clamped.c_voigt[5, 5]
 
 
-def test_clamped_ions_are_much_cheaper(binary):
+def test_clamped_atoms_are_much_cheaper(binary):
     structure, calc = binary
-    relaxed = elastic_tensor(structure, calc, strain=0.002, relax_ions=True, fmax=1e-6)
-    clamped = elastic_tensor(structure, calc, strain=0.002, relax_ions=False)
+    relaxed = elastic_tensor(structure, calc, strain=0.002, relax_atoms=True, fmax=1e-6)
+    clamped = elastic_tensor(structure, calc, strain=0.002, relax_atoms=False)
     assert clamped.evaluations == 13  # one reference plus twelve strains
     assert relaxed.evaluations > clamped.evaluations
 
@@ -183,7 +183,7 @@ def test_a_singular_tensor_says_so_rather_than_raising_attributeerror():
 def test_a_noisy_tensor_is_flagged_rather_than_returned_quietly(caplog):
     """The symmetry residual is the only free error estimate, so it has to shout.
 
-    Measured on benzene with PET-MAD: at a strain of 0.004 and an ionic
+    Measured on benzene with PET-MAD: at a strain of 0.004 and an atomic
     tolerance sitting on the model's force-noise floor, the tensor came back
     with a *negative* bulk modulus and a fifth of it outside the
     symmetry-allowed subspace. Nothing else in the result said so.
@@ -215,7 +215,7 @@ def test_a_noisy_tensor_is_flagged_rather_than_returned_quietly(caplog):
         AsymmetricUnit([Element[18]], np.array([[0.0, 0.0, 0.0]])),
     )
     with caplog.at_level("WARNING"):
-        result = elastic_tensor(crystal, Noisy(), strain=0.002, relax_ions=False)
+        result = elastic_tensor(crystal, Noisy(), strain=0.002, relax_atoms=False)
 
     assert result.noise_fraction > 0.15
     assert "of its largest constant" in caplog.text
@@ -275,7 +275,7 @@ def test_asymmetry_catches_noise_that_symmetry_cannot():
                 volume=result.volume,
             )
 
-    result = elastic_tensor(crystal, Noisy(), strain=0.002, relax_ions=False)
+    result = elastic_tensor(crystal, Noisy(), strain=0.002, relax_atoms=False)
     # nothing is forbidden, so the projection is the identity up to round-off
     assert result.symmetry_residual < 1e-9
     assert result.asymmetry > 0.0
@@ -312,8 +312,8 @@ def test_auto_strain_escalates_until_the_noise_is_acceptable(caplog):
         AsymmetricUnit([Element[18]], np.array([[0.0, 0.0, 0.0]])),
     )
     calc = NoisyBelowAStrain()
-    tight = elastic_tensor(crystal, calc, strain=0.001, relax_ions=False)
-    auto = elastic_tensor(crystal, calc, strain="auto", relax_ions=False)
+    tight = elastic_tensor(crystal, calc, strain=0.001, relax_atoms=False)
+    auto = elastic_tensor(crystal, calc, strain="auto", relax_atoms=False)
 
     assert auto.strain > 0.001
     assert auto.noise_fraction < tight.noise_fraction
@@ -322,3 +322,81 @@ def test_auto_strain_escalates_until_the_noise_is_acceptable(caplog):
 def test_an_explicit_strain_is_not_second_guessed(relaxed_argon):
     crystal, calc = relaxed_argon
     assert elastic_tensor(crystal, calc, strain=0.002).strain == 0.002
+
+
+# -- symmetry chooses the strains, and the atoms relax in what survives --------
+
+
+def _crystal(lengths, angles, number, elements, positions):
+    return Crystal(
+        UnitCell.from_lengths_and_angles(lengths, np.radians(angles)),
+        SpaceGroup(number),
+        AsymmetricUnit([Element[e] for e in elements], np.array(positions, float)),
+    )
+
+
+@pytest.mark.parametrize(
+    "number, angles, expected",
+    [
+        (225, (90, 90, 90), [0, 3]),
+        (136, (90, 90, 90), [0, 2, 3, 5]),
+        (194, (90, 90, 120), [0, 2, 3]),
+        (166, (90, 90, 120), [0, 2, 3]),
+        (62, (90, 90, 90), [0, 1, 2, 3, 4, 5]),
+        (2, (85, 95, 100), [0, 1, 2, 3, 4, 5]),
+    ],
+)
+def test_each_strain_brings_its_orbit(number, angles, expected):
+    from chmpy.opt.elastic import independent_strains
+
+    lengths = (5.0, 5.0, 5.0) if number == 225 else (5.0, 5.0, 7.0)
+    structure = _crystal(lengths, angles, number, [18], [[0.1, 0.2, 0.3]])
+    assert independent_strains(cartesian_rotations(structure)) == expected
+
+
+def test_without_symmetry_the_fit_is_the_matrix_of_responses():
+    from chmpy.opt.elastic import fit_elastic
+
+    responses = np.random.default_rng(1).normal(size=(6, 6))
+    tensor, misfit = fit_elastic(list(enumerate(responses.T)), [])
+    np.testing.assert_allclose(tensor, responses, atol=1e-12)
+    assert misfit < 1e-12
+
+
+@pytest.fixture(scope="module")
+def layered():
+    """R-3m with a free z on 6c, so atoms move under strain."""
+    structure = _crystal(
+        (4.0, 4.0, 20.0), (90, 90, 120), 166, [18, 36], [[0, 0, 0.25], [0, 0, 0]]
+    )
+    calc = TwoSpecies()
+    result = relax(structure, calc, fmax=1e-7, smax=1e-6, steps=800)
+    assert result.converged
+    return result.structure, calc
+
+
+def test_symmetry_reduced_strains_give_the_p1_tensor(layered):
+    structure, calc = layered
+    reduced = elastic_tensor(structure, calc, strain=0.002, fmax=1e-6, steps=500)
+    full = elastic_tensor(
+        structure, calc, strain=0.002, fmax=1e-6, steps=500, symmetry=False
+    )
+    clamped = elastic_tensor(structure, calc, strain=0.002, relax_atoms=False)
+
+    assert reduced.strains == (0, 2, 3)
+    assert reduced.evaluations < full.evaluations
+    np.testing.assert_allclose(reduced.c_voigt, full.c_voigt, atol=2e-3)
+    # the atoms do move under strain
+    assert np.abs(clamped.c_voigt - full.c_voigt).max() > 0.1
+
+
+def test_the_misfit_of_rotated_responses_is_reported(layered):
+    """A response inconsistent with the point group gives a nonzero misfit."""
+    from chmpy.opt.elastic import fit_elastic
+
+    structure, _ = layered
+    rotations = cartesian_rotations(structure)
+    # trigonal allows an xx -> yz response (C14) but not xx -> xy
+    response = np.array([10.0, 3.0, 2.0, 1.0, 0.0, 1.0])
+    _, misfit = fit_elastic([(0, response)], rotations)
+    assert misfit > 0.1

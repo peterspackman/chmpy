@@ -222,7 +222,7 @@ def test_a_fixed_cell_run_has_no_strain_freedoms():
     assert coordinates.n_dof == coordinates.n_atomic == 24
     assert set(
         coordinates.measures(GaussianPairs()(coordinates.system, coordinates.wanted))
-    ) == {"fmax"}
+    ) == {"fmax", "forbidden"}  # no stress measure without a cell to vary
 
 
 def trigonal_triazine():

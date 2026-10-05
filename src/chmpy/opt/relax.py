@@ -39,6 +39,7 @@ import numpy as np
 from chmpy.calc.system import System
 
 from .coordinates import Atomic, AtomicStrain, strain_basis_for
+from .progress import reporter
 from .symmetry import SymmetryAdapted
 from .trust_region import Relaxation, TrustRegion
 
@@ -146,8 +147,7 @@ def relax(
     options=None,
     hessian="model",
     stages=None,
-    logger=None,
-    callback=None,
+    progress=None,
 ) -> Relaxation:
     """Relax a structure to a local minimum.
 
@@ -172,8 +172,8 @@ def relax(
         stages: a list of `Stage`, or "two-stage" for the fixed-cell-then-
             variable-cell protocol. The default is a single stage, which was
             measured to be as good or better -- see the module docstring.
-        logger: called with a one-line summary of each step, e.g. `print`
-        callback: called with each `Step`
+        progress: True to print each step, or a callable given a
+            `chmpy.opt.progress.Progress` per event; see `chmpy.opt.progress`
 
     Returns:
         a `Relaxation`, whose `structure` is of the same kind as the input and
@@ -183,10 +183,11 @@ def relax(
     _check_hessian(hessian)
     plan = _plan(stages, structure, cell, fmax, smax, steps, hessian)
 
+    report = reporter(progress)
     current = structure
     carried = None
     finished = []
-    for stage in plan:
+    for number, stage in enumerate(plan):
         coordinates = coordinates_for(
             current, cell=stage.cell, symmetry=symmetry, fixed=fixed, info=info
         )
@@ -195,8 +196,16 @@ def relax(
             # are all on special positions, say. Evaluating it would cost a
             # call to say so.
             continue
-        if logger is not None and len(plan) > 1:
-            logger(f"--- {stage.name or 'stage'}: {coordinates!r}")
+        # only label and count stages when there is more than one
+        staged = len(plan) > 1
+        name = stage.name or f"stage {number + 1}"
+        report(
+            "relax",
+            name,
+            f"relax {name}: {coordinates!r}" if staged else f"relax {coordinates!r}",
+            index=number if staged else None,
+            total=len(plan) if staged else None,
+        )
         optimiser = TrustRegion(
             coordinates,
             calculator,
@@ -208,9 +217,12 @@ def relax(
             fmax=stage.fmax,
             smax=stage.smax,
             steps=stage.steps,
-            logger=logger,
-            callback=callback,
+            progress=report.nested("relax", name),
         )
+        if staged:
+            report(
+                "relax", name, f"{outcome!r}", index=number, total=len(plan), done=True
+            )
         outcome.structure = _rebuild(current, coordinates)
         current = outcome.structure
         carried = outcome.model
