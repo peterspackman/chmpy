@@ -23,7 +23,7 @@ import numpy as np
 
 from .base import Calculator
 from .neighbors import NeighborList
-from .result import ENERGIES, FORCES, STRESS, Result
+from .result import ENERGIES, ENERGY, FORCES, STRESS, Result
 
 
 class PairPotential(Calculator):
@@ -146,4 +146,58 @@ class LennardJones(PairPotential):
         return (
             f"<LennardJones epsilon={self.epsilon} eV sigma={self.sigma} A "
             f"cutoff={self.cutoff} A>"
+        )
+
+
+class ExternalStress(Calculator):
+    """A constant applied stress, to add to another calculator.
+
+    The energy is `V0 sigma : eps`, with `eps = sym(F) - I` the small strain of
+    the cell `h = h0 F` from a reference cell `h0`, and `V0` its volume. A
+    structure that minimises `E + V0 sigma : eps` has its own stress equal to
+    `-sigma`. With `sigma = P I` this is a hydrostatic pressure, to first order
+    in the strain.
+
+        relax(crystal, calc + ExternalStress(sigma_gpa, reference_cell))
+
+    Args:
+        stress: (3, 3) applied stress in GPa, in the ASE sign convention
+            (positive is tensile on the structure's own stress)
+        reference_cell: (3, 3) lattice vectors as rows that the strain is
+            measured from
+    """
+
+    provides = frozenset({ENERGY, FORCES, STRESS})
+
+    def __init__(self, stress, reference_cell, **kwargs):
+        super().__init__(**kwargs)
+        from .result import EV_PER_ANGSTROM3_TO_GPA
+
+        stress = np.asarray(stress, dtype=float)
+        self.stress = 0.5 * (stress + stress.T) / EV_PER_ANGSTROM3_TO_GPA
+        self.reference_cell = np.array(reference_cell, dtype=float)
+        self.reference_volume = abs(float(np.linalg.det(self.reference_cell)))
+
+    def __repr__(self) -> str:
+        from .result import EV_PER_ANGSTROM3_TO_GPA
+
+        return (
+            f"<ExternalStress max {np.abs(self.stress).max() * EV_PER_ANGSTROM3_TO_GPA:.4g}"
+            " GPa>"
+        )
+
+    def compute(self, system, want):
+        # h = h0 F with lattice vectors as rows
+        deformation = np.linalg.solve(self.reference_cell, np.asarray(system.cell))
+        strain = 0.5 * (deformation + deformation.T) - np.eye(3)
+        energy = self.reference_volume * float(np.sum(self.stress * strain))
+        # a further strain d about the current cell takes F to F (I + d), so
+        # dE = V0 sigma : sym(F d), i.e. dE/dd = V0 F^T sigma, symmetrised
+        derivative = deformation.T @ self.stress * self.reference_volume
+        stress = 0.5 * (derivative + derivative.T) / system.volume
+        return Result(
+            energy=energy,
+            forces=np.zeros((len(system), 3)) if FORCES in want else None,
+            stress=stress if STRESS in want else None,
+            volume=system.volume,
         )

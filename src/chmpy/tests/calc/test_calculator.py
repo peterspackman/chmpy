@@ -277,3 +277,50 @@ def test_the_cutoff_shift_is_per_element_pair():
     assert _TwoRadii().energy(forward) == pytest.approx(
         _TwoRadii().energy(reversed_), abs=1e-12
     )
+
+
+def _rattled_argon(scale=1.0):
+    rng = np.random.default_rng(3)
+    a = 5.3 * scale
+    fractional = np.array([[0, 0, 0], [0.5, 0.5, 0], [0.5, 0, 0.5], [0, 0.5, 0.5]])
+    cell = np.array([[a, 0.1, 0.0], [0.0, a, 0.2], [0.1, 0.0, a]])
+    return System(
+        [18] * 4, fractional @ cell + rng.normal(scale=0.05, size=(4, 3)), cell, True
+    )
+
+
+def test_external_stress_gradients_match_its_energy():
+    from chmpy.calc import ExternalStress
+
+    system = _rattled_argon()
+    stress = np.array([[0.8, 0.1, -0.2], [0.1, -0.3, 0.05], [-0.2, 0.05, 0.4]])
+    calc = LennardJones(cutoff=8.0) + ExternalStress(stress, system.cell)
+    strained = system.copy()
+    strained.set_cell(
+        np.asarray(system.cell)
+        @ np.array([[1.02, 0.01, 0], [0, 0.99, 0], [0.01, 0, 1.01]]),
+        scale_atoms=True,
+    )
+    check = calc.check_gradients(strained, step=1e-5, tolerance=1e-5)
+    assert check.ok, str(check)
+
+
+def test_hydrostatic_external_stress_is_a_pressure():
+    """Equal to first order in the strain, which is how the QHA loop uses it:
+    the reference cell is reset each iteration, so the strains stay small."""
+    from chmpy.calc import ExternalStress
+    from chmpy.opt import relax
+
+    lj = LennardJones(cutoff=8.0)
+    start = relax(_rattled_argon(), lj, fmax=1e-6, smax=1e-6).structure
+    volume = start.volume
+    # relax works on a System in place, so each run gets its own copy
+    by_pressure = relax(start.copy(), lj, pressure=0.05, fmax=1e-6, smax=1e-5).structure
+    by_stress = relax(
+        start.copy(),
+        lj + ExternalStress(0.05 * np.eye(3), start.cell),
+        fmax=1e-6,
+        smax=1e-5,
+    ).structure
+    assert by_pressure.volume < 0.99 * volume
+    assert by_stress.volume == pytest.approx(by_pressure.volume, rel=2e-4)

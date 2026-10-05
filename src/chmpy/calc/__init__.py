@@ -18,7 +18,7 @@ example.
 
 from .base import Calculator, PropertyNotAvailable, ShiftedCalculator, SumCalculator
 from .neighbors import NeighborList, Neighbors
-from .potentials import LennardJones, PairPotential
+from .potentials import ExternalStress, LennardJones, PairPotential
 from .result import (
     ALL_PROPERTIES,
     ENERGIES,
@@ -43,6 +43,7 @@ __all__ = [
     "LennardJones",
     "NeighborList",
     "Neighbors",
+    "ExternalStress",
     "PairPotential",
     "PropertyNotAvailable",
     "Result",
