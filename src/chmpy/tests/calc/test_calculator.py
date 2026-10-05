@@ -260,9 +260,7 @@ class _TwoRadii(PairPotential):
     cutoff = 6.0
 
     def pair(self, r, zi, zj):
-        sigma = 0.5 * (
-            np.where(zi == 18, 3.4, 3.9) + np.where(zj == 18, 3.4, 3.9)
-        )
+        sigma = 0.5 * (np.where(zi == 18, 3.4, 3.9) + np.where(zj == 18, 3.4, 3.9))
         x = (sigma / r) ** 6
         return 0.01 * 4 * (x * x - x), 0.01 * 4 * (-12 * x * x + 6 * x) / r
 
