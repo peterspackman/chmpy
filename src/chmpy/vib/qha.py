@@ -1,18 +1,27 @@
-"""Quasi-harmonic geometry: the structure minimising E_static + F_vib at T.
+"""Quasi-harmonic geometry: the cell minimising G = E_static + F_vib at T.
 
-The free energy is minimised over the strains the space group allows, not
-only the volume, so an anisotropic crystal expands differently along each
-axis.
+The cell is `h = h0 (I + sum_k q_k B_k)` over the strain directions `B_k` the
+space group allows, so an anisotropic crystal can expand differently along
+each axis. At every cell the atoms are relaxed on the static energy (the zero
+static internal stress approximation, ZSISA), and
 
-`thermal_stress` gives `sigma_th = (1/V) dF_vib/d eps` by central differences
-along each allowed strain direction; each strained cell keeps the space group,
-its atoms are relaxed at fixed cell, and its force constants give F_vib on a
-q-mesh. `qha_structure` relaxes the static energy against that stress (through
-`chmpy.calc.ExternalStress`), recomputes it at the new cell, and repeats until
-the cell stops changing. At the fixed point the static stress cancels the
-thermal stress, which is the condition d(E_static + F_vib)/d eps = 0.
+    G(q) = E_static(q) + F_vib(q, T)
 
-    result = qha_structure(crystal, calculator, temperature=295.0)
+is minimised by damped Newton steps:
+
+* the gradient is the static stress, analytically, plus dF_vib/dq_k by
+  central differences, each needing force constants at a strained cell;
+* the Hessian is the static elastic tensor projected onto the strain basis,
+  `V0 B_k : C : B_l`, computed once at the start;
+* each step is bounded and accepted only if G actually decreases, so a large
+  thermal stress cannot carry the cell to a region where the crystal has
+  come apart, which a fixed applied stress does.
+
+Imaginary modes at any cell stop the calculation: the harmonic free energy is
+not defined there, and dropping the modes would make the finite differences
+measure which modes were dropped.
+
+    result = qha_structure(crystal, calculator, temperature=293.0)
     tensor = elastic_tensor(result.structure, calculator)  # quasi-static C
 """
 
@@ -23,7 +32,6 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from chmpy.calc.potentials import ExternalStress
 from chmpy.calc.result import EV_PER_ANGSTROM3_TO_GPA
 
 from .force_constants import force_constants
@@ -31,8 +39,15 @@ from .thermo import thermal_properties
 
 LOG = logging.getLogger(__name__)
 
-#: strain amplitude for the free-energy finite difference
+#: finite-difference step in the strain amplitudes for dF_vib/dq
 DEFAULT_STRAIN = 0.005
+
+#: largest change in any strain amplitude in one Newton step
+MAX_STEP = 0.02
+
+
+class ImaginaryModes(RuntimeError):
+    "A cell had imaginary phonon modes, so its free energy is not defined"
 
 
 @dataclass
@@ -43,13 +58,11 @@ class ThermalStress:
         stress: (3, 3) eV/A^3, `(1/V) dF_vib/d eps`, ASE sign convention
         free_energy: F_vib of the unstrained structure, eV per cell
         temperature: K
-        n_imaginary: imaginary modes found over all the strained cells
     """
 
     stress: np.ndarray
     free_energy: float
     temperature: float
-    n_imaginary: int
 
     @property
     def stress_gpa(self) -> np.ndarray:
@@ -61,52 +74,149 @@ class QHAResult:
     """A quasi-harmonic structure and how it was reached.
 
     Attributes:
-        structure: the structure minimising E_static + F_vib at `temperature`
+        structure: the crystal minimising G at `temperature`, atoms relaxed
         temperature: K
-        thermal_stress: the last `ThermalStress`
-        converged: whether the cell stopped changing within `max_iterations`
-        history: per iteration, the cell lengths and largest thermal stress
+        free_energy: G = E_static + F_vib at the minimum, eV per cell
+        strain: (3, 3) strain from the starting cell
+        converged: whether the gradient fell below tolerance
+        history: per iteration, the amplitudes, G and the largest gradient
     """
 
     structure: object
     temperature: float
-    thermal_stress: ThermalStress
+    free_energy: float
+    strain: np.ndarray
     converged: bool
     history: list = field(default_factory=list)
 
-
-def _strained(crystal, deformation):
-    "The crystal with its cell deformed and its fractional coordinates kept"
-    from chmpy.crystal import Crystal, UnitCell
-
-    return Crystal(
-        UnitCell(np.asarray(crystal.unit_cell.direct) @ deformation),
-        crystal.space_group,
-        crystal.asymmetric_unit,
-    )
+    @property
+    def volume_change(self) -> float:
+        "V / V_start - 1"
+        return float(np.linalg.det(np.eye(3) + self.strain) - 1)
 
 
-def _settle_atoms(crystal, calculator, info, fmax):
-    "Relax the atoms at fixed cell, if they have any freedom"
-    from chmpy.opt import relax
-    from chmpy.opt.relax import coordinates_for
+class _FreeEnergySurface:
+    """G(q) and its gradient for one crystal, temperature and model."""
 
-    if coordinates_for(crystal, cell=False).n_dof == 0:
-        return crystal
-    result = relax(crystal, calculator, cell=False, info=info, fmax=fmax, steps=500)
-    if not result.converged:
-        LOG.warning("atomic relaxation of a strained cell did not converge")
-    return result.structure
+    def __init__(
+        self,
+        crystal,
+        calculator,
+        temperature,
+        *,
+        mesh,
+        supercell,
+        cutoff,
+        strain,
+        info,
+        fmax,
+    ):
+        from chmpy.opt.coordinates import strain_basis_for
 
+        self.reference = crystal
+        self.cell = np.asarray(crystal.unit_cell.direct)
+        self.volume = crystal.unit_cell.volume()
+        self.basis = strain_basis_for(crystal)
+        self.calculator = calculator
+        self.temperature = float(temperature)
+        self.mesh, self.supercell, self.cutoff = mesh, supercell, cutoff
+        self.strain, self.info, self.fmax = strain, info, fmax
+        self._crystals = {}
+        self._vibrational = {}
 
-def _vibrational_free_energy(
-    crystal, calculator, temperature, mesh, supercell, cutoff, info
-):
-    constants = force_constants(
-        crystal, calculator, supercell=supercell, cutoff=cutoff, info=info
-    )
-    properties = thermal_properties(constants, [temperature], mesh=mesh)
-    return properties.free_energy[0], properties.n_imaginary
+    def deformation(self, q):
+        return np.eye(3) + np.einsum("k,kab->ab", q, self.basis)
+
+    def _key(self, q):
+        return tuple(np.round(q, 12))
+
+    def crystal(self, q):
+        "The crystal at amplitudes q with its atoms relaxed on the static energy"
+        key = self._key(q)
+        if key not in self._crystals:
+            from chmpy.crystal import Crystal, UnitCell
+            from chmpy.opt import relax
+            from chmpy.opt.relax import coordinates_for
+
+            crystal = Crystal(
+                UnitCell(self.cell @ self.deformation(q)),
+                self.reference.space_group,
+                self.reference.asymmetric_unit,
+            )
+            if coordinates_for(crystal, cell=False).n_dof:
+                outcome = relax(
+                    crystal,
+                    self.calculator,
+                    cell=False,
+                    info=self.info,
+                    fmax=self.fmax,
+                    steps=500,
+                )
+                if not outcome.converged:
+                    LOG.warning("atomic relaxation at q=%s did not converge", key)
+                crystal = outcome.structure
+            self._crystals[key] = crystal
+        return self._crystals[key]
+
+    def static(self, q):
+        "(E_static, dE_static/dq) at q"
+        from chmpy.calc.system import System
+
+        crystal = self.crystal(q)
+        result = self.calculator(
+            System.from_crystal(crystal, **(self.info or {})), ("energy", "stress")
+        )
+        # dE/dq_k = V <F^-T sigma, B_k>, as for the strain coordinates
+        stress = np.linalg.solve(self.deformation(q).T, result.stress * result.volume)
+        return result.energy, np.einsum("kab,ab->k", self.basis, stress)
+
+    def vibrational(self, q):
+        "F_vib at q, raising ImaginaryModes if any are found"
+        key = self._key(q)
+        if key not in self._vibrational:
+            constants = force_constants(
+                self.crystal(q),
+                self.calculator,
+                supercell=self.supercell,
+                cutoff=self.cutoff,
+                info=self.info,
+            )
+            properties = thermal_properties(
+                constants, [self.temperature], mesh=self.mesh
+            )
+            if properties.n_imaginary:
+                raise ImaginaryModes(
+                    f"{properties.n_imaginary} imaginary modes at strain amplitudes "
+                    f"{np.round(q, 5).tolist()}: the harmonic free energy is not "
+                    "defined there"
+                )
+            self._vibrational[key] = float(properties.free_energy[0])
+        return self._vibrational[key]
+
+    def value(self, q):
+        return self.static(q)[0] + self.vibrational(q)
+
+    def vibrational_gradient(self, q):
+        gradient = np.zeros(len(q))
+        for k in range(len(q)):
+            step = np.zeros(len(q))
+            step[k] = self.strain
+            gradient[k] = (self.vibrational(q + step) - self.vibrational(q - step)) / (
+                2 * self.strain
+            )
+        return gradient
+
+    def hessian(self):
+        "V0 B_k : C : B_l from the static elastic tensor at the start"
+        from chmpy.opt import elastic_tensor
+        from chmpy.opt.strain import elastic_from_voigt, to_vector
+
+        result = elastic_tensor(
+            self.reference, self.calculator, info=self.info, fmax=self.fmax
+        )
+        stiffness = elastic_from_voigt(result.c_voigt) / EV_PER_ANGSTROM3_TO_GPA
+        vectors = to_vector(self.basis)
+        return self.volume * vectors @ stiffness @ vectors.T
 
 
 def thermal_stress(
@@ -123,53 +233,26 @@ def thermal_stress(
 ) -> ThermalStress:
     """`(1/V) dF_vib/d eps` over the strains a crystal's symmetry allows.
 
-    Args:
-        crystal: a relaxed `Crystal`
-        calculator: a `chmpy.calc.Calculator`
-        temperature: K
-        mesh: q-mesh for the free energy
-        supercell, cutoff: passed to `force_constants`
-        strain: finite-difference amplitude along each strain direction
-        info: model inputs that are not geometry
-        fmax: force tolerance for relaxing the atoms of each strained cell
-
-    Returns:
-        ThermalStress
+    Raises:
+        ImaginaryModes: if any strained cell has imaginary modes
     """
-    from chmpy.opt.coordinates import strain_basis_for
-
-    def free_energy(structure):
-        return _vibrational_free_energy(
-            structure, calculator, temperature, mesh, supercell, cutoff, info
-        )
-
-    centre, imaginary = free_energy(crystal)
-    derivative = np.zeros((3, 3))
-    for direction in strain_basis_for(crystal):
-        values = []
-        for sign in (1, -1):
-            strained = _settle_atoms(
-                _strained(crystal, np.eye(3) + sign * strain * direction),
-                calculator,
-                info,
-                fmax,
-            )
-            value, count = free_energy(strained)
-            values.append(value)
-            imaginary += count
-        # the basis is orthonormal, so the gradient's components rebuild it
-        derivative += (values[0] - values[1]) / (2 * strain) * direction
-    if imaginary:
-        LOG.warning(
-            "%d imaginary modes across the strained cells; the free energy "
-            "describes only the stable modes",
-            imaginary,
-        )
+    surface = _FreeEnergySurface(
+        crystal,
+        calculator,
+        temperature,
+        mesh=mesh,
+        supercell=supercell,
+        cutoff=cutoff,
+        strain=strain,
+        info=info,
+        fmax=fmax,
+    )
+    q = np.zeros(len(surface.basis))
+    gradient = surface.vibrational_gradient(q)
     return ThermalStress(
-        stress=derivative / crystal.unit_cell.volume(),
-        free_energy=centre,
+        stress=np.einsum("k,kab->ab", gradient, surface.basis) / surface.volume,
+        free_energy=surface.vibrational(q),
         temperature=float(temperature),
-        n_imaginary=imaginary,
     )
 
 
@@ -184,73 +267,92 @@ def qha_structure(
     strain: float = DEFAULT_STRAIN,
     info=None,
     fmax: float = 1e-3,
-    smax: float = 1e-3,
-    max_iterations: int = 10,
-    tolerance: float = 1e-5,
+    gtol: float = 1e-3,
+    max_iterations: int = 20,
+    max_step: float = MAX_STEP,
 ) -> QHAResult:
-    """Relax a crystal to the minimum of E_static + F_vib at a temperature.
+    """Minimise G = E_static + F_vib over the symmetry-allowed strains.
 
     Args:
-        crystal: a `Crystal`, ideally already relaxed statically
+        crystal: a statically relaxed `Crystal`; strains are measured from its
+            cell
         calculator: a `chmpy.calc.Calculator`
         temperature: K
-        mesh, supercell, cutoff, strain: see `thermal_stress`
+        mesh: q-mesh for F_vib
+        supercell, cutoff: passed to `force_constants`; size the supercell
+            from the model's receptive field, not its cutoff radius
+        strain: finite-difference step for dF_vib/dq
         info: model inputs that are not geometry
-        fmax, smax: tolerances for each relaxation, eV/A and GPa
-        max_iterations: thermal-stress updates before giving up
-        tolerance: largest relative change in a cell vector that counts as
-            converged
+        fmax: force tolerance for the atomic relaxations, eV/A
+        gtol: convergence on the largest gradient component, as a stress in GPa
+        max_iterations: Newton steps before giving up
+        max_step: largest change in any strain amplitude per step
 
     Returns:
         QHAResult
-    """
-    from chmpy.opt import relax
 
-    current = crystal
-    history = []
-    converged = False
-    sigma = None
+    Raises:
+        ImaginaryModes: if any cell visited has imaginary modes
+    """
+    surface = _FreeEnergySurface(
+        crystal,
+        calculator,
+        temperature,
+        mesh=mesh,
+        supercell=supercell,
+        cutoff=cutoff,
+        strain=strain,
+        info=info,
+        fmax=fmax,
+    )
+    hessian = surface.hessian()
+    q = np.zeros(len(surface.basis))
+    G = surface.value(q)
+    history, converged = [], False
+    previous = None
     for _ in range(max_iterations):
-        sigma = thermal_stress(
-            current,
-            calculator,
-            temperature,
-            mesh=mesh,
-            supercell=supercell,
-            cutoff=cutoff,
-            strain=strain,
-            info=info,
-            fmax=fmax,
+        _, static_gradient = surface.static(q)
+        gradient = static_gradient + surface.vibrational_gradient(q)
+        largest = (
+            float(np.abs(gradient).max()) / surface.volume * EV_PER_ANGSTROM3_TO_GPA
         )
-        reference = np.asarray(current.unit_cell.direct)
-        applied = calculator + ExternalStress(sigma.stress_gpa, reference)
-        updated = relax(current, applied, info=info, fmax=fmax, smax=smax).structure
-        change = float(
-            (
-                np.linalg.norm(np.asarray(updated.unit_cell.direct) - reference, axis=1)
-                / np.linalg.norm(reference, axis=1)
-            ).max()
-        )
-        history.append(
-            {
-                "lengths": [float(x) for x in updated.unit_cell.lengths],
-                "thermal_stress_gpa": float(np.abs(sigma.stress_gpa).max()),
-                "cell_change": change,
-            }
-        )
-        current = updated
-        if change < tolerance:
+        history.append({"q": q.tolist(), "G": G, "gradient_gpa": largest})
+        if largest < gtol:
             converged = True
+            break
+        if previous is not None:
+            # BFGS: the static C misses the vibrational softening of G, which
+            # leaves plain Newton converging only linearly
+            s, y = q - previous[0], gradient - previous[1]
+            if s @ y > 1e-12 * np.linalg.norm(s) * np.linalg.norm(y):
+                hs = hessian @ s
+                hessian = (
+                    hessian + np.outer(y, y) / (y @ s) - np.outer(hs, hs) / (s @ hs)
+                )
+        previous = (q.copy(), gradient.copy())
+        step = -np.linalg.solve(hessian, gradient)
+        step *= min(1.0, max_step / max(float(np.abs(step).max()), 1e-300))
+        for _ in range(6):
+            trial = q + step
+            trial_G = surface.value(trial)
+            if trial_G < G:
+                q, G = trial, trial_G
+                break
+            step *= 0.5
+        else:
+            LOG.warning("no step along the Newton direction lowered G; stopping")
             break
     if not converged:
         LOG.warning(
-            "the quasi-harmonic cell was still changing after %d iterations",
+            "the quasi-harmonic cell did not converge to %g GPa in %d steps",
+            gtol,
             max_iterations,
         )
     return QHAResult(
-        structure=current,
+        structure=surface.crystal(q),
         temperature=float(temperature),
-        thermal_stress=sigma,
+        free_energy=G,
+        strain=surface.deformation(q) - np.eye(3),
         converged=converged,
         history=history,
     )

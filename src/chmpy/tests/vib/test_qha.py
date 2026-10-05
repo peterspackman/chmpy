@@ -87,3 +87,95 @@ def test_zero_temperature_leaves_only_zero_point_expansion(calc, static):
     cold = qha_structure(static, calc, 0.0, mesh=MESH, cutoff=CUTOFF)
     warm = qha_structure(static, calc, 40.0, mesh=MESH, cutoff=CUTOFF)
     assert lattice(static) < lattice(cold.structure) < lattice(warm.structure)
+
+
+def hcp_argon():
+    cell = UnitCell.from_lengths_and_angles(
+        (3.75, 3.75, 6.12), np.radians((90, 90, 120))
+    )
+    return Crystal(
+        cell,
+        SpaceGroup(194),
+        AsymmetricUnit([Element[18]], np.array([[1 / 3, 2 / 3, 0.25]])),
+    )
+
+
+def test_anisotropic_expansion_matches_a_lattice_parameter_grid(calc):
+    """hcp has two free lattice parameters; c and a expand by different amounts."""
+    from chmpy.calc import System
+
+    T = 40.0
+    static = relax(hcp_argon(), calc, fmax=1e-7, smax=1e-6, steps=800).structure
+    a0, _, c0 = static.unit_cell.lengths
+    result = qha_structure(static, calc, T, mesh=MESH, cutoff=CUTOFF, fmax=1e-6)
+    assert result.converged
+    a, _, c = result.structure.unit_cell.lengths
+
+    strains = np.linspace(0.0, 0.04, 9)
+    G = np.zeros((9, 9))
+    for i, ea in enumerate(strains):
+        for j, ec in enumerate(strains):
+            crystal = Crystal(
+                UnitCell.from_lengths_and_angles(
+                    (a0 * (1 + ea), a0 * (1 + ea), c0 * (1 + ec)),
+                    np.radians((90, 90, 120)),
+                ),
+                static.space_group,
+                static.asymmetric_unit,
+            )
+            constants = force_constants(crystal, calc, cutoff=CUTOFF)
+            G[i, j] = (
+                calc.energy(System.from_crystal(crystal))
+                + thermal_properties(constants, [T], mesh=MESH).free_energy[0]
+            )
+    x, y = (v.ravel() for v in np.meshgrid(strains, strains, indexing="ij"))
+
+    def design(x, y):
+        return np.stack(
+            [
+                np.ones_like(x),
+                x,
+                y,
+                x * x,
+                x * y,
+                y * y,
+                x**3,
+                x * x * y,
+                x * y * y,
+                y**3,
+            ],
+            axis=1,
+        )
+
+    coefficients = np.linalg.lstsq(design(x, y), G.ravel(), rcond=None)[0]
+    fx, fy = (v.ravel() for v in np.meshgrid(*[np.linspace(0, 0.04, 801)] * 2))
+    best = np.argmin(design(fx, fy) @ coefficients)
+
+    assert a / a0 - 1 == pytest.approx(fx[best], abs=2e-4)
+    assert c / c0 - 1 == pytest.approx(fy[best], abs=2e-4)
+    assert c / a > c0 / a0  # c expands more than a
+
+
+def test_bfgs_converges_faster_than_the_static_hessian(calc):
+    static = relax(hcp_argon(), calc, fmax=1e-7, smax=1e-6, steps=800).structure
+    result = qha_structure(static, calc, 40.0, mesh=MESH, cutoff=CUTOFF, fmax=1e-6)
+    # the static Hessian alone took 7 iterations to 1e-3 GPa
+    assert result.converged and len(result.history) <= 5
+
+
+def test_imaginary_modes_stop_the_calculation():
+    """A saddle point held only by symmetry has no harmonic free energy."""
+    from chmpy.tests.opt.test_elastic import TwoSpecies, _crystal
+    from chmpy.vib.qha import ImaginaryModes
+
+    potential = TwoSpecies()
+    start = _crystal(
+        (4.0, 4.0, 8.0),
+        (90, 90, 90),
+        123,
+        [18, 36, 18],
+        [[0, 0, 0.27], [0.5, 0.5, 0.5], [0.5, 0.5, 0]],
+    )
+    static = relax(start, potential, fmax=1e-7, smax=1e-6, steps=800).structure
+    with pytest.raises(ImaginaryModes, match="imaginary modes"):
+        qha_structure(static, potential, 30.0, mesh=(3, 3, 3), cutoff=9.0)
