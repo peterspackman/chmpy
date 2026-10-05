@@ -81,7 +81,7 @@ def crystal_to_gulp_input(
     return GULP_TEMPLATE.render(
         keywords=keywords,
         frac=True,
-        cell=" ".join(f"{x:10.6f}" for x in crystal.unit_cell.parameters),
+        cell=" ".join(f"{x:.12f}" for x in crystal.unit_cell.parameters),
         atoms=atoms,
         spacegroup=crystal.space_group.crystal17_spacegroup_symbol(),
         origin_choice=getattr(crystal.space_group, "choice", 1),

@@ -134,3 +134,78 @@ def test_system_from_crystal_takes_model_inputs():
     crystal = Crystal.load(TEST_FILES["acetic_acid.cif"])
     system = System.from_crystal(crystal, charge=0, spin=1)
     assert system.info == {"charge": 0, "spin": 1}
+
+
+def test_a_calculator_that_initialises_on_new_numbers_works():
+    """EMT only initialises when `system_changes` includes "numbers"."""
+    from ase.calculators.emt import EMT
+
+    system = System([29] * 4, argon().positions * 0.7, np.eye(3) * 3.7, True)
+    atoms = system.to_ase()
+    atoms.calc = EMT()
+
+    calc = Calculator.from_ase(EMT())
+    result = calc(system, ("energy", "forces"))
+    assert result.energy == pytest.approx(atoms.get_potential_energy())
+    np.testing.assert_allclose(result.forces, atoms.get_forces(), atol=1e-10)
+
+    changed = System([29, 29, 79, 79], system.positions, system.cell, True)
+    atoms = changed.to_ase()
+    atoms.calc = EMT()
+    assert calc(changed, ("energy",)).energy == pytest.approx(
+        atoms.get_potential_energy()
+    )
+
+
+def test_a_result_is_not_changed_by_the_next_evaluation():
+    """EMT reuses its force array between calls; results must hold copies."""
+    from ase.calculators.emt import EMT
+
+    system = System([29] * 4, argon().positions * 0.7, np.eye(3) * 3.7, True)
+    calc = Calculator.from_ase(EMT())
+    first = calc(system, ("energy", "forces", "energies"))
+    kept = first.forces.copy(), first.energies.copy()
+
+    moved = system.copy()
+    moved.set_positions(system.positions + 0.05)
+    calc(moved, ("energy", "forces", "energies"))
+
+    np.testing.assert_array_equal(first.forces, kept[0])
+    np.testing.assert_array_equal(first.energies, kept[1])
+
+
+class _Broken:
+    """Fails identically whichever way it is called."""
+
+    implemented_properties = ["energy", "forces"]
+    calls = 0
+
+    def calculate(self, atoms=None, properties=None, system_changes=None):
+        type(self).calls += 1
+        raise RuntimeError("Traceback...\n  lots of TorchScript\nscatter(): bad index")
+
+    def get_potential_energy(self, atoms=None):
+        self.calculate(atoms)
+
+    def get_property(self, name, atoms=None, allow_calculation=True):
+        self.calculate(atoms)
+
+    def reset(self):
+        pass
+
+
+def test_a_model_that_fails_either_way_raises_its_own_error_once():
+    calc = Calculator.from_ase(_Broken())
+    with pytest.raises(RuntimeError) as raised:
+        calc(argon(), ("energy",))
+    assert str(raised.value).endswith("scatter(): bad index")
+    assert "failed both" not in str(raised.value)
+    # the direct route stays enabled
+    assert calc._direct
+
+
+def test_a_long_error_is_quoted_by_its_last_line():
+    from chmpy.calc.adapters.ase import _first_line
+
+    error = RuntimeError("Traceback...\n  frame\n\nscatter(): bad index\n")
+    assert _first_line(error) == "RuntimeError: scatter(): bad index"

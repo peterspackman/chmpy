@@ -27,6 +27,16 @@ from ..base import Calculator, PropertyNotAvailable
 from ..result import ENERGIES, ENERGY, FORCES, STRESS, Result
 from ..system import System
 
+#: `ase.calculators.calculator.all_changes`, without importing ASE here
+_ALL_CHANGES = (
+    "positions",
+    "numbers",
+    "cell",
+    "pbc",
+    "initial_charges",
+    "initial_magmoms",
+)
+
 #: ASE property names for the ones this interface knows about
 _ASE_NAMES = {
     ENERGY: "energy",
@@ -108,12 +118,15 @@ class AseCalculator(Calculator):
         return f"<AseCalculator {type(self.ase_calculator).__name__}>"
 
     def compute(self, system, want):
-        atoms = self._sync(system)
+        atoms, rebuilt = self._sync(system)
         properties = sorted(_ASE_NAMES[name] for name in want)
+        # new Atoms: report everything as changed, or calculators that set up
+        # in `initialize` (e.g. EMT) never do
+        changes = list(_ALL_CHANGES) if rebuilt else ["positions", "cell"]
 
         if self._direct:
             try:
-                self.ase_calculator.calculate(atoms, properties, ["positions", "cell"])
+                self.ase_calculator.calculate(atoms, properties, changes)
                 return self._unpack(self.ase_calculator.results, system, want)
             except Exception as exc:
                 # Not every calculator can be driven this way -- some need the
@@ -122,28 +135,41 @@ class AseCalculator(Calculator):
                 self._direct = False
                 self._direct_error = exc
 
+        # clear any state left by the failed direct call
+        self.ase_calculator.reset()
         atoms.calc = self.ase_calculator
         try:
             atoms.get_potential_energy()
         except Exception as exc:
-            if self._direct_error is not None:
+            direct, self._direct_error = self._direct_error, None
+            if direct is not None and _same_failure(direct, exc):
+                # same error both ways: the model itself failed, so re-raise
+                # it as-is and keep using the direct route
+                self._direct = True
+                raise
+            if direct is not None:
                 raise RuntimeError(
                     f"{type(self.ase_calculator).__name__} failed both when its "
-                    f"calculate() was called directly ({self._direct_error!r}) and "
-                    f"through ase.Atoms.get_potential_energy()"
+                    f"calculate() was called directly ({_first_line(direct)}) and "
+                    f"through ase.Atoms.get_potential_energy() (below)"
                 ) from exc
             raise
         return self._unpack(self.ase_calculator.results, system, want)
 
-    def _sync(self, system) -> ase.Atoms:  # noqa: F821
-        """Write `system` into the persistent Atoms object, building it once."""
+    def _sync(self, system):
+        """Write `system` into the persistent Atoms object, building it once.
+
+        Returns:
+            (the `ase.Atoms`, whether it was built afresh)
+        """
         atoms = self._atoms
         numbers = np.asarray(system.numbers)
-        if (
+        rebuilt = (
             atoms is None
             or len(atoms) != len(system)
             or not np.array_equal(atoms.numbers, numbers)
-        ):
+        )
+        if rebuilt:
             atoms = self._atoms = system.to_ase()
         else:
             atoms.positions[:] = system.positions
@@ -153,7 +179,7 @@ class AseCalculator(Calculator):
                 atoms.set_pbc(np.asarray(system.pbc))
         atoms.info.update(self.info)
         atoms.info.update(system.info)
-        return atoms
+        return atoms, rebuilt
 
     def _unpack(self, results, system, want) -> Result:
         if "energy" not in results:
@@ -161,16 +187,29 @@ class AseCalculator(Calculator):
                 f"{type(self.ase_calculator).__name__} returned no energy; it "
                 f"produced {sorted(results)}"
             )
+        # copy: some calculators (e.g. EMT) reuse these arrays on the next call
         stress = None
         if STRESS in want and "stress" in results:
-            stress = voigt_to_matrix(results["stress"])
+            stress = voigt_to_matrix(np.array(results["stress"], dtype=np.float64))
         return Result(
             energy=float(results["energy"]),
-            forces=np.asarray(results["forces"]) if FORCES in want else None,
+            forces=np.array(results["forces"]) if FORCES in want else None,
             stress=stress,
-            energies=np.asarray(results["energies"]) if ENERGIES in want else None,
+            energies=np.array(results["energies"]) if ENERGIES in want else None,
             volume=system.volume,
         )
+
+
+def _same_failure(first, second) -> bool:
+    "Whether two exceptions are the same error, raised twice"
+    return type(first) is type(second) and str(first) == str(second)
+
+
+def _first_line(error) -> str:
+    """Last line of an exception message (TorchScript errors embed a full
+    traceback), for quoting in another error."""
+    lines = [line for line in str(error).splitlines() if line.strip()]
+    return f"{type(error).__name__}: {lines[-1] if lines else ''}".strip()
 
 
 def as_ase_calculator(calculator):

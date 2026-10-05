@@ -19,7 +19,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 # rocksalt MgO with a rigid-ion Buckingham model: small, cubic, and with both
-# atoms on special positions, so relaxed-ion and clamped-ion constants agree
+# atoms on special positions, so relaxed-atom and clamped-atom constants agree
 POTENTIALS = """species
 Mg core  2.0
 O  core -2.0
@@ -99,12 +99,7 @@ def test_gradients_agree_with_finite_differences(relaxed):
     positions[1] += [0.08, -0.05, 0.03]
     system.set_positions(positions)
 
-    # The step is chosen, not defaulted. Measured on this structure, the force
-    # check degrades at small steps (round-off in a difference of two numbers
-    # near -165 eV) while the stress check degrades at large ones (O(step^2)
-    # truncation against constants of ~400 GPa): 1e-3 gives 1.1e-3 and 1.3e-2,
-    # 1e-4 gives 1.3e-2 and 1.5e-4, and 3e-4 sits near the bottom of both.
-    check = calc.check_gradients(system, step=3e-4, tolerance=1e-2)
+    check = calc.check_gradients(system, step=1e-4, tolerance=1e-5)
     assert check.ok, str(check)
 
 
@@ -240,3 +235,90 @@ def test_availability_is_not_decided_by_the_name_alone(tmp_path, monkeypatch):
             gulp.GulpCalculator(potentials=DIATOMIC_POTENTIALS)
     finally:
         gulp.available.cache_clear()
+
+
+def test_gulp_sees_the_geometry_it_was_given(relaxed):
+    """A 1e-6 A displacement is not lost to rounding in the GULP input."""
+    structure, calc = relaxed
+    system = System.from_crystal(structure)
+    positions = np.array(system.positions)
+    positions[1] += [0.05, 0.02, -0.03]  # nonzero force
+    system.set_positions(positions)
+    before = calc(system, ("energy", "forces"))
+    assert np.abs(before.forces[1]).max() > 0.1
+
+    step = np.zeros_like(system.positions)
+    step[1] = [1e-6, 0.0, 0.0]
+    moved = system.copy()
+    moved.set_positions(system.positions + step)
+    after = calc(moved, ("energy",))
+
+    predicted = -float(np.sum(before.forces * step))
+    assert after.energy - before.energy == pytest.approx(predicted, rel=0.05)
+
+
+# rutile TiO2 (Matsui & Akaogi); O on 4f (x, x, 0) relaxes under strain
+RUTILE_POTENTIALS = """species
+Ti core  2.196
+O  core -1.098
+buck
+Ti core O  core 16957.53 0.194 12.59 0.0 12.0
+O  core O  core 11782.76 0.234 30.22 0.0 12.0
+Ti core Ti core 31120.20 0.154  5.25 0.0 12.0
+"""
+
+
+@pytest.fixture(scope="module")
+def rutile():
+    from chmpy.opt import relax
+
+    cell = UnitCell.from_lengths_and_angles(
+        (4.594, 4.594, 2.959), np.radians((90, 90, 90))
+    )
+    crystal = Crystal(
+        cell,
+        SpaceGroup(136),
+        AsymmetricUnit(
+            [Element["Ti"], Element["O"]],
+            np.array([[0.0, 0.0, 0.0], [0.305, 0.305, 0.0]]),
+        ),
+    )
+    calc = gulp.GulpCalculator(potentials=RUTILE_POTENTIALS)
+    result = relax(crystal, calc, fmax=1e-5, smax=1e-4, steps=100)
+    assert result.converged
+    return result.structure, calc
+
+
+def test_symmetry_reduced_elastic_tensor_matches_gulp_with_relaxation(rutile):
+    import tempfile
+
+    from chmpy.exe.gulp import Gulp
+    from chmpy.fmt.gulp import crystal_to_gulp_input, parse_elastic_constants
+    from chmpy.opt import elastic_tensor
+
+    structure, calc = rutile
+
+    body = crystal_to_gulp_input(structure, keywords=["conp", "property"])
+    with tempfile.TemporaryDirectory() as scratch:
+        job = Gulp(body + "\n" + RUTILE_POTENTIALS, working_directory=scratch)
+        job.run()
+        reference = parse_elastic_constants(job.output_contents)
+
+    reduced = elastic_tensor(structure, calc, strain=0.002, fmax=1e-6)
+    clamped = elastic_tensor(structure, calc, strain=0.002, relax_atoms=False)
+
+    assert reduced.strains == (0, 2, 3, 5)
+    assert np.abs(reduced.c_voigt - reference).max() < 0.05  # GPa, of up to ~440
+    assert np.abs(clamped.c_voigt - reference).max() > 10  # relaxation matters
+
+
+def test_symmetry_reduced_force_constants_match_p1_with_gulp(rutile):
+    from chmpy.vib import force_constants
+
+    structure, calc = rutile
+    reduced = force_constants(structure, calc, supercell=(2, 2, 3))
+    full = force_constants(structure, calc, supercell=(2, 2, 3), symmetry=False)
+    for q in ([0, 0, 0], [0.5, 0, 0], [0.5, 0.5, 0.5], [0.2, 0.1, 0.3]):
+        np.testing.assert_allclose(
+            reduced.frequencies(q, "cm-1"), full.frequencies(q, "cm-1"), atol=0.05
+        )

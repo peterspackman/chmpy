@@ -7,10 +7,10 @@ cell
 {% for atom_data in atoms -%}
 {% if atom_data|length == 3 -%}
 {% set e, (x, y, z), charge = atom_data[0], atom_data[1], atom_data[2] -%}
-{{e}} core {{"%10.6f" | format(x)}} {{"%10.6f" | format(y)}} {{"%10.6f" | format(z)}} {{"%8.6f" | format(charge)}}
+{{e}} core {{"%.12f" | format(x)}} {{"%.12f" | format(y)}} {{"%.12f" | format(z)}} {{"%8.6f" | format(charge)}}
 {% else -%}
 {% set e, (x, y, z) = atom_data[0], atom_data[1] -%}
-{{e}} core {{"%10.6f" | format(x)}} {{"%10.6f" | format(y)}} {{"%10.6f" | format(z)}} 0.0
+{{e}} core {{"%.12f" | format(x)}} {{"%.12f" | format(y)}} {{"%.12f" | format(z)}} 0.0
 {% endif -%}
 {% endfor -%}
 {% if spacegroup %}
