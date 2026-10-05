@@ -322,3 +322,66 @@ def test_symmetry_reduced_force_constants_match_p1_with_gulp(rutile):
         np.testing.assert_allclose(
             reduced.frequencies(q, "cm-1"), full.frequencies(q, "cm-1"), atol=0.05
         )
+
+
+def _gulp_run(body):
+    """Energy of the primitive cell and its atom count, from a GULP input."""
+    import re
+    import tempfile
+
+    from chmpy.exe.gulp import Gulp
+
+    with tempfile.TemporaryDirectory() as scratch:
+        job = Gulp(body, working_directory=scratch)
+        job.run()
+        output = job.output_contents
+    energy = re.search(r"Primitive unit cell\s*=\s*(-?[\d.]+) eV", output)
+    atoms = re.search(r"Total number atoms/shells =\s+(\d+)", output)
+    return (float(energy.group(1)) if energy else None), int(atoms.group(1))
+
+
+SULFUR = """species
+S core 0.0
+lennard 12 6
+S core S core 1000.0 10.0 0.0 6.0
+"""
+
+
+def test_both_fddd_origin_choices_give_the_same_structure():
+    """Issue #7: alpha-S8 in Fddd, written with each origin choice."""
+    from chmpy.fmt.gulp import crystal_to_gulp_input
+
+    cell = UnitCell.from_lengths_and_angles(
+        (10.46, 12.87, 24.49), np.radians((90, 90, 90))
+    )
+    origin_2 = np.array(
+        [
+            [0.8554, 0.9526, 0.9516],
+            [0.7844, 0.0301, 0.0763],
+            [0.7069, 0.9795, 0.0040],
+            [0.7862, 0.9073, 0.1290],
+        ]
+    )
+    energies = []
+    for choice, positions in (("1", origin_2 + 0.125), ("2", origin_2)):
+        crystal = Crystal(
+            cell,
+            SpaceGroup(70, choice=choice),
+            AsymmetricUnit([Element["S"]] * 4, positions),
+        )
+        body = crystal_to_gulp_input(crystal, keywords=["single"])
+        energy, atoms = _gulp_run(f"{body}\n{SULFUR}")
+        assert atoms == 32  # primitive cell of the 128-atom F-centred cell
+        energies.append(energy)
+        p1 = gulp.GulpCalculator(potentials=SULFUR).energy(System.from_crystal(crystal))
+        assert 4 * energy == pytest.approx(p1, abs=1e-5)
+    assert energies[0] == pytest.approx(energies[1], abs=1e-6)
+
+
+def test_a_rhombohedral_crystal_is_accepted_by_gulp():
+    from chmpy.fmt.gulp import crystal_to_gulp_input
+    from chmpy.tests import TEST_FILES
+
+    crystal = Crystal.load(TEST_FILES["r3c_example.cif"])
+    _, atoms = _gulp_run(crystal_to_gulp_input(crystal, keywords=["single"]))
+    assert atoms == len(crystal.unit_cell_atoms()["element"]) // 3

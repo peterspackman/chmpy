@@ -84,9 +84,18 @@ def crystal_to_gulp_input(
         cell=" ".join(f"{x:.12f}" for x in crystal.unit_cell.parameters),
         atoms=atoms,
         spacegroup=crystal.space_group.crystal17_spacegroup_symbol(),
-        origin_choice=getattr(crystal.space_group, "choice", 1),
+        origin_choice=_gulp_origin(crystal.space_group),
         additional_keywords=additional_keywords,
     )
+
+
+def _gulp_origin(space_group):
+    """GULP's `origin` value, or None for the default (origin choice 1).
+
+    Only origin choice 2 needs stating; "H"/"R" are axis settings, which GULP
+    takes from the cell.
+    """
+    return "2" if str(getattr(space_group, "choice", "")) == "2" else None
 
 
 def molecule_to_gulp_input(molecule, keywords=None, additional_keywords=None):
