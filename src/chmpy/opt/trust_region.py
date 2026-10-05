@@ -319,7 +319,7 @@ class TrustRegion:
             entry = Step(
                 iteration,
                 energy,
-                coordinates.measures(result),
+                self._measures(result),
                 radius,
                 rho,
                 accept,
@@ -347,7 +347,7 @@ class TrustRegion:
                     break
 
         coordinates.set(x)
-        _warn_if_forbidden(coordinates.measures(result), fmax)
+        _warn_if_forbidden(self._measures(result), fmax)
         if inconsistent:
             LOG.warning(
                 "the optimiser stopped: %d steps in a row at the minimum trust "
@@ -365,7 +365,7 @@ class TrustRegion:
             converged=converged,
             steps=len(history),
             energy=energy,
-            measures=coordinates.measures(result),
+            measures=self._measures(result),
             evaluations=self.calculator.stats.calls - started,
             history=history,
             structure=coordinates.system,
@@ -400,8 +400,23 @@ class TrustRegion:
             gradient = gradient + pressure_term(self.coordinates, self.pressure)
         return gradient / scale
 
+    def _measures(self, result) -> dict:
+        """Convergence measures on the stress that has to vanish.
+
+        With an applied pressure the minimum of E + PV has its own stress at
+        -P I, so the measure is taken on the stress plus P I.
+        """
+        if self.pressure and result.stress is not None:
+            from dataclasses import replace
+
+            from chmpy.calc.result import EV_PER_ANGSTROM3_TO_GPA
+
+            applied = self.pressure / EV_PER_ANGSTROM3_TO_GPA * np.eye(3)
+            result = replace(result, stress=result.stress + applied)
+        return self.coordinates.measures(result)
+
     def _converged(self, result, tolerances) -> bool:
-        measures = self.coordinates.measures(result)
+        measures = self._measures(result)
         return all(
             value <= tolerances[name]
             for name, value in measures.items()

@@ -205,7 +205,7 @@ def test_external_pressure_compresses_the_cell():
 
     compressed = argon(5.3, rattle=0.05, seed=8)
     relaxation = TrustRegion(AtomicStrain(compressed), calc, pressure=2.0).run(
-        fmax=1e-4, smax=1e9, steps=300
+        fmax=1e-4, smax=1e-3, steps=300
     )
     assert relaxation.converged
     assert compressed.volume < relaxed.volume
@@ -244,3 +244,17 @@ def test_a_gradient_inconsistent_with_the_energy_stops_early(caplog):
     assert outcome.stalled
     assert outcome.steps < 100
     assert "check_gradients" in caplog.text
+
+
+def test_pressure_moves_a_structure_already_at_zero_stress():
+    calc = LennardJones()
+    system = argon(5.3, rattle=0.05, seed=8)
+    TrustRegion(AtomicStrain(system), calc).run(fmax=1e-5, smax=1e-5, steps=300)
+    volume = system.volume
+    relaxation = TrustRegion(AtomicStrain(system), calc, pressure=0.05).run(
+        fmax=1e-5, smax=1e-4, steps=300
+    )
+    assert relaxation.converged
+    assert relaxation.steps > 0
+    assert system.volume < 0.99 * volume
+    assert calc(system, ("energy", "stress")).pressure == pytest.approx(0.05, abs=1e-4)
