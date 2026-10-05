@@ -106,14 +106,17 @@ class ForceConstants:
         """
         q = np.asarray(q, dtype=float)
         n = self.n_atoms
-        matrix = np.zeros((3 * n, 3 * n), dtype=complex)
+        i, j = self.pairs[:, 0], self.pairs[:, 1]
 
-        phases = np.exp(2j * np.pi * (self.shifts @ q)) * self.weights
         root_mass = np.sqrt(self.masses)
-        for (i, j), block, phase in zip(self.pairs, self.blocks, phases, strict=True):
-            matrix[3 * i : 3 * i + 3, 3 * j : 3 * j + 3] += (
-                phase * block / (root_mass[i] * root_mass[j])
-            )
+        phases = (
+            np.exp(2j * np.pi * (self.shifts @ q))
+            * self.weights
+            / (root_mass[i] * root_mass[j])
+        )
+        blocks = np.zeros((n, n, 3, 3), dtype=complex)
+        np.add.at(blocks, (i, j), phases[:, None, None] * self.blocks)
+        matrix = blocks.transpose(0, 2, 1, 3).reshape(3 * n, 3 * n)
 
         # the sum is Hermitian in exact arithmetic; make it so in practice
         return 0.5 * (matrix + matrix.conj().T)

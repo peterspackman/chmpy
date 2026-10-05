@@ -22,13 +22,17 @@ from .christoffel import (
     phonon_velocities,
 )
 from .force_constants import ForceConstants, force_constants, symmetrise
+from .thermo import ThermalProperties, q_mesh, thermal_properties
 
 __all__ = [
     "ForceConstants",
+    "ThermalProperties",
     "christoffel_velocities",
     "compare_with_elastic",
     "density",
     "force_constants",
     "phonon_velocities",
+    "q_mesh",
     "symmetrise",
+    "thermal_properties",
 ]
