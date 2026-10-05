@@ -1,4 +1,4 @@
-![CI](https://github.com/peterspackman/chmpy/workflows/CI/badge.svg)
+[![CI](https://github.com/peterspackman/chmpy/actions/workflows/pythonpackage.yml/badge.svg?branch=main)](https://github.com/peterspackman/chmpy/actions/workflows/pythonpackage.yml)
 [![DOI](https://zenodo.org/badge/211644812.svg)](https://zenodo.org/doi/10.5281/zenodo.10697512)
 
 
