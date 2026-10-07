@@ -35,6 +35,9 @@ SG_FROM_SYMBOL = {
     x.international.split("=")[-1]: x for k, sgs in SG_FROM_NUMBER.items() for x in sgs
 }
 SG_CHOICES = {int(k): [x.choice for x in v] for k, v in SG_FROM_NUMBER.items()}
+
+with open(os.path.join(os.path.dirname(__file__), "hall_symbols.json")) as f:
+    HALL_SYMBOLS = json.load(f)
 SG_DEFAULT_SETTING_CHOICE = {
     48: "2",
     50: "2",
@@ -145,6 +148,11 @@ class SpaceGroup:
             SymmetryOperation.from_integer_code(s) for s in symops
         ]
         self._sgdata = sgdata
+
+    @property
+    def hall_symbol(self) -> str:
+        "The Hall symbol of this setting, e.g. '-P 2yab' for P 1 21/a 1."
+        return HALL_SYMBOLS[f"{self.international_tables_number}:{self.choice}"]
 
     @property
     def cif_section(self) -> str:
@@ -481,6 +489,32 @@ class SpaceGroup:
         else:
             sgdata = SG_FROM_SYMOPS[encoded]
             return SpaceGroup(sgdata.number, choice=sgdata.choice)
+
+    @classmethod
+    def from_hall_symbol(cls, symbol):
+        """The tabulated setting a Hall symbol describes.
+
+        Args:
+            symbol (str): Hall symbol, e.g. "-P 2ybc" or "P 31 2 (0 0 4)"
+
+        Returns:
+            SpaceGroup: the setting with exactly the symbol's operations
+
+        Raises:
+            ValueError: if the symbol is invalid or its setting is not one of
+                the tabulated settings (`parse_hall_symbol` still gives its
+                operations)
+        """
+        from .hall_symbol import parse_hall_symbol
+
+        try:
+            return cls.from_symmetry_operations(parse_hall_symbol(symbol))
+        except ValueError as e:
+            if "Could not find matching spacegroup" not in str(e):
+                raise
+            raise ValueError(
+                f"Hall symbol {symbol!r} describes a setting that is not tabulated"
+            ) from None
 
     @classmethod
     def from_symbol(cls, symbol):
