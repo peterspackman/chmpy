@@ -31,4 +31,4 @@ class GMF:
             energies.append(float(tokens[7]))
             cuts.append(float(tokens[4]))
 
-        return cls(np.array(hkls), np.array(energies), np.array(cuts))
+        return cls(hkl=np.array(hkls), cuts=np.array(cuts), energies=np.array(energies))
