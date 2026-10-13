@@ -66,3 +66,11 @@ class UnitCellTestCase(unittest.TestCase):
 
         np.testing.assert_allclose([c.alpha_deg, c.beta_deg, c.gamma_deg], 90.0)
         np.testing.assert_allclose(c.parameters, [2, 2, 2, 90, 90, 90])
+
+    def test_metric_tensor_is_gram_matrix_of_lattice_vectors(self):
+        c = UnitCell.triclinic(5.1, 6.3, 7.7, 81.0, 97.0, 104.0, unit="degrees")
+        a, b, cc = c.direct
+        G = c.metric_tensor
+        np.testing.assert_allclose(np.diag(G), [5.1**2, 6.3**2, 7.7**2])
+        self.assertAlmostEqual(G[0, 1], a @ b)
+        self.assertAlmostEqual(G[1, 2], b @ cc)
