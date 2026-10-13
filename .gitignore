@@ -61,3 +61,4 @@ site/
 
 # benchmark inputs and outputs: structures are third-party, results go stale
 benchmarks/data/
+uv.lock
