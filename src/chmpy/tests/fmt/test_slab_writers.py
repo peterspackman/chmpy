@@ -8,13 +8,15 @@ from pathlib import Path
 import numpy as np
 
 from chmpy import Crystal, Slab
+from chmpy.calc.adapters.gulp import available as gulp_available
 from chmpy.core.element import Element
 from chmpy.crystal import AsymmetricUnit, SpaceGroup, UnitCell
 from chmpy.fmt.aims import parse_geometry_string
 from chmpy.fmt.vasp import parse_poscar
 from chmpy.fmt.xyz_file import parse_xyz_string
 
-GULP = shutil.which("gulp") or str(Path.home() / "bin" / "gulp")
+GULP = shutil.which("gulp")
+HAVE_GULP = gulp_available()
 NACL_BUCK = """buck
 Na core Cl core 1170.41 0.3150 0.0 0.0 12.0
 Cl core Cl core 1227.20 0.3214 14.53 0.0 12.0"""
@@ -82,7 +84,7 @@ class SlabWriterTestCase(unittest.TestCase):
                 self.slab.save(Path(tmp, name))
                 self.assertTrue(Path(tmp, name).read_text())
 
-    @unittest.skipUnless(Path(GULP).exists(), "needs gulp")
+    @unittest.skipUnless(HAVE_GULP, "needs GULP")
     def test_gulp_rocksalt_100_surface_energy(self):
         bulk = run_gulp(BULK_NACL)
         energies = {}
@@ -99,7 +101,7 @@ class SlabWriterTestCase(unittest.TestCase):
         self.assertLess(energies[4] * joules_per_m2, 0.4)
         self.assertAlmostEqual(energies[4], energies[6], places=3)
 
-    @unittest.skipUnless(Path(GULP).exists(), "needs gulp")
+    @unittest.skipUnless(HAVE_GULP, "needs GULP")
     def test_gulp_region_2_surface_energy_matches_two_sided(self):
         bulk = run_gulp(BULK_NACL)
         slab = rocksalt_slab(6)
@@ -128,7 +130,7 @@ class SlabWriterTestCase(unittest.TestCase):
         )
         self.assertAlmostEqual(gamma, two_sided * 16.0218, places=2)
 
-    @unittest.skipUnless(Path(GULP).exists(), "needs gulp")
+    @unittest.skipUnless(HAVE_GULP, "needs GULP")
     def test_oriented_bulk_has_the_bulk_energy(self):
         from chmpy.fmt.gulp import crystal_to_gulp_input
 
