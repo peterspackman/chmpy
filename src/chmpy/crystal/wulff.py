@@ -3,49 +3,29 @@ from scipy.spatial import ConvexHull
 
 from chmpy.util.optional import require
 
+from .miller_plane import face_images, reduce_hkl
 
-def expand_symmetry_related_planes(hkl, energies, crystal):
-    hkl.shape[0]
-    sg = crystal.sg
-    len(sg)
-    expanded_facets = []
 
-    R = crystal.uc.reciprocal_lattice
-    RI = crystal.uc.direct.T
-    frac = crystal.to_fractional(hkl @ R)
-    print(frac)
-    print(np.round(crystal.to_cartesian(frac) @ RI, 2).astype(int))
+def expand_symmetry_related_planes(hkl, energies, space_group):
+    """All faces symmetry-equivalent to the given ones, with their energies.
 
-    for s in sg.symmetry_operations:
-        if len(np.nonzero(s.translation)[0]) > 0:
-            continue
-        print("Symop", s)
-        rot = s.rotation.T
-        print(rot)
-        transformed = crystal.to_cartesian(frac @ rot) @ RI
-        print(transformed)
-        transformed = np.round(transformed, 2).astype(int)
-        print(transformed)
-        expanded_facets.append(transformed)
+    Indices are reduced; where two input faces share an image, the lower
+    energy is kept.
 
-    expanded_facets = np.vstack(expanded_facets)
-    tiled_energies = np.tile(energies, expanded_facets.shape[0] // hkl.shape[0])
+    Args:
+        hkl: (N, 3) integer Miller indices
+        energies: (N,) facet energies
+        space_group: SpaceGroup whose point group generates the forms
 
-    # identify the unique directions
-    # we may not need to include the inversion as it should probably
-    # be provided...
+    Returns:
+        (M, 3) unique reduced Miller indices and their (M,) energies
+    """
     unique = {}
-    for i, x in enumerate(expanded_facets):
-        reduced = tuple(x / np.gcd.reduce(x).max())
-        if reduced not in unique or tiled_energies[unique[reduced]] > tiled_energies[i]:
-            unique[reduced] = i
-
-    unique_facets = []
-    unique_energies = []
-    for k, v in unique.items():
-        unique_facets.append(k)
-        unique_energies.append(tiled_energies[v])
-    return np.array(unique_facets), np.array(unique_energies)
+    for h, e in zip(np.asarray(hkl, dtype=int), energies, strict=True):
+        for image, _ in face_images(space_group, reduce_hkl(h)):
+            if image not in unique or e < unique[image]:
+                unique[image] = e
+    return np.array(list(unique.keys())), np.array(list(unique.values()))
 
 
 def project_to_plane(points, plane_normal):

@@ -12,6 +12,7 @@ from .disorder import Disorder, analyse_disorder, disorder_components
 from .point_group import PointGroup
 from .powder import PowderPattern, plot_powder_patterns, powder_pattern
 from .reflection_conditions import ReflectionCondition
+from .slab import Slab
 from .space_group import SpaceGroup
 from .symmetry_operation import SymmetryOperation
 from .unit_cell import UnitCell
@@ -30,4 +31,5 @@ __all__ = [
     "powder_pattern",
     "plot_powder_patterns",
     "ReflectionCondition",
+    "Slab",
 ]

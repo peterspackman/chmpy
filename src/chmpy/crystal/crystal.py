@@ -1302,6 +1302,31 @@ class Crystal:
 
         return save(self, filename, **kwargs)
 
+    def unique_faces(self, d_min: float) -> list:
+        """One MillerPlane per symmetry-distinct form with d-spacing >= d_min
+        (Angstroms), sorted by decreasing d."""
+        from .miller_plane import unique_faces
+
+        return unique_faces(self.space_group, self.unit_cell, d_min)
+
+    def surface_symmetry(self, hkl):
+        "SurfaceSymmetry (plane group, flip and shift operations) of face (hkl)."
+        from .surface_symmetry import SurfaceSymmetry
+
+        return SurfaceSymmetry.from_crystal(self, hkl)
+
+    def surface_terminations(self, hkl, keep_molecules=None) -> list:
+        "Symmetry-distinct cuts of face (hkl), widest gap first."
+        from .slab import terminations
+
+        return terminations(self, hkl, keep_molecules=keep_molecules)
+
+    def cut_slab(self, hkl, **kwargs):
+        "Cut a Slab on (hkl); keyword arguments as for `Slab.from_crystal`."
+        from .slab import Slab
+
+        return Slab.from_crystal(self, hkl, **kwargs)
+
     def enumerate_subgroups(self, max_index: int = 8) -> list:
         """Enumerate translationengleiche (t-) subgroups of this crystal's space group.
 

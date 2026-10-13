@@ -65,3 +65,19 @@ class WulffConstructionTestCase(unittest.TestCase):
             s = WulffSHT(facets_r, facet_energies, l_max=l_max)
             inv = s.power_spectrum()
             np.testing.assert_allclose(inv, invariants_expected, rtol=1e-3, atol=1e-1)
+
+
+class ExpandSymmetryRelatedPlanesTestCase(unittest.TestCase):
+    def test_cubic_forms_keep_lowest_energy(self):
+        from chmpy.crystal import SpaceGroup
+        from chmpy.crystal.wulff import expand_symmetry_related_planes
+
+        hkl, energies = expand_symmetry_related_planes(
+            np.array([(2, 0, 0), (1, 1, 1), (0, 1, 0)]),
+            [2.0, 3.0, 1.0],
+            SpaceGroup(221),
+        )
+        found = {tuple(h): e for h, e in zip(hkl, energies, strict=True)}
+        self.assertEqual(len(found), 14)
+        self.assertEqual(found[(-1, 0, 0)], 1.0)
+        self.assertEqual(found[(1, -1, 1)], 3.0)

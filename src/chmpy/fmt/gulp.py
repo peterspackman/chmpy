@@ -89,6 +89,157 @@ def crystal_to_gulp_input(
     )
 
 
+def slab_to_gulp_input(
+    slab,
+    keywords=None,
+    fixed=None,
+    charges=None,
+    additional_keywords=None,
+    bulk_energy=None,
+):
+    """GULP input for a 2D periodic slab.
+
+    The surface vectors are given by `svectors` and positions by
+    `sfractional`, with the top of the slab at z = 0. Fixed atoms are
+    written as region 2, which GULP holds fixed as the underlying bulk and
+    excludes from the surface energy, so the energy reported is that of the
+    top face; the rest are region 1.
+
+    Args:
+        slab: Slab
+        keywords: GULP keywords
+        fixed: (N,) boolean mask of region 2 atoms; defaults to `slab.fixed`
+        charges: optional per atom (or, for cut slabs, per asymmetric unit
+            atom) charges
+        additional_keywords: dict of extra options written after the
+            coordinates
+        bulk_energy: energy (eV) of the bulk primitive cell; when given,
+            `sbulkenergy` is written for the region 1 layers so GULP reports
+            the surface energy (needs a cut slab and whole fixed layers)
+
+    Returns:
+        str: GULP input contents
+    """
+    from chmpy.core.element import Element
+
+    keywords = keywords or []
+    additional_keywords = additional_keywords or {}
+    fixed = slab.fixed if fixed is None else np.asarray(fixed, dtype=bool)
+    frac = slab.frac_positions
+    z = slab.positions[:, 2] - slab.positions[:, 2].max()
+    q = None
+    if charges is not None:
+        q = np.asarray(charges, dtype=float)
+        if len(q) != len(slab):
+            q = q[slab.asym_atom]
+    lines = [" ".join(keywords), "title", slab.title, "end", "svectors"]
+    for vec in slab.cell[:2]:
+        lines.append(f"{vec[0]:.10f} {vec[1]:.10f}")
+
+    regions = [~fixed, fixed] if fixed.any() else [np.ones(len(slab), dtype=bool)]
+    for region, mask in enumerate(regions, start=1):
+        lines.append(
+            f"sfractional region {region}" if len(regions) > 1 else "sfractional"
+        )
+        for i in np.flatnonzero(mask):
+            line = (
+                f"{Element[slab.elements[i]].symbol} core "
+                f"{frac[i, 0]:.10f} {frac[i, 1]:.10f} {z[i]:.10f}"
+            )
+            if q is not None:
+                line += f" {q[i]:.6f}"
+            lines.append(line)
+    if bulk_energy is not None:
+        lines.append(f"sbulkenergy {_region_1_layers(slab, fixed) * bulk_energy:.10f}")
+    for keyword, argument in additional_keywords.items():
+        if keyword == "species":
+            lines.extend([keyword, str(argument)])
+        else:
+            lines.append(f"{keyword} {argument}")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _region_1_layers(slab, fixed) -> int:
+    "Number of whole layer periods in region 1, each one bulk primitive cell."
+    if slab.layer is None or slab.layers is None:
+        raise ValueError("sbulkenergy needs a slab with layer information")
+    free_layers = np.unique(slab.layer[~fixed])
+    if np.intersect1d(free_layers, slab.layer[fixed]).size:
+        raise ValueError("Region 2 must consist of whole layers for sbulkenergy")
+    return len(free_layers)
+
+
+def gulp_string_to_slab(contents, vacuum: float = 15.0):
+    """Read a Slab from a GULP surface input (svectors and sfractional).
+
+    Region 2 atoms are marked fixed; shells are skipped. GULP surfaces have
+    no third vector, so the slab is placed in a cell with `vacuum`
+    Angstroms between images.
+    """
+    from chmpy.crystal.slab import Slab, parse_slab_title
+
+    lines = contents.splitlines()
+    svectors, elements, positions, fixed, metadata = [], [], [], [], {}
+    region = None
+    i = 0
+    while i < len(lines):
+        tokens = lines[i].split()
+        i += 1
+        if not tokens:
+            continue
+        word = tokens[0].lower()
+        if word == "title":
+            while i < len(lines) and lines[i].strip().lower() != "end":
+                metadata = metadata or parse_slab_title(lines[i])
+                i += 1
+            i += 1
+        elif word.startswith("svec"):
+            svectors = [[float(x) for x in lines[i + j].split()[:2]] for j in range(2)]
+            i += 2
+        elif word.startswith("sfrac"):
+            region = (
+                int(tokens[2])
+                if len(tokens) > 2 and tokens[1].lower().startswith("reg")
+                else 1
+            )
+        elif region is not None:
+            values = tokens[1:]
+            kind = "core"
+            if values and not _is_number(values[0]):
+                kind = values[0].lower()
+                values = values[1:]
+            if len(values) < 3 or not all(_is_number(v) for v in values[:3]):
+                region = None
+                i -= 1
+                continue
+            if kind.startswith("s"):
+                continue
+            elements.append(re.sub(r"\d+$", "", tokens[0]))
+            positions.append([float(x) for x in values[:3]])
+            fixed.append(region == 2)
+    if len(svectors) != 2 or not elements:
+        raise ValueError("GULP input has no svectors or sfractional surface")
+    a = np.array([*svectors[0], 0.0])
+    b = np.array([*svectors[1], 0.0])
+    frac = np.array(positions)
+    z = frac[:, 2]
+    height = z.max() - z.min() + vacuum
+    cart = frac[:, :1] * a + frac[:, 1:2] * b
+    cart[:, 2] = z - 0.5 * (z.max() + z.min()) + 0.5 * height
+    return Slab(
+        np.array([a, b, [0.0, 0.0, height]]), elements, cart, fixed=fixed, **metadata
+    )
+
+
+def _is_number(token) -> bool:
+    try:
+        float(token)
+    except ValueError:
+        return False
+    return True
+
+
 def _gulp_origin(space_group):
     """GULP's `origin` value, or None for the default (origin choice 1).
 

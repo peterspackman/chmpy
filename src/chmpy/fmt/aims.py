@@ -87,6 +87,64 @@ def molecule_to_geometry_string(molecule):
     return "\n".join(lines)
 
 
+def slab_to_geometry_string(slab, fixed=None):
+    """FHI-aims geometry.in for a periodic slab model.
+
+    Args:
+        slab: Slab, written with its vacuum cell (normal along z)
+        fixed: (N,) boolean mask of atoms to hold fixed with
+            constrain_relaxation; defaults to `slab.fixed`
+
+    Returns:
+        str: FHI-aims geometry.in contents
+    """
+    fixed = slab.fixed if fixed is None else np.asarray(fixed, dtype=bool)
+    lines = [f"# {slab.title}"]
+    for vec in slab.cell:
+        lines.append(f"lattice_vector {vec[0]:.8f} {vec[1]:.8f} {vec[2]:.8f}")
+    lines.append("")
+    for n, pos, fix in zip(slab.elements, slab.positions, fixed, strict=True):
+        lines.append(f"atom {pos[0]:.8f} {pos[1]:.8f} {pos[2]:.8f} {Element[n].symbol}")
+        if fix:
+            lines.append("    constrain_relaxation .true.")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def geometry_string_to_slab(contents):
+    """Read a Slab from FHI-aims geometry.in contents.
+
+    The third lattice vector is taken as the vacuum direction; atoms
+    followed by `constrain_relaxation .true.` are marked fixed.
+    """
+    from chmpy.crystal.slab import Slab, parse_slab_title
+
+    lattice, elements, positions, fractional, fixed = [], [], [], [], []
+    metadata = {}
+    for line in contents.splitlines():
+        tokens = line.split()
+        if not tokens:
+            continue
+        if tokens[0].startswith("#"):
+            metadata = metadata or parse_slab_title(line)
+        elif tokens[0] == "lattice_vector":
+            lattice.append([float(x) for x in tokens[1:4]])
+        elif tokens[0] in ("atom", "atom_frac"):
+            positions.append([float(x) for x in tokens[1:4]])
+            elements.append(tokens[4])
+            fractional.append(tokens[0] == "atom_frac")
+            fixed.append(False)
+        elif tokens[0] == "constrain_relaxation" and tokens[1].lower() == ".true.":
+            fixed[-1] = True
+    if len(lattice) != 3:
+        raise ValueError("A slab geometry.in needs three lattice vectors")
+    lattice = np.array(lattice)
+    positions = np.array(positions)
+    frac = np.array(fractional)
+    positions[frac] = positions[frac] @ lattice
+    return Slab(lattice, elements, positions, fixed=fixed, **metadata)
+
+
 def to_geometry_string(obj, **kwargs):
     """Convert a Crystal or Molecule object to FHI-aims geometry.in format.
 
