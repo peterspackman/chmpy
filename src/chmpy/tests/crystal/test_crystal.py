@@ -350,7 +350,9 @@ O1 O 0.0 0.0 0.0
             written["symmetry_Int_Tables_number"],
             crystal.space_group.international_tables_number,
         )
-        self.assertNotIn("symmetry_space_group_name_Hall", written)
+        self.assertEqual(
+            written["symmetry_space_group_name_Hall"], crystal.space_group.hall_symbol
+        )
 
     def test_source_data_can_be_left_out(self):
         crystal = Crystal.load(TEST_FILES["r3c_example.cif"])

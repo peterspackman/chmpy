@@ -211,19 +211,40 @@ def from_cif_data(cif_data, titl=None):
             number = int(cif_data[k])
             break
 
-    # Try to parse the Hermann-Mauguin symbol first
+    # The setting comes from the Hall symbol, else the H-M symbol, unless the
+    # listed operations contradict it
     hm_parsed = False
+    hall_symbol = str(cif_data.get("symmetry_space_group_name_Hall") or "").strip()
     hm_symbol = str(cif_data.get("symmetry_space_group_name_H-M") or "").strip()
-    if hm_symbol:
+    used_symbol = None
+    if hall_symbol:
         try:
-            # Convert CIF Hermann-Mauguin notation to correct SpaceGroup
+            space_group = SpaceGroup.from_hall_symbol(hall_symbol)
+            hm_parsed = True
+            used_symbol = f"Hall symbol {hall_symbol!r}"
+        except (ValueError, KeyError):
+            pass
+    if not hm_parsed and hm_symbol:
+        try:
             space_group = _parse_hermann_mauguin_symbol(hm_symbol, number)
             hm_parsed = True
+            used_symbol = f"H-M symbol {hm_symbol!r}"
         except (ValueError, KeyError):
-            # Fall back to symmetry operations if HM symbol parsing fails
             pass
 
-    # Only try symmetry operations if HM parsing failed
+    listed = next((cif_data[k] for k in symop_data_names if k in cif_data), None)
+    if hm_parsed and listed is not None:
+        listed_codes = {SymmetryOperation.from_string_code(x).integer_code for x in listed}
+        symbol_codes = {op.integer_code for op in space_group.symmetry_operations}
+        if listed_codes != symbol_codes:
+            LOG.warning(
+                "%s disagrees with the listed symmetry operations; "
+                "using the operations",
+                used_symbol,
+            )
+            hm_parsed = False
+
+    # Only try symmetry operations if no symbol gave the setting
     if not hm_parsed:
         for symop_data_block in symop_data_names:
             if symop_data_block in cif_data:
@@ -497,6 +518,27 @@ CORE_ATOM_SITE_NAMES = (
 SYMMETRY_LOOP_NAMES = ("symmetry_equiv_pos_site_id", "symmetry_equiv_pos_as_xyz")
 
 
+def _cif_hermann_mauguin(space_group) -> str:
+    """The H-M symbol to write to a CIF: the full symbol in CIF spacing for
+    monoclinic groups, whose short symbol does not identify the setting,
+    otherwise the short symbol."""
+    import re
+
+    if not 3 <= space_group.international_tables_number <= 15:
+        return space_group.symbol
+    symbol = space_group.full_symbol
+    parts = re.findall(r"\d(?:_\d)?(?:/[a-z])?|[a-z]", symbol[1:])
+    return " ".join([symbol[0], *(x.replace("_", "") for x in parts)])
+
+
+def _cif_hall(space_group) -> str:
+    "The Hall symbol of a tabulated setting, or '?' for any other."
+    try:
+        return space_group.hall_symbol
+    except KeyError:
+        return "?"
+
+
 def to_cif_data(crystal, data_block_name=None, source_data=True) -> CifBlock:
     """Convert a crystal structure to CIF data.
 
@@ -529,7 +571,8 @@ def to_cif_data(crystal, data_block_name=None, source_data=True) -> CifBlock:
         "cell_angle_beta": cell.beta_deg,
         "cell_angle_gamma": cell.gamma_deg,
         "cell_volume": cell.volume(),
-        "symmetry_space_group_name_H-M": space_group.symbol,
+        "symmetry_space_group_name_H-M": _cif_hermann_mauguin(space_group),
+        "symmetry_space_group_name_Hall": _cif_hall(space_group),
         "symmetry_Int_Tables_number": space_group.international_tables_number,
         "symmetry_equiv_pos_site_id": list(range(1, len(symmetry_operations) + 1)),
         "symmetry_equiv_pos_as_xyz": [str(x) for x in symmetry_operations],
