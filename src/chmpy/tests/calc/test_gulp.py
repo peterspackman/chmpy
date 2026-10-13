@@ -257,6 +257,46 @@ def test_gulp_sees_the_geometry_it_was_given(relaxed):
     assert after.energy - before.energy == pytest.approx(predicted, rel=0.05)
 
 
+def _rotated_mgo(relaxed):
+    """Distorted MgO, and the same thing rigidly rotated out of GULP's frame."""
+    from scipy.spatial.transform import Rotation
+
+    structure, calc = relaxed
+    system = System.from_crystal(structure)
+    system.set_cell(np.asarray(system.cell) * [0.98, 1.0, 1.01], scale_atoms=True)
+    positions = np.array(system.positions)
+    positions[1] += [0.08, -0.05, 0.03]
+    system.set_positions(positions)
+
+    rotation = Rotation.from_euler("zyx", [30, 50, 70], degrees=True).as_matrix()
+    rotated = System(
+        system.numbers,
+        system.positions @ rotation.T,
+        np.asarray(system.cell) @ rotation.T,
+    )
+    return system, rotated, rotation, calc
+
+
+def test_forces_and_stress_rotate_with_the_structure(relaxed):
+    "Forces and stress rotate with the cell, whatever its orientation."
+    system, rotated, rotation, calc = _rotated_mgo(relaxed)
+    want = ("energy", "forces", "stress")
+    reference = calc(system, want)
+    result = calc(rotated, want)
+
+    assert result.energy == pytest.approx(reference.energy, abs=1e-8)
+    np.testing.assert_allclose(result.forces, reference.forces @ rotation.T, atol=1e-6)
+    np.testing.assert_allclose(
+        result.stress, rotation @ reference.stress @ rotation.T, atol=1e-8
+    )
+
+
+def test_gradients_agree_with_finite_differences_in_any_orientation(relaxed):
+    _, rotated, _, calc = _rotated_mgo(relaxed)
+    check = calc.check_gradients(rotated, step=1e-4, tolerance=1e-5)
+    assert check.ok, str(check)
+
+
 # rutile TiO2 (Matsui & Akaogi); O on 4f (x, x, 0) relaxes under strain
 RUTILE_POTENTIALS = """species
 Ti core  2.196

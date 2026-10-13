@@ -141,6 +141,8 @@ class GulpCalculator(Calculator):
                     f"keywords, which are {self.keywords}"
                 )
             forces = -np.asarray(gradients, dtype=float)
+            if system.periodic:
+                forces = forces @ _from_gulp_frame(system.cell)
 
         stress = None
         if STRESS in want and system.periodic:
@@ -150,6 +152,8 @@ class GulpCalculator(Calculator):
                     f"the keywords, which are {self.keywords}"
                 )
             stress = _to_matrix(np.asarray(strain, dtype=float)) / system.volume
+            rotation = _from_gulp_frame(system.cell)
+            stress = rotation.T @ stress @ rotation
 
         return Result(
             energy=float(energy),
@@ -188,6 +192,25 @@ class GulpCalculator(Calculator):
                 keywords.append("conv")
             body = molecule_to_gulp_input(system.to_molecule(), keywords=keywords)
         return f"{body}\n{self.potentials}\n"
+
+
+def _from_gulp_frame(cell) -> np.ndarray:
+    """The rotation taking GULP's Cartesian frame to the one `cell` is in.
+
+    The input gives GULP only the cell's lengths and angles, and it rebuilds
+    the lattice with a along x and b in the xy plane. Its Cartesian
+    derivatives are in that frame, so for a cell in any other orientation they
+    must be rotated back: with lattice vectors as rows, `cell = gulp @ R`, and
+    a row vector in GULP's frame maps to ours as `v @ R`.
+    """
+    from chmpy.crystal import UnitCell
+
+    cell = np.asarray(cell, dtype=float)
+    parameters = UnitCell(cell).parameters  # what the input gives GULP
+    gulp = UnitCell.from_lengths_and_angles(
+        parameters[:3], parameters[3:], unit="degrees"
+    ).direct
+    return np.linalg.solve(gulp, cell)
 
 
 def _to_matrix(strain_gradients) -> np.ndarray:
