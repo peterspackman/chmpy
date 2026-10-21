@@ -222,6 +222,7 @@ class _Cut:
     centre: Fraction
     flip: object
     keep_molecules: bool
+    bottom: float
 
 
 def _atomic_numbers(elements) -> np.ndarray:
@@ -322,6 +323,7 @@ class Slab:
         thickness: float = 10.0,
         vacuum: float = 15.0,
         keep_molecules: bool | None = None,
+        symmetric: bool = False,
     ) -> Slab:
         """Cut a slab from a crystal.
 
@@ -337,6 +339,10 @@ class Slab:
             vacuum: vacuum gap (Angstroms) in the periodic cell
             keep_molecules: keep molecules whole; by default True for
                 molecular crystals
+            symmetric: cut the bottom face at the image of the top cut under
+                an operation exchanging the faces, so that both faces have
+                the top termination. The slab then spans between `layers - 1`
+                and `layers` layer periods and need not be stoichiometric.
         """
         if keep_molecules is None:
             keep_molecules = is_molecular(crystal)
@@ -347,13 +353,17 @@ class Slab:
         d = symmetry.layer_spacing
         if layers is None:
             layers = max(1, ceil(thickness / d - 1e-9))
+        bottom = _symmetric_bottom(symmetry, offset) if symmetric else offset
 
         columns = {k: [] for k in ("pos", "el", "layer", "mol", "uc", "asym", "unit")}
         units = _surface_units(crystal, symmetry, keep_molecules)
         for u, unit in enumerate(units):
             base = unit.positions - [0.0, 0.0, np.floor(unit.reference[2] - offset)]
+            base_z = base[:, 2].mean()
             n = len(unit.elements)
             for k in range(layers):
+                if base_z + k < bottom:
+                    continue
                 columns["pos"].append(base + [0.0, 0.0, k])
                 columns["el"].append(unit.elements)
                 columns["layer"].append(np.full(n, k))
@@ -370,11 +380,13 @@ class Slab:
         flip = _find_flip(symmetry, surface_pos, data["el"])
         if flip is not None:
             centre = flip[1] / 2
+        elif symmetric:
+            raise ValueError(f"Could not cut a symmetric slab on {symmetry.hkl}")
         else:
-            centre = Fraction(round((offset + layers / 2) * 12), 12)
+            centre = Fraction(round((bottom + offset + layers) / 2 * 12), 12)
 
         vectors = symmetry.plane.vectors @ symmetry.plane.surface_frame().T
-        c = layers * d + vacuum
+        c = (offset + layers - bottom) * d + vacuum
         cell = np.array([vectors[0], vectors[1], [0.0, 0.0, c]])
         shifted = surface_pos - [0.0, 0.0, float(centre)]
         cart = shifted @ vectors + [0.0, 0.0, 0.5 * c]
@@ -399,7 +411,9 @@ class Slab:
         )
         slab.unit_cell_atom = data["uc"]
         slab.asym_atom = data["asym"]
-        slab._cut = _Cut(crystal, symmetry, surface_pos, centre, flip, keep_molecules)
+        slab._cut = _Cut(
+            crystal, symmetry, surface_pos, centre, flip, keep_molecules, bottom
+        )
         return slab
 
     @classmethod
@@ -463,9 +477,15 @@ class Slab:
         """Slab thickness (Angstroms): the layer periods of a cut slab,
         otherwise the extent of the atoms along the normal."""
         if self._cut is not None:
-            return self.layers * self._cut.symmetry.layer_spacing
+            span = self.offset + self.layers - self._cut.bottom
+            return span * self._cut.symmetry.layer_spacing
         z = self.positions[:, 2]
         return float(z.max() - z.min())
+
+    @property
+    def n_units(self) -> int:
+        "Number of molecules (or atoms, for atomic cuts) in the slab."
+        return len(np.unique(self.fragment))
 
     @property
     def vacuum(self) -> float:
@@ -628,14 +648,21 @@ class Slab:
         from .space_group import SpaceGroup
         from .unit_cell import UnitCell
 
-        plane = self._cut.symmetry.plane
+        cut = self._cut
+        plane = cut.symmetry.plane
         vectors = plane.vectors @ plane.surface_frame().T
-        mask = self.layer == 0
-        frac = self._cut.surface_positions[mask]
+        units = _surface_units(cut.crystal, cut.symmetry, cut.keep_molecules)
+        frac = np.vstack(
+            [
+                u.positions - [0.0, 0.0, np.floor(u.reference[2] - self.offset)]
+                for u in units
+            ]
+        )
+        elements = np.concatenate([u.elements for u in units])
         return Crystal(
             UnitCell(vectors),
             SpaceGroup(1),
-            AsymmetricUnit([Element[x] for x in self.elements[mask]], frac),
+            AsymmetricUnit([Element[x] for x in elements], frac),
             titl=self.title.replace(" ", "_") + "_bulk",
         )
 
@@ -735,6 +762,21 @@ def parse_slab_title(text: str) -> dict:
     if layers is not None:
         result["layers"] = int(layers)
     return result
+
+
+def _symmetric_bottom(symmetry, offset: float) -> float:
+    """Height of a bottom cut whose face matches the top cut at `offset`:
+    its image under a face-exchanging operation, the nearest one above."""
+    flips = symmetry.flip_operations
+    if not flips:
+        raise ValueError(
+            f"No operation exchanges the two faces of {symmetry.hkl}, "
+            "so it has no symmetric slab"
+        )
+    rises = [
+        round((float(op.translation[2]) - 2 * offset) % 1.0, 9) % 1.0 for op in flips
+    ]
+    return offset + min(rises)
 
 
 def _find_flip(symmetry, surface_positions, elements):

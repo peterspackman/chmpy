@@ -5,6 +5,8 @@ import numpy as np
 from scipy.sparse.csgraph import connected_components
 
 from chmpy import Crystal, Molecule
+from chmpy.calc import System
+from chmpy.calc.potentials import LennardJones
 from chmpy.core.element import Element
 from chmpy.crystal import AsymmetricUnit, SpaceGroup, UnitCell
 from chmpy.crystal.slab import Slab, is_molecular, terminations
@@ -106,3 +108,50 @@ class SlabTestCase(unittest.TestCase):
         self.assertTrue(
             np.all(slab.positions[slab.fixed_mask(2), 2] < slab.cell[2, 2] / 2)
         )
+
+
+class SymmetricSlabTestCase(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.acetic = Crystal.load(join(TEST_FILES, "acetic_acid.cif"))
+        cls.cuts = terminations(cls.acetic, (1, 1, 0))
+        cls.calc = LennardJones(epsilon=0.005, sigma=3.0, cutoff=8.0)
+
+    def slab(self, termination, symmetric):
+        return Slab.from_crystal(
+            self.acetic,
+            (1, 1, 0),
+            termination=self.cuts[termination],
+            layers=5,
+            vacuum=20.0,
+            symmetric=symmetric,
+        )
+
+    def gamma(self, slab):
+        bulk = slab.oriented_bulk()
+        e_bulk = self.calc(System.from_crystal(bulk)).energy
+        e_slab = self.calc(System(slab.elements, slab.positions, slab.cell)).energy
+        per_molecule = e_bulk / len(bulk.unit_cell_molecules())
+        return (e_slab - slab.n_units * per_molecule) / (2 * slab.area)
+
+    def test_both_faces_share_the_top_termination(self):
+        for termination in (1, 2):
+            self.assertFalse(self.slab(termination, symmetric=False).is_symmetric)
+            self.assertTrue(self.slab(termination, symmetric=True).is_symmetric)
+
+    def test_self_paired_termination_is_unchanged(self):
+        plain, symmetric = self.slab(0, False), self.slab(0, True)
+        self.assertEqual(len(plain), len(symmetric))
+        self.assertAlmostEqual(plain.thickness, symmetric.thickness)
+
+    def test_stoichiometric_slab_averages_the_two_faces(self):
+        "Exact for a pair potential, which also gives both faces the same energy."
+        average = self.gamma(self.slab(1, symmetric=False))
+        faces = [self.gamma(self.slab(t, symmetric=True)) for t in (1, 2)]
+        self.assertAlmostEqual(average, self.gamma(self.slab(2, symmetric=False)))
+        self.assertAlmostEqual(average, np.mean(faces), places=8)
+        self.assertAlmostEqual(faces[0], faces[1], places=8)
+
+    def test_no_symmetric_slab_without_a_face_exchanging_operation(self):
+        with self.assertRaises(ValueError):
+            Slab.from_crystal(self.acetic, (0, 0, 1), layers=2, symmetric=True)
