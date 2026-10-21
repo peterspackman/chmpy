@@ -1,10 +1,15 @@
 import numpy as np
 
+from .cna import StructureType, adaptive_cna, fixed_cna, interval_cna
 from .symmetry_function_ani1 import SymmetryFunctionsANI1
 
 __all__ = [
     "selling_scalars",
+    "StructureType",
     "SymmetryFunctionsANI1",
+    "adaptive_cna",
+    "fixed_cna",
+    "interval_cna",
 ]
 
 

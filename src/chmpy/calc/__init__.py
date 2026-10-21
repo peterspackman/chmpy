@@ -17,6 +17,7 @@ example.
 """
 
 from .base import Calculator, PropertyNotAvailable, ShiftedCalculator, SumCalculator
+from .nearest import NearestNeighbors, nearest_neighbors
 from .neighbors import NeighborList, Neighbors
 from .potentials import ExternalStress, LennardJones, PairPotential
 from .result import (
@@ -41,6 +42,7 @@ __all__ = [
     "CalculatorStats",
     "GradientCheck",
     "LennardJones",
+    "NearestNeighbors",
     "NeighborList",
     "Neighbors",
     "ExternalStress",
@@ -50,4 +52,5 @@ __all__ = [
     "ShiftedCalculator",
     "SumCalculator",
     "System",
+    "nearest_neighbors",
 ]
