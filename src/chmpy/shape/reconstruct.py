@@ -53,8 +53,8 @@ def reconstruct(coefficients, real=True, pole_extension_factor=2):
         faces.append(
             [
                 north_pole_index,
-                north_pole_indices[(i + 1) % sht.nphi],
                 north_pole_indices[i],
+                north_pole_indices[(i + 1) % sht.nphi],
             ]
         )
         faces.append(

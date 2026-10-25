@@ -147,8 +147,8 @@ def cartesian_to_spherical(xyz: np.ndarray, dtype=np.float64) -> np.ndarray:
     rtp[:, 0] = np.sqrt(
         xyz[:, 0] * xyz[:, 0] + xyz[:, 1] * xyz[:, 1] + xyz[:, 2] * xyz[:, 2]
     )
-    rtp[:, 1] = np.fmod(np.arctan2(xyz[:, 1], xyz[:, 0]) + 4 * np.pi, 2 * np.pi)
-    rtp[:, 2] = np.arccos(xyz[:, 2] / rtp[:, 0])
+    rtp[:, 1] = np.arccos(xyz[:, 2] / rtp[:, 0])
+    rtp[:, 2] = np.fmod(np.arctan2(xyz[:, 1], xyz[:, 0]) + 4 * np.pi, 2 * np.pi)
     return rtp
 
 

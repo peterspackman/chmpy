@@ -93,7 +93,9 @@ def calculate_coordination_numbers_crystal(crystal, cutoff=None):
         count = 0.5 * (1.0 + erf(-kcn_value * (dists - rc) / rc))
 
         cn[i] += 0.5 * count.sum()
-        cn[atom_neighbors[:, 0].astype(int)] += 0.5 * count[:]
+        # a neighbour can appear more than once (as different periodic
+        # images), and fancy-indexed += would keep only one of them
+        np.add.at(cn, atom_neighbors[:, 0].astype(int), 0.5 * count)
 
     return cn
 

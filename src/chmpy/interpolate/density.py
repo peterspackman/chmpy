@@ -63,7 +63,7 @@ class PromoleculeDensity:
             d_n = (d - vdw) / vdw
             p = np.argmin(d_n)
             d_norm[j] = d_n[p]
-            vecs[j] = (pos[p] - positions[j]) / vdw[p]
+            vecs[j] = (pos[i[p]] - positions[j]) / vdw[p]
         if dists.ndim == 1:
             return dists, d_norm, vecs
         return dists[:, 0], d_norm, vecs

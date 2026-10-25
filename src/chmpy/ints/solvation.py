@@ -1,7 +1,7 @@
 import logging
 
 import numpy as np
-from scipy.spatial.kdtree import cKDTree as KDTree
+from scipy.spatial import cKDTree as KDTree
 
 from .lebedev import load_grid_num_points
 

@@ -345,17 +345,14 @@ class SHT:
             result += self.plm_work_array[plm_idx] * coeffs[plm_idx].real
             plm_idx += 1
 
-        mv = 2 * np.exp(1j * np.arange(1, self.lmax + 1) * phi)
-        sign = 1
+        # a real function's m < 0 coefficients are the conjugates of its m > 0
+        # ones, so each pair contributes twice the real part of the m > 0 term
         for m in range(1, self.lmax + 1):
             tmp = 0.0
-            sign *= -1
             for _l in range(m, self.lmax + 1):
-                # m +ve and m -ve
-                tmp += sign * self.plm_work_array[plm_idx] * coeffs[plm_idx]
+                tmp += self.plm_work_array[plm_idx] * coeffs[plm_idx]
                 plm_idx += 1
-
-            result += tmp.real * mv[m - 1].real + tmp.imag * mv[m - 1].imag
+            result += 2 * (-1) ** m * (tmp * np.exp(1j * m * phi)).real
         return result
 
     def _eval_at_points_cplx(self, coeffs, theta, phi):
@@ -370,26 +367,16 @@ class SHT:
             result += self.plm_work_array[plm_idx] * coeffs[l_offset]
             plm_idx += 1
 
-        mv = np.exp(1j * np.arange(-self.lmax, self.lmax + 1) * phi)
-        cos_vals = 0.0
-        sin_vals = 0.0
         for m in range(1, self.lmax + 1):
-            tmpr = 0.0
-            tmpc = 0.0
+            positive = 0.0
+            negative = 0.0
             for l in range(m, self.lmax + 1):
                 l_offset = l * (l + 1)
-                tmpr += self.plm_work_array[plm_idx] * coeffs[l_offset + m]
-                tmpc += self.plm_work_array[plm_idx] * coeffs[l_offset - m]
+                positive += self.plm_work_array[plm_idx] * coeffs[l_offset + m]
+                negative += self.plm_work_array[plm_idx] * coeffs[l_offset - m]
                 plm_idx += 1
-            if m & 1:
-                tmpc = -tmpc
-            cos_vals += np.real(mv[self.lmax + m]) * (tmpr + tmpc)
-            sin_vals += np.imag(mv[self.lmax - m]) * (tmpr - tmpc)
-        result += (
-            np.real(cos_vals)
-            - np.imag(sin_vals)
-            + 1j * (np.imag(cos_vals) + np.real(sin_vals))
-        )
+            result += (-1) ** m * positive * np.exp(1j * m * phi)
+            result += negative * np.exp(-1j * m * phi)
         return result
 
     def evaluate_at_points(self, coeffs, theta, phi):

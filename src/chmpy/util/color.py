@@ -52,5 +52,5 @@ def property_to_color(prop, cmap="viridis", **kwargs):
     else:
         import numpy as np
 
-        prop = np.clip(prop, vmin, vmax) - vmin
+        prop = (np.clip(prop, vmin, vmax) - vmin) / (vmax - vmin)
         return colormap(prop)

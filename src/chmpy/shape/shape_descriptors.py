@@ -31,7 +31,7 @@ def make_N_invariants(coefficients) -> np.ndarray:
     for i in range(0, size):
         lower, upper = i**2, (i + 1) ** 2
         invariants[i] = np.sum(
-            coefficients[lower : upper + 1] * np.conj(coefficients[lower : upper + 1])
+            coefficients[lower:upper] * np.conj(coefficients[lower:upper])
         ).real
     return np.sqrt(invariants)
 

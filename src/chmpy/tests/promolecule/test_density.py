@@ -36,7 +36,8 @@ class PromoleculeDensityTestCase(unittest.TestCase):
         d, d_norm, vecs = self.dens.d_norm(pts)
         expected = np.array((-1.0, -0.082569))
         expected_d = np.array((0.0, 1.0))
-        expected_vecs = np.array(((-0.917431, 0, 0), (-1.834862, 0, 0)))
+        # each vector points at the nearest atom: the first point sits on atom 1
+        expected_vecs = np.array(((0, 0, 0), (-0.917431, 0, 0)))
         np.testing.assert_allclose(d_norm, expected, atol=1e-5)
         np.testing.assert_allclose(d, expected_d, atol=1e-5)
         np.testing.assert_allclose(vecs, expected_vecs, atol=1e-5)
