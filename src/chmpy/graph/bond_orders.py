@@ -128,9 +128,7 @@ def perceive_bond_orders(graph: "MolecularGraph") -> np.ndarray:
     return bond_orders
 
 
-def _bond_length_heuristic(
-    graph: "MolecularGraph", atom_i: int, atom_j: int
-) -> float:
+def _bond_length_heuristic(graph: "MolecularGraph", atom_i: int, atom_j: int) -> float:
     """
     Estimate bond order from bond length.
 

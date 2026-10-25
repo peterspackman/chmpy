@@ -36,12 +36,12 @@ BOND_LENGTH_THRESHOLDS = {
     # (element1, element2): (single_min, double_max)
     # If length < double_max: could be double/aromatic
     # If length > single_min: likely single
-    (6, 6): (1.45, 1.44),   # C-C: single > 1.45, double/arom < 1.44
-    (6, 7): (1.40, 1.38),   # C-N
-    (6, 8): (1.36, 1.32),   # C-O
+    (6, 6): (1.45, 1.44),  # C-C: single > 1.45, double/arom < 1.44
+    (6, 7): (1.40, 1.38),  # C-N
+    (6, 8): (1.36, 1.32),  # C-O
     (6, 16): (1.78, 1.72),  # C-S
-    (7, 7): (1.40, 1.30),   # N-N
-    (7, 8): (1.36, 1.25),   # N-O
+    (7, 7): (1.40, 1.30),  # N-N
+    (7, 8): (1.36, 1.25),  # N-O
 }
 
 
@@ -133,9 +133,7 @@ def is_aromatic_ring(graph: "MolecularGraph", ring: tuple[int, ...]) -> bool:
     return _satisfies_huckel_rule(pi_electrons)
 
 
-def count_pi_electrons(
-    graph: "MolecularGraph", ring: tuple[int, ...]
-) -> int | None:
+def count_pi_electrons(graph: "MolecularGraph", ring: tuple[int, ...]) -> int | None:
     """
     Count the number of π electrons contributed to a ring.
 
@@ -362,10 +360,12 @@ def _ring_bond_lengths_conjugated(
     return True
 
 
-def _get_bond_distance(graph: "MolecularGraph", atom_i: int, atom_j: int) -> float | None:
+def _get_bond_distance(
+    graph: "MolecularGraph", atom_i: int, atom_j: int
+) -> float | None:
     """Get the distance between two bonded atoms."""
     # Try to get from graph's bond_distance method if available
-    if hasattr(graph, 'bond_distance'):
+    if hasattr(graph, "bond_distance"):
         dist = graph.bond_distance(atom_i, atom_j)
         if dist is not None:
             return dist

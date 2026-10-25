@@ -57,7 +57,9 @@ def crystal_to_geometry_string(crystal, use_cartesian=False):
         # Use fractional coordinates
         frac_pos = uc_atoms["frac_pos"]
         for pos, el in zip(frac_pos, elements, strict=True):
-            lines.append(f"atom_frac {pos[0]:.6f} {pos[1]:.6f} {pos[2]:.6f} {el.symbol}")
+            lines.append(
+                f"atom_frac {pos[0]:.6f} {pos[1]:.6f} {pos[2]:.6f} {el.symbol}"
+            )
 
     lines.append("")  # Trailing blank line
     return "\n".join(lines)
@@ -237,7 +239,9 @@ def parse_geometry_string(contents):
     if lattice_vectors:
         result["lattice"] = np.array(lattice_vectors)
 
-    LOG.debug("Parsed %d atoms, %d lattice vectors", len(elements), len(lattice_vectors))
+    LOG.debug(
+        "Parsed %d atoms, %d lattice vectors", len(elements), len(lattice_vectors)
+    )
 
     return result
 
@@ -361,7 +365,7 @@ def generate_control_in(
         ...     xc="pbe",
         ...     k_grid=(4, 4, 4),
         ...     relax_geometry=True,
-        ...     relax_unit_cell="full"
+        ...     relax_unit_cell="full",
         ... )
     """
     species_dir = Path(species_defaults_dir).expanduser()
@@ -426,7 +430,9 @@ def generate_control_in(
     if is_periodic:
         if k_grid is not None:
             if len(k_grid) == 3:
-                lines.append(f"k_grid                             {k_grid[0]} {k_grid[1]} {k_grid[2]}")
+                lines.append(
+                    f"k_grid                             {k_grid[0]} {k_grid[1]} {k_grid[2]}"
+                )
             else:
                 raise ValueError("k_grid must be a tuple/list of 3 integers")
         else:
@@ -446,7 +452,9 @@ def generate_control_in(
 
     # Add species defaults
     for element in sorted(elements):
-        species_file = basis_dir / f"{element.atomic_number:02d}_{element.symbol}_default"
+        species_file = (
+            basis_dir / f"{element.atomic_number:02d}_{element.symbol}_default"
+        )
         if not species_file.exists():
             LOG.warning(f"Species file not found: {species_file}")
             LOG.warning(f"Skipping species {element.symbol}")
@@ -492,7 +500,9 @@ class OptimizationStep:
     def to_crystal(self):
         """Convert this step to a Crystal object."""
         if self.lattice is None:
-            raise ValueError("No lattice vectors available - this is not a periodic system")
+            raise ValueError(
+                "No lattice vectors available - this is not a periodic system"
+            )
         if self.elements is None or self.positions is None:
             raise ValueError("No atomic structure available for this step")
 
@@ -741,7 +751,9 @@ class AimsOutput:
                     in_structure_block = False
                     step = OptimizationStep(
                         step_number=current_step,
-                        energy=pending_energy if pending_energy else (energies[-1] if energies else None),
+                        energy=pending_energy
+                        if pending_energy
+                        else (energies[-1] if energies else None),
                         max_force=current_max_force,
                         forces_on_atoms=current_forces_atoms,
                         forces_on_lattice=current_forces_lattice,
@@ -882,6 +894,8 @@ class AimsOutput:
             lines.append(comment)
 
             for el, pos in zip(mol.elements, mol.positions, strict=True):
-                lines.append(f"{el.symbol:2s} {pos[0]:15.8f} {pos[1]:15.8f} {pos[2]:15.8f}")
+                lines.append(
+                    f"{el.symbol:2s} {pos[0]:15.8f} {pos[1]:15.8f} {pos[2]:15.8f}"
+                )
 
         Path(filename).write_text("\n".join(lines) + "\n")

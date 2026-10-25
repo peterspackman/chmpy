@@ -196,9 +196,9 @@ class MolecularAxesTestCase(unittest.TestCase):
 
     def test_homogeneous_matches_plain(self):
         mol = self.bent_molecule()
-        homogeneous = np.c_[mol.positions, np.ones(len(mol))] @ mol.axes(
-            homogeneous=True
-        ).T
+        homogeneous = (
+            np.c_[mol.positions, np.ones(len(mol))] @ mol.axes(homogeneous=True).T
+        )
         np.testing.assert_allclose(
             homogeneous[:, :3],
             mol.positions_in_molecular_axis_frame(),

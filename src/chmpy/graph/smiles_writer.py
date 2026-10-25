@@ -74,6 +74,7 @@ def to_smiles(
     # Optionally guess formal charges
     if guess_charges:
         from .formal_charges import assign_formal_charges
+
         graph = assign_formal_charges(graph)
 
     # Get canonical ordering if requested
@@ -211,8 +212,11 @@ class _SMILESWriter:
                 visited.add(atom)
                 parent[atom] = from_atom
 
-                neighbors = [n for n in self.graph.neighbors(atom)
-                           if n not in self.skip_atoms and n != from_atom]
+                neighbors = [
+                    n
+                    for n in self.graph.neighbors(atom)
+                    if n not in self.skip_atoms and n != from_atom
+                ]
                 neighbors.sort(key=lambda x: self.ordering[x], reverse=True)
 
                 for neighbor in neighbors:
@@ -228,7 +232,9 @@ class _SMILESWriter:
                             # Record ring opening at the earlier-visited atom (neighbor)
                             if neighbor not in self.ring_openings:
                                 self.ring_openings[neighbor] = []
-                            self.ring_openings[neighbor].append((ring_num, bond_symbol, atom))
+                            self.ring_openings[neighbor].append(
+                                (ring_num, bond_symbol, atom)
+                            )
 
                             # Record ring closing at current atom
                             if atom not in self.ring_openings:
@@ -384,16 +390,22 @@ class _SMILESWriter:
                 ring_partners.append(other_atom)
 
         # Get neighbors (excluding where we came from and skipped atoms)
-        neighbors = [n for n in self.graph.neighbors(atom_idx)
-                    if n != from_atom and n not in self.skip_atoms]
+        neighbors = [
+            n
+            for n in self.graph.neighbors(atom_idx)
+            if n != from_atom and n not in self.skip_atoms
+        ]
         neighbors.sort(key=lambda x: self.ordering[x])
 
         # Get ring closure targets from this atom (these are handled via ring numbers, not branches)
         ring_closure_targets = set(ring_partners)
 
         # Filter out already-visited neighbors and ring closure targets
-        branch_neighbors = [n for n in neighbors
-                           if n not in self.visited and n not in ring_closure_targets]
+        branch_neighbors = [
+            n
+            for n in neighbors
+            if n not in self.visited and n not in ring_closure_targets
+        ]
 
         branches = []
         for neighbor in branch_neighbors:
@@ -483,8 +495,11 @@ class _SMILESWriter:
             actual_bonds = self._count_aromatic_bonds(atom_idx)
             expected_h = max(0, aromatic_valence - actual_bonds)
             # Count explicit H neighbors that were skipped
-            explicit_h = sum(1 for n in self.graph.neighbors(atom_idx)
-                            if self.graph.atomic_numbers[n] == 1 and n in self.skip_atoms)
+            explicit_h = sum(
+                1
+                for n in self.graph.neighbors(atom_idx)
+                if self.graph.atomic_numbers[n] == 1 and n in self.skip_atoms
+            )
             total_h = expected_h  # Use expected H for aromatic atoms
             # Only need brackets if we have explicit H that differs
             if explicit_h > 0 and explicit_h != expected_h:
@@ -493,14 +508,19 @@ class _SMILESWriter:
         else:
             # For non-aromatic atoms, use standard valence model
             # Count explicit H neighbors (hydrogens in skip_atoms that are bonded to this atom)
-            explicit_h = sum(1 for n in self.graph.neighbors(atom_idx)
-                            if self.graph.atomic_numbers[n] == 1 and n in self.skip_atoms)
+            explicit_h = sum(
+                1
+                for n in self.graph.neighbors(atom_idx)
+                if self.graph.atomic_numbers[n] == 1 and n in self.skip_atoms
+            )
 
             # Calculate expected H based on valence, charge, and non-H bonds
             # Charge affects effective valence: + charge adds capacity, - charge removes
             # N+ (charge +1) has valence 4, O- (charge -1) has valence 1
             default_valence = self._default_valence(z, is_aromatic)
-            actual_non_h_bonds = self._count_bonds(atom_idx)  # this excludes H in skip_atoms
+            actual_non_h_bonds = self._count_bonds(
+                atom_idx
+            )  # this excludes H in skip_atoms
 
             # total_h is how many H are attached (explicit) + how many should be implicit
             # For atoms in brackets, we display the actual H count
@@ -519,8 +539,13 @@ class _SMILESWriter:
             total_h += expected_h
 
             # Check if brackets needed due to unexpected H count
-            standard_expected_h = max(0, default_valence - actual_non_h_bonds - explicit_h)
-            if symbol.upper() in ORGANIC_SUBSET and total_h != standard_expected_h + explicit_h:
+            standard_expected_h = max(
+                0, default_valence - actual_non_h_bonds - explicit_h
+            )
+            if (
+                symbol.upper() in ORGANIC_SUBSET
+                and total_h != standard_expected_h + explicit_h
+            ):
                 needs_brackets = True
 
         # Build atom string
@@ -537,11 +562,11 @@ class _SMILESWriter:
     def _default_valence(self, atomic_num: int, aromatic: bool = False) -> int | None:
         """Get default valence for an element (None if not in the organic subset)."""
         valences = {
-            5: 3,   # B
-            6: 4,   # C
-            7: 3,   # N
-            8: 2,   # O
-            9: 1,   # F
+            5: 3,  # B
+            6: 4,  # C
+            7: 3,  # N
+            8: 2,  # O
+            9: 1,  # F
             15: 3,  # P
             16: 2,  # S
             17: 1,  # Cl
@@ -554,10 +579,10 @@ class _SMILESWriter:
         """Get aromatic valence for an element (bonds in aromatic system)."""
         # Aromatic valence = number of bonds expected in aromatic context
         aromatic_valences = {
-            5: 2,   # b - boron in aromatic
-            6: 3,   # c - aromatic carbon has 3 bonds (2 in ring + 1 H or substituent)
-            7: 2,   # n - pyridine-like nitrogen
-            8: 2,   # o - furan-like oxygen
+            5: 2,  # b - boron in aromatic
+            6: 3,  # c - aromatic carbon has 3 bonds (2 in ring + 1 H or substituent)
+            7: 2,  # n - pyridine-like nitrogen
+            8: 2,  # o - furan-like oxygen
             15: 2,  # p
             16: 2,  # s - thiophene-like sulfur
         }
@@ -621,7 +646,9 @@ class _SMILESWriter:
         # Single bond (implicit)
         return ""
 
-    def _adjust_bond_order_for_charges(self, atom_i: int, atom_j: int, order: float) -> float:
+    def _adjust_bond_order_for_charges(
+        self, atom_i: int, atom_j: int, order: float
+    ) -> float:
         """
         Adjust bond order based on formal charges and valence rules.
 

@@ -29,6 +29,7 @@ LOG = logging.getLogger(__name__)
 # Dispatch maps
 # ---------------------------------------------------------------------------
 
+
 def _ext_load_map():
     return {
         ".cif": from_cif_file,
@@ -41,8 +42,10 @@ def _ext_load_map():
 
 
 def _ext_save_map(crystal):
-    return {".cif": lambda f, **kw: to_cif_file(crystal, f, **kw),
-            ".res": lambda f, **kw: to_shelx_file(crystal, f)}
+    return {
+        ".cif": lambda f, **kw: to_cif_file(crystal, f, **kw),
+        ".res": lambda f, **kw: to_shelx_file(crystal, f),
+    }
 
 
 def _fname_load_map():
@@ -63,6 +66,7 @@ def _fname_save_map(crystal):
 # ---------------------------------------------------------------------------
 # Dispatchers
 # ---------------------------------------------------------------------------
+
 
 def load(filename, **kwargs) -> Crystal | dict:
     """
@@ -104,6 +108,7 @@ def save(crystal, filename, **kwargs):
 # Loaders
 # ---------------------------------------------------------------------------
 
+
 def from_vasp_string(string, **kwargs):
     "Initialize a crystal structure from a VASP POSCAR string"
     from chmpy.fmt.vasp import parse_poscar
@@ -133,7 +138,9 @@ def from_aims_string(string, **kwargs):
 
     aims_data = parse_geometry_string(string)
     if "lattice" not in aims_data:
-        raise ValueError("FHI-aims geometry.in file must contain lattice vectors for Crystal")
+        raise ValueError(
+            "FHI-aims geometry.in file must contain lattice vectors for Crystal"
+        )
 
     uc = UnitCell(aims_data["lattice"])
     sg = SpaceGroup(1)
@@ -234,7 +241,9 @@ def from_cif_data(cif_data, titl=None):
 
     listed = next((cif_data[k] for k in symop_data_names if k in cif_data), None)
     if hm_parsed and listed is not None:
-        listed_codes = {SymmetryOperation.from_string_code(x).integer_code for x in listed}
+        listed_codes = {
+            SymmetryOperation.from_string_code(x).integer_code for x in listed
+        }
         symbol_codes = {op.integer_code for op in space_group.symmetry_operations}
         if listed_codes != symbol_codes:
             LOG.warning(
@@ -257,9 +266,7 @@ def from_cif_data(cif_data, titl=None):
                     space_group = new_sg
                 except ValueError:
                     space_group.symmetry_operations = symops
-                    symbol = cif_data.get(
-                        "symmetry_space_group_name_H-M", "Unknown"
-                    )
+                    symbol = cif_data.get("symmetry_space_group_name_H-M", "Unknown")
                     space_group.international_tables_number = number
                     space_group.symbol = symbol
                     space_group.full_symbol = symbol
@@ -329,9 +336,7 @@ def from_cif_file(filename, data_block_name=None, options=None):
     if data_block_name is not None:
         return from_cif_data(cif.data[data_block_name], titl=data_block_name)
 
-    crystals = {
-        name: from_cif_data(data, titl=name) for name, data in cif.data.items()
-    }
+    crystals = {name: from_cif_data(data, titl=name) for name, data in cif.data.items()}
     keys = list(crystals.keys())
     if len(keys) == 1:
         return crystals[keys[0]]
@@ -368,9 +373,7 @@ def from_cif_string(file_content, data_block_name=None, options=None, **kwargs):
     if data_block_name is not None:
         return from_cif_data(cif.data[data_block_name], titl=data_block_name)
 
-    crystals = {
-        name: from_cif_data(data, titl=name) for name, data in cif.data.items()
-    }
+    crystals = {name: from_cif_data(data, titl=name) for name, data in cif.data.items()}
     keys = list(crystals.keys())
     if len(keys) == 1:
         return crystals[keys[0]]
@@ -464,6 +467,7 @@ def from_gen_file(filename, **kwargs):
 # ---------------------------------------------------------------------------
 # Savers
 # ---------------------------------------------------------------------------
+
 
 def to_ase_atoms(crystal, **kwargs):
     from chmpy.ext.ase import crystal_to_ase

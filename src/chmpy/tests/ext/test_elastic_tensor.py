@@ -70,21 +70,25 @@ class ElasticTensorTestCase(unittest.TestCase):
         4. 4th-order tensor contractions are invariant
         """
         # MALNAC06 example data - lattice vectors from GULP optimization
-        gulp_vectors = np.array([
-            [ 4.777394,  0.096445, -0.149209],
-            [-0.330401,  5.723170,  0.439075],
-            [-1.709427, -2.386116,  6.715339]
-        ])
+        gulp_vectors = np.array(
+            [
+                [4.777394, 0.096445, -0.149209],
+                [-0.330401, 5.723170, 0.439075],
+                [-1.709427, -2.386116, 6.715339],
+            ]
+        )
 
         # Elastic tensor from GULP in GPa
-        gulp_tensor_data = np.array([
-            [38.9166, 19.2288, 21.8648,  2.7327, -10.0968,   0.3838],
-            [19.2288, 45.1814, 20.8091,  7.5240,  -7.8010, -11.8334],
-            [21.8648, 20.8091, 30.4442,  2.4606, -15.8000,  -2.7215],
-            [ 2.7327,  7.5240,  2.4606, 17.6056,  -7.3482,  -5.2410],
-            [-10.0968, -7.8010, -15.8000, -7.3482, 16.9020,   4.4631],
-            [ 0.3838, -11.8334, -2.7215, -5.2410,  4.4631,  16.0395]
-        ])
+        gulp_tensor_data = np.array(
+            [
+                [38.9166, 19.2288, 21.8648, 2.7327, -10.0968, 0.3838],
+                [19.2288, 45.1814, 20.8091, 7.5240, -7.8010, -11.8334],
+                [21.8648, 20.8091, 30.4442, 2.4606, -15.8000, -2.7215],
+                [2.7327, 7.5240, 2.4606, 17.6056, -7.3482, -5.2410],
+                [-10.0968, -7.8010, -15.8000, -7.3482, 16.9020, 4.4631],
+                [0.3838, -11.8334, -2.7215, -5.2410, 4.4631, 16.0395],
+            ]
+        )
 
         # Create elastic tensor from GULP data
         et_original = ElasticTensor(gulp_tensor_data)
@@ -100,7 +104,7 @@ class ElasticTensorTestCase(unittest.TestCase):
         standard_uc = UnitCell(np.eye(3))
         standard_uc.set_lengths_and_angles(
             [original_uc.a, original_uc.b, original_uc.c],
-            [original_uc.alpha, original_uc.beta, original_uc.gamma]
+            [original_uc.alpha, original_uc.beta, original_uc.gamma],
         )
 
         R = kabsch_rotation_matrix(original_uc.direct, standard_uc.direct)
@@ -125,29 +129,35 @@ class ElasticTensorTestCase(unittest.TestCase):
 
         # Bulk modulus should be invariant under rotation
         self.assertAlmostEqual(
-            averages_orig['bulk_modulus_avg']['hill'],
-            averages_reor['bulk_modulus_avg']['hill'],
-            places=10
+            averages_orig["bulk_modulus_avg"]["hill"],
+            averages_reor["bulk_modulus_avg"]["hill"],
+            places=10,
         )
 
         # Shear modulus should be invariant under rotation
         self.assertAlmostEqual(
-            averages_orig['shear_modulus_avg']['hill'],
-            averages_reor['shear_modulus_avg']['hill'],
-            places=10
+            averages_orig["shear_modulus_avg"]["hill"],
+            averages_reor["shear_modulus_avg"]["hill"],
+            places=10,
         )
 
         # Young's modulus average should be invariant
         self.assertAlmostEqual(
-            averages_orig['youngs_modulus_avg']['hill'],
-            averages_reor['youngs_modulus_avg']['hill'],
-            places=10
+            averages_orig["youngs_modulus_avg"]["hill"],
+            averages_reor["youngs_modulus_avg"]["hill"],
+            places=10,
         )
 
         # Test 4: True 4th-order tensor contractions should be invariant
         # Full contraction: S_iijj (trace of 4th-order tensor)
-        full_trace_orig = np.trace(np.trace(et_original.elasticity_tensor, axis1=0, axis2=1), axis1=0, axis2=1)
-        full_trace_reor = np.trace(np.trace(et_reoriented.elasticity_tensor, axis1=0, axis2=1), axis1=0, axis2=1)
+        full_trace_orig = np.trace(
+            np.trace(et_original.elasticity_tensor, axis1=0, axis2=1), axis1=0, axis2=1
+        )
+        full_trace_reor = np.trace(
+            np.trace(et_reoriented.elasticity_tensor, axis1=0, axis2=1),
+            axis1=0,
+            axis2=1,
+        )
         self.assertAlmostEqual(full_trace_orig, full_trace_reor, places=10)
 
         # Test 5: Coordinate transformation accuracy with random fractional coordinates

@@ -166,7 +166,9 @@ def promolecule_density_isosurface(
     t2 = time.time()
     LOG.info(
         "promolecule surface took %.3fs (%s, %d verts)",
-        t2 - t1, SURFACE_BACKEND, len(verts),
+        t2 - t1,
+        SURFACE_BACKEND,
+        len(verts),
     )
     return IsosurfaceMesh(verts, faces, normals, vertex_props)
 
@@ -240,6 +242,8 @@ def stockholder_weight_isosurface(
     t2 = time.time()
     LOG.info(
         "stockholder weight surface took %.3fs (%s, %d verts)",
-        t2 - t1, SURFACE_BACKEND, len(verts),
+        t2 - t1,
+        SURFACE_BACKEND,
+        len(verts),
     )
     return IsosurfaceMesh(verts, faces, normals, vertex_props)

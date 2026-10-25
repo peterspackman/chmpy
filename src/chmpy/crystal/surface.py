@@ -18,7 +18,6 @@ if TYPE_CHECKING:  # only needed to spell the return types
     from trimesh import Trimesh
 
 
-
 def _nearest_molecule_idx(vertices, el, pos):
     from scipy.sparse.csgraph import connected_components
 
@@ -281,9 +280,7 @@ def stockholder_weight_isosurfaces(crystal, kind="mol", **kwargs) -> list[Trimes
             pos = surrounds["centre"]["cart_pos"]
             neighbour_els = surrounds["neighbours"]["element"]
             neighbour_pos = surrounds["neighbours"]["cart_pos"]
-            s = StockholderWeight.from_arrays(
-                [n], [pos], neighbour_els, neighbour_pos
-            )
+            s = StockholderWeight.from_arrays([n], [pos], neighbour_els, neighbour_pos)
             iso = stockholder_weight_isosurface(s, isovalue=isovalue, sep=sep)
             isos.append(iso)
     elif kind == "mol":
@@ -294,19 +291,15 @@ def stockholder_weight_isosurfaces(crystal, kind="mol", **kwargs) -> list[Trimes
             if vertex_color == "esp":
                 extra_props["esp"] = mol.electrostatic_potential
             elif vertex_color == "fragment_patch":
-                extra_props["fragment_patch"] = (
-                    lambda x, _n_e=n_e, _n_p=n_p: _nearest_molecule_idx(
-                        x, _n_e, _n_p
-                    )
+                extra_props["fragment_patch"] = lambda x, _n_e=n_e, _n_p=n_p: (
+                    _nearest_molecule_idx(x, _n_e, _n_p)
                 )
-            extra_props["nearest_atom_external"] = (
-                lambda x, _n_e=n_e, _n_p=n_p: nearest_atomic_number(x, _n_e, _n_p)
+            extra_props["nearest_atom_external"] = lambda x, _n_e=n_e, _n_p=n_p: (
+                nearest_atomic_number(x, _n_e, _n_p)
             )
             extra_props["nearest_atom_internal"] = (
-                lambda x,
-                _atomic_nums=mol.atomic_numbers,
-                _positions=mol.positions: nearest_atomic_number(
-                    x, _atomic_nums, _positions
+                lambda x, _atomic_nums=mol.atomic_numbers, _positions=mol.positions: (
+                    nearest_atomic_number(x, _atomic_nums, _positions)
                 )
             )
             s = StockholderWeight.from_arrays(

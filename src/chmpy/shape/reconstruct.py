@@ -69,6 +69,7 @@ def reconstruct(coefficients, real=True, pole_extension_factor=2):
 
 def reconstructed_surface_convex(coefficients, real=True):
     from scipy.spatial import ConvexHull
+
     Trimesh = require("trimesh", "reconstructing a shape mesh").Trimesh
 
     pts, _ = reconstruct(coefficients, real=real)

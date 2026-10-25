@@ -196,9 +196,9 @@ def promolecule_density_descriptor(sht, n_i, p_i, **kwargs):
     g[:, 2] = z.flatten()
 
     o = kwargs.get("origin", np.mean(p_i, axis=0, dtype=np.float32))
-    r = sphere_promolecule_radii(
-        pro, o, g, r_min, r_max, isovalue=isovalue
-    ).reshape(sht.grid[0].shape)
+    r = sphere_promolecule_radii(pro, o, g, r_min, r_max, isovalue=isovalue).reshape(
+        sht.grid[0].shape
+    )
     if np.any(r < 0):
         raise ValueError(
             f"Unable to find isovalue {isovalue:.2f} in all "

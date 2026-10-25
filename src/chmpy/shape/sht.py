@@ -317,8 +317,12 @@ class SHT:
             np.ndarray the set of spherical harmonic coefficients
         """
         if np.iscomplexobj(values):
-            return analyze_cplx_full(values, self.weights, self._plm_cache, self._sht_tables)
-        return analyze_real_full(values, self.weights, self._plm_cache, self._sht_tables)
+            return analyze_cplx_full(
+                values, self.weights, self._plm_cache, self._sht_tables
+            )
+        return analyze_real_full(
+            values, self.weights, self._plm_cache, self._sht_tables
+        )
 
     def synthesis(self, coeffs):
         """
@@ -332,8 +336,12 @@ class SHT:
             np.ndarray the evaluated function at the SHT grid points
         """
         if coeffs.size == self.nplm():
-            return synthesize_real_full(coeffs, self._plm_cache, self._sht_tables, self.nphi)
-        return synthesize_cplx_full(coeffs, self._plm_cache, self._sht_tables, self.nphi)
+            return synthesize_real_full(
+                coeffs, self._plm_cache, self._sht_tables, self.nphi
+            )
+        return synthesize_cplx_full(
+            coeffs, self._plm_cache, self._sht_tables, self.nphi
+        )
 
     def _eval_at_points_real(self, coeffs, theta, phi):
         # very slow pure python implementation, should move to cython
