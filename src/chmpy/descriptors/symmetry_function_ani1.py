@@ -3,6 +3,8 @@ from itertools import combinations_with_replacement
 import numpy as np
 from scipy.spatial import cKDTree as KDTree
 
+from chmpy.core.element import Element
+
 SYMF_DEFAULT_PARAMETERS = {
     "radial_eta": 50,
     "angular_eta": 5,
@@ -34,6 +36,12 @@ class SymmetryFunctionsANI1:
         self.pairs = [
             tuple(sorted(x))
             for x in combinations_with_replacement(self.unique_atoms, 2)
+        ]
+        # atomic numbers matching the ordering of unique_atoms and pairs,
+        # used to lay out the radial and angular blocks
+        self.species = [Element[x].atomic_number for x in self.unique_atoms]
+        self.species_pairs = [
+            (Element[a].atomic_number, Element[b].atomic_number) for a, b in self.pairs
         ]
         self.radial = np.zeros(
             (self.n_atoms, self.n_atom_types * n_radial), dtype=np.float64
@@ -80,7 +88,8 @@ class SymmetryFunctionsANI1:
 
     @classmethod
     def from_crystal(cls, crys, **kwargs):
-        if len(crys.asym_mols()) > 1:
+        molecules = crys.symmetry_unique_molecules()
+        if len(molecules) > 1:
             raise NotImplementedError("Only implemented for Z'=1 crystals")
         args = SYMF_DEFAULT_PARAMETERS.copy()
         args.update(kwargs)
@@ -89,14 +98,14 @@ class SymmetryFunctionsANI1:
             "Angular R_s and Theta lists must be the same length."
         )
 
-        # Generate a finite cluster of molecules to the largest cutoff given
-        # This is done by centroid-centroid distances and so should be sufficient
-        nearest_atoms = atoms_in_radius(
-            crys, max((args["radial_cutoff"], args["angular_cutoff"]))
-        )
-
         # Get xyz data
-        mol = crys.asym_mols()[0]
+        mol = molecules[0]
+
+        # Generate a finite cluster containing every atom within the largest
+        # cutoff of any atom in the molecule
+        nearest_atoms = atoms_in_radius(
+            crys, max((args["radial_cutoff"], args["angular_cutoff"])), molecule=mol
+        )
         cm_xyz = mol.positions.copy()
         labels = [e.symbol for e in mol.elements]
 
@@ -121,6 +130,7 @@ class SymmetryFunctionsANI1:
                     args["radial_eta"],
                     args["only_intermolecular"],
                     args["separate_radial"],
+                    species=symf.species,
                 ),
             )
             symf.set_angular(
@@ -136,6 +146,7 @@ class SymmetryFunctionsANI1:
                     args["zeta"],
                     args["only_intermolecular"],
                     args["separate_angular"],
+                    species_pairs=symf.species_pairs,
                 ),
             )
         return symf
@@ -152,8 +163,17 @@ class NearestAtoms:
         return self.nums[idx], self.positions[idx]
 
 
-def atoms_in_radius(c, radius):
-    atoms_dict = c.atoms_in_radius(radius)
+def atoms_in_radius(c, radius, molecule=None):
+    """
+    Periodic atoms within `radius` of the Cartesian origin or, if `molecule`
+    is given, within `radius` of any atom in `molecule`.
+    """
+    if molecule is None:
+        atoms_dict = c.atoms_in_radius(radius)
+    else:
+        centroid = molecule.positions.mean(axis=0)
+        extent = np.max(np.linalg.norm(molecule.positions - centroid, axis=1))
+        atoms_dict = c.atoms_in_radius(radius + extent, origin=centroid)
     return NearestAtoms(atoms_dict["element"], atoms_dict["cart_pos"])
 
 
@@ -166,6 +186,7 @@ def calc_radial_function(
     eta,
     only_intermolecular=False,
     separate_radial=True,
+    species=None,
 ):
     """
     Radial function (eq (3) of Smith et al. (2017))
@@ -177,6 +198,8 @@ def calc_radial_function(
     cutoff : float, max L1 distance where atom contributions are included
     r_s : list of hyperparameters controlling position of each gaussian
     eta : float, hyperparameter controlling width of each gaussian
+    species : atomic numbers giving the order of the per-element blocks
+        (default: the unique elements among the neighbours)
     """
     els, pos = nearest_atoms.neighbours(cm_atom_xyz, cutoff)
     centered = pos - cm_atom_xyz
@@ -192,7 +215,7 @@ def calc_radial_function(
 
     g = np.square(distances[:, np.newaxis] - r_s_lst)
 
-    unique_atoms = np.unique(els)
+    unique_atoms = np.unique(els) if species is None else species
 
     if separate_radial:
         G1_list = []
@@ -219,6 +242,7 @@ def calc_angular_function(
     zeta,
     only_intermolecular=False,
     separate_angular=True,
+    species_pairs=None,
 ):
     """
     Angular function (eq (4) of Smith et al. (2017))
@@ -233,6 +257,8 @@ def calc_angular_function(
     theta: list of hyperparameters contrlling the angular position of each gaussian
     eta : float, hyperparameter controlling width of each gaussian
     zeta : float, hyperparameter controlling the width of each gaussian
+    species_pairs : (Z1, Z2) pairs giving the order of the per-pair blocks
+        (default: unique pairs among the neighbours, ordered by atomic number)
     """
 
     front_factor = 2 ** (1 - zeta)
@@ -275,15 +301,18 @@ def calc_angular_function(
 
     fjfk = np.triu(fjfk, k=1)
 
-    pairs_in_cluster = np.outer(els, els)
-    unique_atoms = np.unique(els)
-    atoms_pairs = np.triu(np.outer(unique_atoms, unique_atoms))
+    if species_pairs is None:
+        unique_atoms = np.unique(els)
+        species_pairs = [
+            (a, b) for i, a in enumerate(unique_atoms) for b in unique_atoms[i:]
+        ]
 
     if separate_angular is True:
         G2_list = []
-        for pair in atoms_pairs[atoms_pairs != 0]:
-            fjfk_temp = np.copy(fjfk)
-            fjfk_temp[pairs_in_cluster != pair] = 0
+        for a, b in species_pairs:
+            is_a, is_b = els == a, els == b
+            mask = np.outer(is_a, is_b) | np.outer(is_b, is_a)
+            fjfk_temp = np.where(mask, fjfk, 0)
             G2 = front_factor * np.einsum("ij,ijk,ijl->kl", fjfk_temp, r1r2, angle_diff)
             G2_list.append(G2)
 
