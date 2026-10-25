@@ -85,6 +85,63 @@ class MoleculeTestCase(unittest.TestCase):
         np.testing.assert_allclose(bbox, expected, atol=1e-5)
         np.testing.assert_allclose(mol.bbox_size, expected[1] - expected[0])
 
+    def test_to_sdf_string(self):
+        from chmpy.fmt.sdf import parse_sdf_contents
+
+        mol = self.load_water()
+        sdf = parse_sdf_contents(mol.to_sdf_string() + "\n$$$$\n")[0]
+        atoms = sdf["atoms"]
+        np.testing.assert_allclose(
+            np.c_[atoms["x"], atoms["y"], atoms["z"]], mol.positions, atol=1e-4
+        )
+        # bonds are guessed if missing, and each one written once
+        self.assertEqual(len(sdf["bonds"]["left"]), 2)
+        self.assertTrue(np.all(sdf["bonds"]["left"] < sdf["bonds"]["right"]))
+
+    def test_rotational_constants(self):
+        mol = self.load_water()
+        mhz = mol.rotational_constants()
+        self.assertTrue(np.isrealobj(mhz))
+        self.assertTrue(np.all(np.diff(mhz) <= 0))
+        np.testing.assert_allclose(mol.rotational_constants(unit="GHz"), mhz * 1e-3)
+        np.testing.assert_allclose(
+            mol.rotational_constants(unit="cm^-1"), mhz / 29979.2458
+        )
+        with self.assertRaises(ValueError):
+            mol.rotational_constants(unit="eV")
+
+    def test_atomic_shape_descriptors(self):
+        mol = self.load_water()
+        self.assertEqual(mol.atomic_shape_descriptors(l_max=3).shape[0], 3)
+
+    def test_from_aims_string_kwargs(self):
+        aims = "atom 0.0 0.0 0.0 O\natom 0.0 0.757 0.586 H\n"
+        mol = Molecule.from_aims_string(aims, charge=-1)
+        self.assertEqual(mol.charge, -1)
+
+    def test_mol2_aromatic_bonds_and_charges(self):
+        mol2 = """@<TRIPOS>MOLECULE
+benz
+ 2 1 1 0 0
+SMALL
+USER_CHARGES
+
+@<TRIPOS>ATOM
+      1 C1          0.0000    0.0000    0.0000 C.ar      1  BEN      -0.1000
+      2 C2          1.3900    0.0000    0.0000 C.ar      1  BEN       0.1000
+@<TRIPOS>BOND
+     1     1     2   ar
+"""
+        mol = Molecule.from_mol2_string(mol2)
+        self.assertEqual(mol.charge, 0)
+        np.testing.assert_allclose(mol.partial_charges, [-0.1, 0.1])
+        self.assertEqual(mol.bonds[0, 1], 1.5)
+        self.assertEqual(mol.bonds[1, 0], 1.5)
+
+    def test_pdb_file_read(self):
+        mol = Molecule.from_pdb_file(TEST_FILES["HXACAN01.pdb"])
+        self.assertEqual(len(mol), 20)
+
 
 class MolecularAxesTestCase(unittest.TestCase):
     """`axes` returns the principal axes as rows, ordered by extent."""

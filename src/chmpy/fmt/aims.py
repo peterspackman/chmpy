@@ -242,11 +242,12 @@ def parse_geometry_string(contents):
     return result
 
 
-def geometry_string_to_molecule(contents):
+def geometry_string_to_molecule(contents, **kwargs):
     """Convert an FHI-aims geometry.in string to a Molecule object.
 
     Args:
         contents (str): Contents of the geometry.in file
+        **kwargs: Additional keyword arguments passed to the Molecule constructor
 
     Returns:
         Molecule: A new Molecule object
@@ -267,7 +268,7 @@ def geometry_string_to_molecule(contents):
             "Use geometry_string_to_crystal() instead."
         )
 
-    return Molecule(data["elements"], data["positions"])
+    return Molecule(data["elements"], data["positions"], **kwargs)
 
 
 def geometry_file_to_molecule(filename):

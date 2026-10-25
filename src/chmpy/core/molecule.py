@@ -13,6 +13,10 @@ from .element import Element
 
 LOG = logging.getLogger(__name__)
 
+# bond orders for the non-numeric mol2 bond types (aromatic as 1.5,
+# consistent with chmpy.graph), 'nc' (not connected) bonds are skipped
+_MOL2_BOND_ORDERS = {"ar": 1.5, "am": 1, "du": 1, "un": 1}
+
 
 class Molecule:
     """
@@ -434,6 +438,9 @@ class Molecule:
         if "name" in atoms:
             labels = atoms.pop("name")
 
+        # per-atom charges, not the total molecular charge
+        partial_charges = atoms.pop("charge", None)
+
         bondlist = None
         if bonds != {}:
             bondlist = dok_matrix((N, N))
@@ -441,11 +448,18 @@ class Molecule:
             for a, b, t in zip(
                 bonds["origin"], bonds["target"], bonds["type"], strict=False
             ):
-                bondlist[a - 1, b - 1] = int(t)
+                if t == "nc":
+                    continue
+                order = _MOL2_BOND_ORDERS.get(t)
+                if order is None:
+                    order = int(t)
+                bondlist[a - 1, b - 1] = order
+                bondlist[b - 1, a - 1] = order
 
-        return cls(
-            elements, positions, bonds=bondlist, labels=labels, **atoms, **kwargs
-        )
+        m = cls(elements, positions, bonds=bondlist, labels=labels, **atoms, **kwargs)
+        if partial_charges is not None:
+            m.partial_charges = np.array(partial_charges)
+        return m
 
     @classmethod
     def from_mol2_file(cls, filename, **kwargs):
@@ -467,7 +481,7 @@ class Molecule:
         """
         from chmpy.fmt.aims import geometry_string_to_molecule
 
-        return geometry_string_to_molecule(contents)
+        return geometry_string_to_molecule(contents, **kwargs)
 
     @classmethod
     def from_aims_file(cls, filename, **kwargs):
@@ -541,9 +555,11 @@ class Molecule:
 
         bonds_left = []
         bonds_right = []
-        if self.bonds is not None:
+        if self.bonds is None:
             self.guess_bonds()
-            for x, y in self.bonds.keys():
+        for x, y in self.bonds.keys():
+            # bonds is symmetric, only write each bond once
+            if x < y:
                 bonds_left.append(x + 1)
                 bonds_right.append(y + 1)
 
@@ -551,13 +567,15 @@ class Molecule:
             "header": [self.name, "created by chmpy", ""],
             "atoms": {
                 "x": self.positions[:, 0],
-                "y": self.positions[:, 0],
-                "z": self.positions[:, 0],
+                "y": self.positions[:, 1],
+                "z": self.positions[:, 2],
                 "symbol": np.array([x.symbol for x in self.elements]),
             },
             "bonds": {
-                "left": np.array(bonds_left),
-                "right": np.array(bonds_right),
+                "left": np.array(bonds_left, dtype=int),
+                "right": np.array(bonds_right, dtype=int),
+                # bond orders are not tracked, so write all bonds as single
+                "type": np.ones(len(bonds_left), dtype=int),
             },
         }
         return to_sdf_string(sdf_dict)
@@ -797,7 +815,7 @@ class Molecule:
             idxs = np.where((dists[n, :] < radius) & (dists[n, :] > 1e-3))[0]
             neighbour_els = elements[idxs]
             neighbour_pos = positions[idxs]
-            ubound = Element[n].vdw_radius * 3
+            ubound = self.elements[n].vdw_radius * 3
             descriptors.append(
                 stockholder_weight_descriptor(
                     sph,
@@ -1120,16 +1138,36 @@ class Molecule:
 
     def principle_moments_of_inertia(self, units="amu angstrom^2"):
         t = self.inertia_tensor()
-        return np.sort(np.linalg.eig(t)[0])
+        return np.linalg.eigvalsh(t)
 
     def rotational_constants(self, unit="MHz"):
-        from scipy.constants import Avogadro, Planck, speed_of_light
+        """
+        The rotational constants A >= B >= C of this molecule.
 
-        # convert amu angstrom^2 to g cm^2
-        moments = self.principle_moments_of_inertia() / Avogadro / 1e16
+        Args:
+            unit (str, optional): one of 'MHz', 'GHz', 'Hz' or 'cm^-1'
+                (default 'MHz')
 
-        # convert g cm^2 to kg m^2
-        return 1e5 * Planck / (8 * np.pi * np.pi * speed_of_light * moments)
+        Returns:
+            np.ndarray: the 3 rotational constants in the requested unit
+        """
+        from scipy.constants import Planck, atomic_mass, speed_of_light
+
+        # convert amu angstrom^2 to kg m^2
+        moments = self.principle_moments_of_inertia() * atomic_mass * 1e-20
+        with np.errstate(divide="ignore"):
+            hz = Planck / (8 * np.pi * np.pi * moments)
+        factors = {
+            "hz": 1.0,
+            "mhz": 1e-6,
+            "ghz": 1e-9,
+            "cm^-1": 1 / (100 * speed_of_light),
+            "cm-1": 1 / (100 * speed_of_light),
+        }
+        key = unit.lower()
+        if key not in factors:
+            raise ValueError(f"Unknown unit for rotational constants: {unit}")
+        return hz * factors[key]
 
     def positions_in_molecular_axis_frame(self, method="pca"):
         if method not in ("pca",):
@@ -1304,6 +1342,6 @@ class Molecule:
         from chmpy.fmt.pdb import Pdb
 
         p = Pdb.from_file(filename)
-        xyz = np.c_[p.data["x"], p.data["y"], p.data["z"]]
-        elements = [Element[x] for x in p.data["element"]]
-        return cls(elements, xyz)
+        xyz = np.c_[p.atoms["x"], p.atoms["y"], p.atoms["z"]]
+        elements = [Element[x] for x in p.atoms["element"]]
+        return cls(elements, xyz, **kwargs)

@@ -357,6 +357,8 @@ class Element(metaclass=_ElementMeta):
             >>> Element[79].name
             'gold'
         """
+        if not 1 <= n <= len(_ELEMENT_DATA):
+            raise ValueError(f"Invalid atomic number: {n}")
         return Element(n, *_ELEMENT_DATA[n - 1])
 
     @property

@@ -20,7 +20,7 @@ class ElementTestCase(unittest.TestCase):
             self.assertEqual(e.symbol, "H")
             self.assertEqual(e.name, "hydrogen")
 
-        for s in ("blah", "32.141", None, 1.5):
+        for s in ("blah", "32.141", None, 1.5, 0, -1, 1000):
             with self.assertRaises(ValueError):
                 e = Element[s]
 
