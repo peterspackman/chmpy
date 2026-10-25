@@ -31,6 +31,24 @@ calc = upet("pet-mad-s", dtype="float64")   # or Calculator.from_ase(UPETCalcula
 Use `float64` if you plan to compute elastic constants or phonons: both
 take differences of forces, and float32 noise is amplified by them.
 
+The same models also run on [pet-kokkos](https://github.com/peterspackman/pet-kokkos),
+a C++ implementation that needs no torch and is several times faster on small
+cells. `pip install 'chmpy[pet]'` gives the CPU build; for an NVIDIA GPU install
+the CUDA one from its own index instead
+(`pip install pet-kokkos --extra-index-url https://peterspackman.github.io/pet-kokkos/cu12`):
+
+``` python
+from chmpy.calc.adapters.pet_kokkos import PetKokkosCalculator
+
+calc = PetKokkosCalculator("pet-mad-s")      # downloaded on first use
+calc = PetKokkosCalculator("pet-mad-s", gemm="tf32", attention="tf32")  # faster on GPUs
+```
+
+pet-kokkos computes in fp32 (with fp64 sums), so the same caveat applies to
+elastic constants and phonons. The `tf32` modes are good for relaxations and
+MD, but their energies scatter by about 1e-5 relative, which the optimiser is
+told about and works around.
+
 The ASE wrapper keeps one `ase.Atoms` alive and writes each new geometry into it,
 rather than copying a structure on every call. Results are cached, so asking
 for the same geometry twice costs nothing.

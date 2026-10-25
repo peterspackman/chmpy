@@ -63,6 +63,12 @@ mlip = [
     "vesin>=0.3",
     "metatomic-torch>=0.1.17",
 ]
+# PET models (PET-MAD etc.) on pet-kokkos, which needs neither torch nor ASE.
+# This is the CPU build; the CUDA and ROCm ones come from pet-kokkos' own
+# indexes, e.g. --extra-index-url https://peterspackman.github.io/pet-kokkos/cu12
+pet = [
+    "pet-kokkos>=0.1",
+]
 # everything, for anyone who had the pre-split behaviour
 all = [
     "chmpy[plots,mesh,ase]",

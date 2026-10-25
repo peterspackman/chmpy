@@ -8,8 +8,8 @@
     result = calc(system, ("energy", "forces", "stress"))
 
 Adapters live in `chmpy.calc.adapters`: `ase` in both directions,
-`metatomic` for models driven directly, and `gulp` for the external
-program, which is the one that can supply analytic second derivatives.
+`metatomic` for models driven directly, `pet_kokkos` for PET models without
+torch, and `gulp` for the external program, which is the one that can supply analytic second derivatives.
 
 Write one by subclassing `Calculator` and implementing `compute`; see
 `chmpy.calc.base` for the contract and `chmpy.calc.potentials` for a worked

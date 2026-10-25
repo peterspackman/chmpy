@@ -20,6 +20,7 @@ EXTRAS = {
     "torch": "mlip",
     "metatomic": "mlip",
     "metatensor": "mlip",
+    "pet_kokkos": "pet",
 }
 
 
