@@ -444,6 +444,8 @@ def from_gen_string(contents, **kwargs):
 
     elements, positions, cell, fractional = parse_gen_string(contents)
     unit_cell = UnitCell(cell[1:4, :])
+    if not fractional:
+        positions = unit_cell.to_fractional(positions)
 
     asym = AsymmetricUnit(
         elements=elements,
