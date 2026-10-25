@@ -1,4 +1,5 @@
 import logging
+import re
 from pathlib import Path
 
 from chmpy.crystal import SymmetryOperation
@@ -31,16 +32,34 @@ def _parse_symm(line):
     return SymmetryOperation.from_string_code(line[4:])
 
 
-def _parse_atom_line(sfac, line):
+def _parse_fvar(line):
+    return tuple(float(x) for x in line.split()[1:])
+
+
+def _occupation(sof, fvar):
+    # SHELXL encodes site occupation factors as 10 * m + p:
+    # |m| = 1 is fixed at p, otherwise p * fv(m), or p * (fv(-m) - 1) if m < 0
+    if abs(sof) <= 5:
+        return sof
+    m = int(sof / 10)
+    p = sof - 10 * m
+    if m == 1:
+        return p
+    if m == -1:
+        return -p
+    fv = fvar[abs(m) - 1] if abs(m) <= len(fvar) else 1.0
+    return p * fv if m > 0 else p * (fv - 1)
+
+
+def _parse_atom_line(sfac, line, fvar=()):
     tokens = line.split()
-    len(tokens)
     label = tokens[0]
     LOG.debug("Parsing atom line: %s", line)
     sfac_idx = int(tokens[1])
     a, b, c = (float(x) for x in tokens[2:5])
     occupation = 1.0
     if len(tokens) > 5:
-        occupation = float(tokens[5])
+        occupation = _occupation(float(tokens[5]), fvar)
     return {
         "label": label,
         "element": sfac[sfac_idx - 1],
@@ -56,20 +75,37 @@ SHELX_LINE_KEYS = {
     "LATT": _parse_int,
     "SFAC": _parse_sfac,
     "SYMM": _parse_symm,
-    "FVAR": None,
-    "UNIT": None,
-    "REM ": None,
-    "MORE": None,
-    "TIME": None,
-    "OMIT": None,
-    "ESEL": None,
-    "EGEN": None,
-    "LIST": None,
-    "FMAP": None,
-    "PLAN": None,
-    "MOLE": None,
-    "HKLF": None,
+    "FVAR": _parse_fvar,
 }
+
+# other SHELXL instructions, which are ignored
+_IGNORED_INSTRUCTIONS = {
+    "ABIN", "ACTA", "AFIX", "ANIS", "ANSC", "ANSR", "BASF", "BEDE", "BIND",
+    "BLOC", "BOND", "BUMP", "CGLS", "CHIV", "CONF", "CONN", "DAMP", "DANG",
+    "DEFS", "DELU", "DFIX", "DISP", "EADP", "EGEN", "EQIV", "ESEL", "EXTI",
+    "EXYZ", "FEND", "FLAT", "FMAP", "FRAG", "FREE", "GRID", "HFIX", "HKLF",
+    "HTAB", "ISOR", "LAUE", "LIST", "L.S.", "LONE", "MERG", "MOLE", "MORE",
+    "MOVE", "MPLA", "NCSY", "NEUT", "OMIT", "PART", "PLAN", "PRIG", "REM",
+    "RESI", "RIGU", "RTAB", "SADI", "SAME", "SHEL", "SIMU", "SIZE", "SPEC",
+    "STIR", "SUMP", "SWAT", "TEMP", "TIME", "TWIN", "TWST", "UNIT", "WGHT",
+    "WIGL", "WPDB", "XNPD",
+}  # fmt: skip
+
+
+def _logical_lines(file_content):
+    # join lines continued with a trailing '=' (e.g. anisotropic atoms)
+    line_number, buffer = 0, ""
+    for i, line in enumerate(file_content.split("\n"), start=1):
+        if not buffer:
+            line_number = i
+        line = line.rstrip()
+        if line.endswith("=") and not line.upper().startswith("REM"):
+            buffer += line[:-1] + " "
+            continue
+        yield line_number, buffer + line
+        buffer = ""
+    if buffer:
+        yield line_number, buffer
 
 
 def parse_shelx_file_content(file_content):
@@ -82,25 +118,30 @@ def parse_shelx_file_content(file_content):
     Returns:
         dictionary of parsed shelx data
     """
-    contents = file_content.split("\n")
     shelx_dict = {"SYMM": [SymmetryOperation.from_string_code("x,y,z")], "ATOM": []}
-    for line_number, line in enumerate(contents, start=1):
+    for line_number, line in _logical_lines(file_content):
         try:
             line = line.strip()
-            if not line:
+            if not line or line.startswith("!"):
                 continue
-            key = line[:4].upper()
+            key = line.split()[0][:4].upper()
             if key == "END":
                 break
             elif key == "SYMM":
                 shelx_dict[key].append(SHELX_LINE_KEYS[key](line))
-            elif key not in SHELX_LINE_KEYS:
-                shelx_dict["ATOM"].append(_parse_atom_line(shelx_dict["SFAC"], line))
+            elif key in SHELX_LINE_KEYS:
+                shelx_dict[key] = SHELX_LINE_KEYS[key](line)
+            elif key in _IGNORED_INSTRUCTIONS:
+                continue
+            elif re.match(r"Q\d+$", line.split()[0], re.IGNORECASE):
+                # residual electron density peaks
+                continue
             else:
-                f = SHELX_LINE_KEYS[key]
-                if f is None:
-                    continue
-                shelx_dict[key] = f(line)
+                shelx_dict["ATOM"].append(
+                    _parse_atom_line(
+                        shelx_dict["SFAC"], line, shelx_dict.get("FVAR", ())
+                    )
+                )
         except Exception as e:
             raise ValueError(f"Error parsing shelx string: line {line_number}") from e
     return shelx_dict

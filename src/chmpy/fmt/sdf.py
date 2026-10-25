@@ -90,24 +90,38 @@ def parse_counts_line(line):
 
 
 def parse_data_lines(lines):
-    sections = "".join(lines).strip().split("> <")
+    # data items: a header line starting with '>' containing <NAME>
+    # (e.g. '> <NAME>' or '>  <NAME>  (1)'), then value lines up to a blank line
     result = {}
-    for section in sections:
-        if not section:
-            continue
-        i = section.find(">")
-        k = section[:i]
-        v = section[i + 1 :]
-        result[k] = v
+    key = None
+    values = []
+    for line in lines:
+        if key is None:
+            if line.startswith(">"):
+                l = line.find("<")
+                r = line.find(">", l + 1)
+                if l < 0 or r < 0:
+                    continue
+                key = line[l + 1 : r]
+                values = []
+        elif not line.strip():
+            result[key] = "\n".join(values)
+            key = None
+        else:
+            values.append(line)
+    if key is not None:
+        result[key] = "\n".join(values)
     return result
 
 
 def parse_property_line(line):
-    n = int(line[:4])
-    l = 4
+    # nn8 followed by n entries of ' aaa vvv'
+    n = int(line[:3])
+    l = 3
     props = []
     for _i in range(n):
         props.append((int(line[l : l + 4]), int(line[l + 4 : l + 8])))
+        l += 8
     return props
 
 
@@ -153,7 +167,7 @@ def parse_sdf_contents(contents, limit=None, progress=False, keep_sdf_text=False
         bond_lines = lines[l:u]
         bonds = parse_bond_lines(bond_lines)
         l = u
-        while lines[u].startswith("M "):
+        while u < len(lines) and lines[u].startswith("M "):
             u += 1
         property_lines = lines[l : u - 1]
         charges, isotopes = parse_property_lines(property_lines)
@@ -207,7 +221,7 @@ def to_atom_line(
     exact_exchange=0,
 ):
     return (
-        f"{x:10.4f} {y:10.4f} {z:10.4f} {symbol:3s}"
+        f"{x:10.4f}{y:10.4f}{z:10.4f} {symbol:<3s}"
         f"{mass_difference:2d}{charge: 3d}{stereo: 3d}"
         f"{hydrogen_count: 3d}{stereo_care_box: 3d}"
         f"{valence: 3d}{h0_designator: 3d}{not_used1: 3d}"
@@ -271,10 +285,8 @@ def to_sdf_string(sdf_dict):
         fields = {k: bonds_filled[k][i] for k, _, _ in _BOND_FIELDS}
         bond_lines.append(to_bond_line(**fields))
 
-    header = "\n".join(header_lines)
-    atom_str = "\n".join(atom_lines)
-    bond_str = "\n".join(bond_lines)
-    return f"{header}\n{counts_line}\n{atom_str}\n{bond_str}\nM  END"
+    lines = [*header_lines, counts_line, *atom_lines, *bond_lines, "M  END"]
+    return "\n".join(lines)
 
 
 def to_sdf_file(filename, sdf_dict):

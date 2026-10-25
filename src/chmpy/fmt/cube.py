@@ -16,7 +16,7 @@ class CubeData:
             self._parse_cube_file(filename)
 
     def _parse_title_lines(self, l1, l2):
-        self.title, self.subtitle = l1.strip(), l2.strip
+        self.title, self.subtitle = l1.strip(), l2.strip()
 
     def _parse_atom_lines(self, lines):
         elements = []
@@ -35,8 +35,11 @@ class CubeData:
     def _parse_cube_buf(self, buf):
         self._parse_title_lines(buf.readline(), buf.readline())
         tokens = buf.readline().split()
-        self.natom = int(tokens[0])
-        self._volume_origin_bohr = np.fromstring(" ".join(tokens[1:]), sep=" ")
+        # a negative atom count indicates an MO cube, with an extra line
+        # of MO ids after the atoms
+        natom = int(tokens[0])
+        self.natom = abs(natom)
+        self._volume_origin_bohr = np.fromstring(" ".join(tokens[1:4]), sep=" ")
         self.volume_origin = units.angstrom(self._volume_origin_bohr)
         for ax in ("x", "y", "z"):
             tokens = buf.readline().split()
@@ -50,6 +53,8 @@ class CubeData:
 
         self.basis = np.vstack((self.x_basis, self.y_basis, self.z_basis))
         self._parse_atom_lines(buf.readline() for i in range(self.natom))
+        if natom < 0:
+            self.mo_ids = [int(x) for x in buf.readline().split()[1:]]
         self.data = np.fromstring(buf.read(), sep=" ")
 
     @classmethod

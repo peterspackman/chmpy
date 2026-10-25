@@ -56,7 +56,7 @@ class Pdb:
             "charge": [],
         }
 
-        # Process all atom lines until we hit a non-atom record or end of file
+        # Process all atom lines until we hit an END record or end of file
         total_lines = len(self.content_lines)
 
         while self.line_index < total_lines:
@@ -95,9 +95,7 @@ class Pdb:
                     print(
                         f"Warning: Error parsing atom at line {self.line_index + 1}: {e}"
                     )
-            else:
-                # If we hit a non-atom record, break the parsing loop
-                break
+            # other records (TER, ANISOU, CONECT etc.) are skipped
 
             self.line_index += 1
 

@@ -19,6 +19,17 @@ END"""
         assert "ATOM      2 N    MOL A   1" in output
         assert output.endswith("END")
 
+    def test_atoms_after_ter_and_anisou(self):
+        """Atom records after TER/ANISOU records are still read."""
+        test_pdb_content = """ATOM      1  N   ALA A   1      11.104   6.134  -6.504  1.00  0.00           N
+ANISOU    1  N   ALA A   1     2406   1892   1614    198    519   -328       N
+ATOM      2  CA  ALA A   1      11.639   6.071  -5.147  1.00  0.00           C
+TER       3      ALA A   1
+ATOM      4  N   GLY B   1      12.104   7.134  -6.504  1.00  0.00           N
+END"""
+        pdb = Pdb.from_string(test_pdb_content)
+        assert pdb.atoms["element"] == ["N", "C", "N"]
+
     def test_pdb_roundtrip(self, tmp_path):
         """Test PDB read-write roundtrip."""
         test_pdb_content = """HEADER    Test structure

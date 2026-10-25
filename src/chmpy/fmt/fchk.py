@@ -60,5 +60,5 @@ class FchkFile:
 
     @classmethod
     def scf_energy(cls, fname, units="hartree"):
-        fchk = cls(fname, parse=False)
+        fchk = cls.from_file(fname, parse=False)
         return cls.UNIT_CONVERSIONS[units] * fchk._parse_energy_only()

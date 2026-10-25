@@ -24,7 +24,7 @@ def parse_xyz_string(contents, filename=None):
     LOG.debug("Expecting %d atoms %s", natom, "in " + filename if filename else "")
     elements = []
     positions = []
-    for line in lines[2:]:
+    for line in lines[2 : 2 + natom]:
         if not line.strip():
             break
         tokens = line.strip().split()
