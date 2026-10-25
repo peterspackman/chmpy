@@ -13,6 +13,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from chmpy.core.element import Element
+
 from .aromaticity import perceive_aromaticity
 from .bond_orders import get_bond_order
 from .canonicalization import canonical_ordering
@@ -20,8 +22,6 @@ from .rings import find_sssr
 from .stereochemistry import (
     find_double_bond_stereo,
     find_stereocenters,
-    get_double_bond_config,
-    get_stereocenter_config,
 )
 
 if TYPE_CHECKING:
@@ -91,8 +91,12 @@ def to_smiles(
 
     # Find stereocenters
     stereocenters = {sc.atom_idx: sc for sc in find_stereocenters(graph)}
+    # Double bonds in rings smaller than 8 cannot be E/Z in SMILES
+    small_ring_bonds = _identify_ring_bonds([r for r in rings if len(r) < 8])
     double_bond_stereo = {}
     for db in find_double_bond_stereo(graph):
+        if (min(db.atom1, db.atom2), max(db.atom1, db.atom2)) in small_ring_bonds:
+            continue
         double_bond_stereo[(db.atom1, db.atom2)] = db
         double_bond_stereo[(db.atom2, db.atom1)] = db
 
@@ -155,11 +159,17 @@ class _SMILESWriter:
         self.visited = set()
         self.ring_openings = {}  # Maps atom_idx -> list of (ring_num, bond_symbol, other_atom)
         self.next_ring_num = 1
+        # Maps (double bond atom, substituent) -> +1 ('/') or -1 ('\\') for the
+        # single bond written in the direction double bond atom -> substituent
+        self.bond_directions = {}
 
     def generate(self) -> str:
         """Generate the SMILES string."""
         # First pass: identify all ring closures and assign ring numbers
         self._identify_ring_closures()
+
+        # Directional single bonds ('/' and '\\') encoding E/Z double bonds
+        self._assign_bond_directions()
 
         # Handle multiple fragments
         fragments = []
@@ -227,6 +237,134 @@ class _SMILESWriter:
                     else:
                         stack.append((neighbor, atom))
 
+    def _assign_bond_directions(self):
+        """
+        Assign '/' and '\\' to single bonds adjacent to E/Z double bonds.
+
+        The double bond itself is always written as '='. For each stereo
+        double bond, every writable single bond to a substituent is marked
+        according to which side of the double bond the substituent lies on.
+        Single bonds shared between two conjugated stereo double bonds tie
+        their markings together; inconsistent systems are left unmarked.
+        """
+        closure_bonds = set()
+        for atom, entries in self.ring_openings.items():
+            for _, _, other in entries:
+                closure_bonds.add((min(atom, other), max(atom, other)))
+
+        sides = {}
+        for a1, a2 in self.double_bond_stereo:
+            key = (min(a1, a2), max(a1, a2))
+            if key in sides:
+                continue
+            bond_sides = self._substituent_sides(key[0], key[1], closure_bonds)
+            if bond_sides:
+                sides[key] = bond_sides
+
+        owner = {}
+        for key, bond_sides in sides.items():
+            for end_sub in bond_sides:
+                owner[end_sub] = key
+
+        signs = {}
+        for start in sides:
+            if start in signs:
+                continue
+            signs[start] = 1
+            queue = [start]
+            component = [start]
+            consistent = True
+            while queue:
+                key = queue.pop()
+                for (end, sub), side in sides[key].items():
+                    other = owner.get((sub, end))
+                    if other is None:
+                        continue
+                    # the shared bond read from the other end flips direction
+                    required = -signs[key] * side * sides[other][(sub, end)]
+                    if other not in signs:
+                        signs[other] = required
+                        queue.append(other)
+                        component.append(other)
+                    elif signs[other] != required:
+                        consistent = False
+            if not consistent:
+                for key in component:
+                    signs[key] = None
+
+        for key, bond_sides in sides.items():
+            if signs[key] is None:
+                continue
+            for end_sub, side in bond_sides.items():
+                self.bond_directions[end_sub] = signs[key] * side
+
+    def _substituent_sides(self, atom1: int, atom2: int, closure_bonds: set) -> dict:
+        """
+        Side (+1/-1) of each markable substituent of the double bond atom1=atom2.
+
+        Returns an empty dict if either end has no markable single bond or
+        the geometry is ambiguous.
+        """
+        pos = self.graph.positions
+        axis = pos[atom2] - pos[atom1]
+        axis = axis / np.linalg.norm(axis)
+
+        def perp(end, sub):
+            v = pos[sub] - pos[end]
+            v = v - np.dot(v, axis) * axis
+            norm = np.linalg.norm(v)
+            return v / norm if norm > 1e-6 else None
+
+        substituents = []
+        for end, other in ((atom1, atom2), (atom2, atom1)):
+            subs = []
+            for n in sorted(self.graph.neighbors(end), key=lambda x: self.ordering[x]):
+                bond_key = (min(end, n), max(end, n))
+                if (
+                    n == other
+                    or n in self.skip_atoms
+                    or bond_key in closure_bonds
+                    or bond_key in self.aromatic_bonds
+                ):
+                    continue
+                order = get_bond_order(self.graph, end, n)
+                order = self._adjust_bond_order_for_charges(end, n, order)
+                if 0.9 <= order <= 1.1:
+                    subs.append((end, int(n)))
+            if not subs:
+                return {}
+            substituents.extend(subs)
+
+        reference = perp(*substituents[0])
+        if reference is None:
+            return {}
+        result = {}
+        for end, sub in substituents:
+            v = perp(end, sub)
+            if v is None:
+                return {}
+            dot = np.dot(v, reference)
+            if abs(dot) < 0.1:
+                return {}
+            result[(int(end), sub)] = 1 if dot > 0 else -1
+        return result
+
+    def _chiral_tag(self, atom_idx: int, neighbor_order: list[int]) -> str:
+        """
+        Tetrahedral chirality tag for the neighbours in SMILES output order.
+
+        '@' means the remaining neighbours are anticlockwise when viewed from
+        the first neighbour towards the centre, '@@' clockwise.
+        """
+        if len(neighbor_order) != 4:
+            return ""
+        pos = self.graph.positions
+        first, a, b, c = (pos[i] for i in neighbor_order)
+        volume = np.dot(pos[atom_idx] - first, np.cross(b - a, c - a))
+        if abs(volume) < 1e-6:
+            return ""
+        return "@" if volume < 0 else "@@"
+
     def _dfs_to_smiles(self, atom_idx: int, from_atom: int) -> str:
         """Generate SMILES string via DFS from given atom."""
         if atom_idx in self.visited or atom_idx in self.skip_atoms:
@@ -234,16 +372,16 @@ class _SMILESWriter:
 
         self.visited.add(atom_idx)
 
-        # Build atom string
-        result = self._atom_symbol(atom_idx)
-
-        # Add ring closure digits for this atom
+        # Ring closure digits for this atom, and the atoms they connect to
+        ring_str = ""
+        ring_partners = []
         if atom_idx in self.ring_openings:
-            for ring_num, bond_sym, _ in sorted(self.ring_openings[atom_idx]):
+            for ring_num, bond_sym, other_atom in sorted(self.ring_openings[atom_idx]):
                 if ring_num < 10:
-                    result += f"{bond_sym}{ring_num}"
+                    ring_str += f"{bond_sym}{ring_num}"
                 else:
-                    result += f"{bond_sym}%{ring_num}"
+                    ring_str += f"{bond_sym}%{ring_num}"
+                ring_partners.append(other_atom)
 
         # Get neighbors (excluding where we came from and skipped atoms)
         neighbors = [n for n in self.graph.neighbors(atom_idx)
@@ -251,51 +389,64 @@ class _SMILESWriter:
         neighbors.sort(key=lambda x: self.ordering[x])
 
         # Get ring closure targets from this atom (these are handled via ring numbers, not branches)
-        ring_closure_targets = set()
-        if atom_idx in self.ring_openings:
-            for _, _, other_atom in self.ring_openings[atom_idx]:
-                ring_closure_targets.add(other_atom)
+        ring_closure_targets = set(ring_partners)
 
         # Filter out already-visited neighbors and ring closure targets
         branch_neighbors = [n for n in neighbors
                            if n not in self.visited and n not in ring_closure_targets]
 
-        if not branch_neighbors:
-            return result
+        branches = []
+        for neighbor in branch_neighbors:
+            bond_symbol = self._bond_symbol(atom_idx, neighbor)
+            branch_smiles = self._dfs_to_smiles(neighbor, atom_idx)
+            if branch_smiles:
+                branches.append((neighbor, bond_symbol + branch_smiles))
+
+        # Neighbour order as written, for tetrahedral stereo: preceding atom,
+        # implicit H, ring closures, then branches (OpenSMILES)
+        neighbor_order = [from_atom] if from_atom >= 0 else []
+        neighbor_order += [
+            n
+            for n in self.graph.neighbors(atom_idx)
+            if n in self.skip_atoms and self.graph.atomic_numbers[n] == 1
+        ]
+        neighbor_order += ring_partners + [n for n, _ in branches]
+
+        result = self._atom_symbol(atom_idx, neighbor_order) + ring_str
 
         # Last branch continues inline (no parentheses)
         # Earlier branches need parentheses so they're clearly attached to current atom
         # This produces C(N)N instead of CN(N) for urea
-        for neighbor in branch_neighbors[:-1]:
-            bond_symbol = self._bond_symbol(atom_idx, neighbor)
-            branch_smiles = self._dfs_to_smiles(neighbor, atom_idx)
-            if branch_smiles:
-                result += "(" + bond_symbol + branch_smiles + ")"
-
-        # Last branch continues inline
-        last = branch_neighbors[-1]
-        bond_symbol = self._bond_symbol(atom_idx, last)
-        last_smiles = self._dfs_to_smiles(last, atom_idx)
-        if last_smiles:
-            result += bond_symbol + last_smiles
+        for _, branch in branches[:-1]:
+            result += "(" + branch + ")"
+        if branches:
+            result += branches[-1][1]
 
         return result
 
-    def _atom_symbol(self, atom_idx: int) -> str:
-        """Generate the SMILES atom symbol."""
+    def _atom_symbol(
+        self, atom_idx: int, neighbor_order: list[int] | None = None
+    ) -> str:
+        """
+        Generate the SMILES atom symbol.
+
+        ``neighbor_order`` lists the atom's neighbours in the order they appear
+        in the output, used to assign tetrahedral chirality tags.
+        """
         z = self.graph.atomic_numbers[atom_idx]
-        symbol = ELEMENT_SYMBOLS.get(z, f"#{z}")
+        symbol = ELEMENT_SYMBOLS.get(z)
+        if symbol is None:
+            try:
+                symbol = Element.from_atomic_number(int(z)).symbol
+            except ValueError:
+                symbol = f"#{z}"
 
         is_aromatic = self.aromatic_atoms[atom_idx]
 
         # Check for stereochemistry
         stereo_str = ""
-        if atom_idx in self.stereocenters:
-            config = get_stereocenter_config(self.graph, atom_idx)
-            if config == "R":
-                stereo_str = "@@"
-            elif config == "S":
-                stereo_str = "@"
+        if atom_idx in self.stereocenters and neighbor_order is not None:
+            stereo_str = self._chiral_tag(atom_idx, neighbor_order)
 
         # Get formal charge
         charge = self.graph.formal_charges[atom_idx]
@@ -349,7 +500,6 @@ class _SMILESWriter:
             # Charge affects effective valence: + charge adds capacity, - charge removes
             # N+ (charge +1) has valence 4, O- (charge -1) has valence 1
             default_valence = self._default_valence(z, is_aromatic)
-            effective_valence = default_valence + charge  # positive charge adds, negative removes
             actual_non_h_bonds = self._count_bonds(atom_idx)  # this excludes H in skip_atoms
 
             # total_h is how many H are attached (explicit) + how many should be implicit
@@ -357,8 +507,15 @@ class _SMILESWriter:
             # For atoms outside brackets, we rely on implicit H conventions
             total_h = explicit_h  # start with explicit H from skip_atoms
 
-            # Expected H based on valence
-            expected_h = max(0, effective_valence - actual_non_h_bonds - explicit_h)
+            # Expected H based on valence (none invented for elements without
+            # a defined valence, e.g. metals)
+            if default_valence is None:
+                default_valence = 0
+                expected_h = 0
+            else:
+                # positive charge adds, negative removes
+                effective_valence = default_valence + charge
+                expected_h = max(0, effective_valence - actual_non_h_bonds - explicit_h)
             total_h += expected_h
 
             # Check if brackets needed due to unexpected H count
@@ -377,8 +534,8 @@ class _SMILESWriter:
 
         return symbol
 
-    def _default_valence(self, atomic_num: int, aromatic: bool = False) -> int:
-        """Get default valence for an element."""
+    def _default_valence(self, atomic_num: int, aromatic: bool = False) -> int | None:
+        """Get default valence for an element (None if not in the organic subset)."""
         valences = {
             5: 3,   # B
             6: 4,   # C
@@ -391,7 +548,7 @@ class _SMILESWriter:
             35: 1,  # Br
             53: 1,  # I
         }
-        return valences.get(atomic_num, 4)
+        return valences.get(atomic_num)
 
     def _aromatic_valence(self, atomic_num: int) -> int:
         """Get aromatic valence for an element (bonds in aromatic system)."""
@@ -447,19 +604,19 @@ class _SMILESWriter:
         # This handles cases like nitramines where N-N bond is short but should be single
         order = self._adjust_bond_order_for_charges(atom_i, atom_j, order)
 
-        # Check for E/Z stereo on double bond
+        # E/Z stereo is encoded on the adjacent single bonds, not the double bond
         if 1.9 <= order <= 2.1:
-            db_key = (atom_i, atom_j)
-            if db_key in self.double_bond_stereo:
-                config = get_double_bond_config(self.graph, atom_i, atom_j)
-                if config == "E":
-                    return "/"
-                elif config == "Z":
-                    return "\\"
             return "="
 
         if 2.9 <= order <= 3.1:
             return "#"
+
+        # Directional single bond next to a stereo double bond
+        direction = self.bond_directions.get((atom_i, atom_j))
+        if direction is None and (atom_j, atom_i) in self.bond_directions:
+            direction = -self.bond_directions[(atom_j, atom_i)]
+        if direction is not None:
+            return "/" if direction > 0 else "\\"
 
         # Single bond (implicit)
         return ""

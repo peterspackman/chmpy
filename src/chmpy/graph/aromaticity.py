@@ -272,8 +272,9 @@ def _ring_is_conjugated(graph: "MolecularGraph", ring: tuple[int, ...]) -> bool:
     Check if a ring is conjugated based on bond lengths (Kekulé structure).
 
     A ring is conjugated if all bonds are short enough to be unsaturated
-    (double or aromatic character). This distinguishes benzene (~1.39 Å)
-    from cyclohexane (~1.54 Å).
+    (double or aromatic character), or if an integer bond order assignment
+    gives a conjugated ring. This distinguishes benzene (~1.39 Å) from
+    cyclohexane (~1.54 Å).
 
     Args:
         graph: A MolecularGraph instance.
@@ -282,6 +283,55 @@ def _ring_is_conjugated(graph: "MolecularGraph", ring: tuple[int, ...]) -> bool:
     Returns:
         True if all ring bonds are consistent with conjugation.
     """
+    if _ring_bond_lengths_conjugated(graph, ring):
+        return True
+    return _ring_kekule_conjugated(graph, ring)
+
+
+def _ring_kekule_conjugated(graph: "MolecularGraph", ring: tuple[int, ...]) -> bool:
+    """
+    Check conjugation using an integer (Kekule) bond order assignment.
+
+    Every ring atom must either take part in a double bond within the ring,
+    or be a lone-pair donor (furan O, thiophene S, pyrrole N) with no
+    multiple bonds. This catches rings such as furan whose bond lengths
+    fall just outside the length thresholds.
+    """
+    if graph.bond_orders is not None:
+
+        def order(i, j):
+            return float(graph.bond_orders[i, j])
+
+    else:
+        from .bond_orders import kekule_bond_orders
+
+        kekule = kekule_bond_orders(graph)
+
+        def order(i, j):
+            return kekule.get((min(i, j), max(i, j)), 0)
+
+    ring_size = len(ring)
+    for k, atom in enumerate(ring):
+        prev_atom = ring[k - 1]
+        next_atom = ring[(k + 1) % ring_size]
+        if max(order(atom, prev_atom), order(atom, next_atom)) > 1.4:
+            continue
+        z = graph.atomic_numbers[atom]
+        neighbors = graph.neighbors(atom)
+        if any(order(atom, n) > 1.4 for n in neighbors):
+            return False
+        donor = (z in (O, S, Se) and len(neighbors) == 2) or (
+            z in (N, P) and len(neighbors) == 3
+        )
+        if not donor:
+            return False
+    return True
+
+
+def _ring_bond_lengths_conjugated(
+    graph: "MolecularGraph", ring: tuple[int, ...]
+) -> bool:
+    """Check that all ring bonds are short enough to be unsaturated."""
     ring_size = len(ring)
 
     for i in range(ring_size):

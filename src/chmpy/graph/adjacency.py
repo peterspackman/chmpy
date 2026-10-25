@@ -138,7 +138,7 @@ class MolecularGraph:
         """
         if self.bond_orders is None:
             return 1 if self.has_bond(atom_i, atom_j) else 0
-        return int(self.bond_orders[atom_i, atom_j])
+        return int(round(float(self.bond_orders[atom_i, atom_j])))
 
     def connected_components(self) -> tuple[int, np.ndarray]:
         """

@@ -112,12 +112,10 @@ def perceive_bond_orders(graph: "MolecularGraph") -> np.ndarray:
     n = graph.n_atoms
     bond_orders = dok_matrix((n, n), dtype=np.float32)
 
-    # Get edges
-    edges = graph.edges()
-
-    # Step 1: Initial assignment from bond lengths
-    for i, j in edges:
-        order = _bond_length_heuristic(graph, i, j)
+    # Steps 1 and 3: integer (Kekule) assignment satisfying valences, using
+    # bond lengths both to limit which bonds may be multiple and to choose
+    # between alternative assignments
+    for (i, j), order in kekule_bond_orders(graph).items():
         bond_orders[i, j] = order
         bond_orders[j, i] = order
 
@@ -126,9 +124,6 @@ def perceive_bond_orders(graph: "MolecularGraph") -> np.ndarray:
     for i, j in aromatic_bonds:
         bond_orders[i, j] = 1.5
         bond_orders[j, i] = 1.5
-
-    # Step 3: Valence constraint propagation
-    bond_orders = _valence_propagation(graph, bond_orders)
 
     return bond_orders
 
@@ -189,112 +184,213 @@ def _bond_length_heuristic(
     return best_order
 
 
-def _valence_propagation(
-    graph: "MolecularGraph", bond_orders: dok_matrix
-) -> dok_matrix:
-    """
-    Refine bond orders using valence constraints.
+# Allowed valences used when assigning bond orders. Elements with several
+# entries may expand their valence (e.g. S in SO2, N in nitro groups) when
+# that lets otherwise unsatisfied neighbours form multiple bonds.
+_KEKULE_VALENCES = {
+    1: [1],
+    5: [3],
+    6: [4],
+    7: [3, 5],
+    8: [2],
+    9: [1],
+    14: [4],
+    15: [3, 5],
+    16: [2, 4, 6],
+    17: [1, 3, 5, 7],
+    34: [2, 4, 6],
+    35: [1, 3, 5, 7],
+    53: [1, 3, 5, 7],
+}
 
-    Iteratively adjusts bond orders to satisfy valence rules for each atom.
+
+def _charge_adjusted_valence(z: int, valence: int, charge: int) -> int:
+    """Valence of an atom with a given formal charge (e.g. N+ -> 4, O- -> 1)."""
+    if charge == 0:
+        return valence
+    if z in (6, 14):
+        return valence - abs(charge)
+    if z == 5:
+        return valence - charge
+    return valence + charge
+
+
+def kekule_bond_orders(graph: "MolecularGraph") -> dict[tuple[int, int], int]:
+    """
+    Assign integer (Kekule) bond orders satisfying valence constraints.
+
+    Each atom's unsaturation (its standard valence minus its number of
+    bonds) is distributed over bonds to other unsaturated atoms, so all
+    atoms must be present (i.e. explicit hydrogens). Bonds whose length
+    indicates a single bond are never promoted, and shorter bonds are
+    preferred when several assignments are possible.
 
     Args:
         graph: A MolecularGraph.
-        bond_orders: Initial bond order matrix.
 
     Returns:
-        Refined bond order matrix.
+        Dict mapping (i, j) with i < j to integer bond orders (1, 2 or 3).
     """
+    from chmpy.core.element import cov_radii
+
     n = graph.n_atoms
-    max_iterations = 10
+    edges = [(int(i), int(j)) for i, j in graph.edges()]
+    orders = dict.fromkeys(edges, 1)
+    if not edges:
+        return orders
 
-    for _iteration in range(max_iterations):
-        changed = False
+    nums = graph.atomic_numbers
+    degree = np.zeros(n, dtype=int)
+    for i, j in edges:
+        degree[i] += 1
+        degree[j] += 1
 
-        for atom_idx in range(n):
-            z = graph.atomic_numbers[atom_idx]
-            if z not in STANDARD_VALENCES:
-                continue
+    # Maximum extra bond order allowed on each bond, and a preference score
+    # (shorter relative to the covalent radii sum = more likely multiple)
+    radii = cov_radii(nums)
+    cap = {}
+    score = {}
+    for i, j in edges:
+        if nums[i] == 1 or nums[j] == 1:
+            continue
+        if (min(nums[i], nums[j]), max(nums[i], nums[j])) in BOND_LENGTH_RANGES:
+            max_order = int(np.ceil(_bond_length_heuristic(graph, i, j)))
+        else:
+            max_order = 3
+        if max_order <= 1:
+            continue
+        cap[(i, j)] = max_order - 1
+        dist = graph.bond_distance(i, j)
+        if not dist:
+            dist = np.linalg.norm(graph.positions[i] - graph.positions[j])
+        score[(i, j)] = float(dist) / (radii[i] + radii[j])
 
-            target_valences = STANDARD_VALENCES[z]
-            neighbors = graph.neighbors(atom_idx)
+    adjacent = [[] for _ in range(n)]
+    for i, j in cap:
+        adjacent[i].append(j)
+        adjacent[j].append(i)
 
-            # Calculate current valence (sum of bond orders)
-            current_valence = sum(bond_orders[atom_idx, n] for n in neighbors)
+    def key(a, b):
+        return (a, b) if a < b else (b, a)
 
-            # Check if valence is satisfied
-            if any(abs(current_valence - v) < 0.1 for v in target_valences):
-                continue
+    # Choose the smallest valence that accommodates each atom's bonds
+    level = np.zeros(n, dtype=int)
+    deficit = np.zeros(n, dtype=int)
 
-            # Only correct OVER-valence (e.g. carboxylate carbon with both C-O
-            # bonds initially flagged as double). UNDER-valence is expected
-            # when hydrogens are implicit; "correcting" it by promoting bonds
-            # would turn an isolated C-C single bond into a triple, etc.
-            max_target = max(target_valences)
-            if current_valence <= max_target + 0.1:
-                continue
+    def set_deficit(a):
+        valences = _KEKULE_VALENCES.get(int(nums[a]))
+        if valences is None:
+            deficit[a] = 0
+            return
+        charge = int(graph.formal_charges[a])
+        valences = [_charge_adjusted_valence(nums[a], v, charge) for v in valences]
+        allowed = [v for v in valences if v >= degree[a]]
+        if level[a] >= len(allowed):
+            deficit[a] = 0
+        else:
+            deficit[a] = allowed[level[a]] - degree[a]
 
-            # Pick the largest target we still exceed and reduce toward it.
-            target = max(v for v in target_valences if v <= current_valence)
-            diff = target - current_valence  # negative
+    for a in range(n):
+        set_deficit(a)
 
-            # Adjust bonds proportionally
-            adjustable_neighbors = [
-                n for n in neighbors if _can_adjust_bond(graph, atom_idx, n, diff > 0)
+    def solve():
+        extra = dict.fromkeys(cap, 0)
+        remaining = deficit.copy()
+
+        def partners(a):
+            return [
+                b
+                for b in adjacent[a]
+                if remaining[b] > 0 and extra[key(a, b)] < cap[key(a, b)]
             ]
 
-            if not adjustable_neighbors:
-                continue
+        # Greedy: always satisfy the most constrained atom first
+        while True:
+            best = None
+            for a in range(n):
+                if remaining[a] <= 0:
+                    continue
+                p = partners(a)
+                if p and (best is None or len(p) < best[0]):
+                    best = (len(p), a, p)
+            if best is None:
+                break
+            _, a, p = best
+            b = min(p, key=lambda x: (score[key(a, x)], len(partners(x)), x))
+            extra[key(a, b)] += 1
+            remaining[a] -= 1
+            remaining[b] -= 1
 
-            adjustment = diff / len(adjustable_neighbors)
-            for neighbor in adjustable_neighbors:
-                new_order = bond_orders[atom_idx, neighbor] + adjustment
-                new_order = max(1, min(3, new_order))  # Clamp to valid range
+        # Augmenting paths (alternately promoting and demoting bonds) between
+        # pairs of atoms that are still unsaturated
+        for start in range(n):
+            while remaining[start] > 0 and _augment(start, extra, remaining):
+                pass
+        return extra, remaining
 
-                if abs(new_order - bond_orders[atom_idx, neighbor]) > 0.01:
-                    bond_orders[atom_idx, neighbor] = new_order
-                    bond_orders[neighbor, atom_idx] = new_order
-                    changed = True
-
-        if not changed:
-            break
-
-    return bond_orders
-
-
-def _can_adjust_bond(
-    graph: "MolecularGraph", atom_i: int, atom_j: int, increase: bool
-) -> bool:
-    """
-    Check if a bond order can be adjusted in the specified direction.
-
-    Args:
-        graph: A MolecularGraph.
-        atom_i: First atom index.
-        atom_j: Second atom index.
-        increase: True to increase, False to decrease.
-
-    Returns:
-        True if the bond can be adjusted.
-    """
-    # Hydrogen bonds are always single
-    if graph.atomic_numbers[atom_i] == 1 or graph.atomic_numbers[atom_j] == 1:
+    def _augment(start, extra, remaining):
+        # BFS over (atom, parity); parity 0 means the next bond is promoted
+        parent = {(start, 0): None}
+        queue = [(start, 0)]
+        while queue:
+            a, parity = queue.pop(0)
+            for b in adjacent[a]:
+                k = key(a, b)
+                if parity == 0 and extra[k] >= cap[k]:
+                    continue
+                if parity == 1 and extra[k] <= 0:
+                    continue
+                state = (b, 1 - parity)
+                if state in parent:
+                    continue
+                parent[state] = (a, parity)
+                if parity == 0 and b != start and remaining[b] > 0:
+                    path = [state]
+                    while parent[path[-1]] is not None:
+                        path.append(parent[path[-1]])
+                    bonds = [
+                        key(x[0], y[0]) for x, y in zip(path, path[1:], strict=False)
+                    ]
+                    if len(set(bonds)) != len(bonds):
+                        continue
+                    for idx, k2 in enumerate(reversed(bonds)):
+                        extra[k2] += 1 if idx % 2 == 0 else -1
+                    remaining[start] -= 1
+                    remaining[b] -= 1
+                    return True
+                queue.append(state)
         return False
 
-    # Check if the other atom can accommodate the change
-    z = graph.atomic_numbers[atom_j]
-    if z not in STANDARD_VALENCES:
-        return True
+    extra, remaining = solve()
 
-    target_valences = STANDARD_VALENCES[z]
-    max_valence = max(target_valences)
+    # Expand valences of hypervalent-capable atoms (S, P, N, halogens) when
+    # this satisfies more of their unsaturated neighbours (e.g. O=S=O)
+    for _ in range(n):
+        improved = False
+        for a in range(n):
+            if not adjacent[a]:
+                continue
+            unsatisfied = sum(remaining[b] for b in adjacent[a] if remaining[b] > 0)
+            if unsatisfied == 0:
+                continue
+            old_level, old_deficit = level[a], deficit[a]
+            level[a] += 1
+            set_deficit(a)
+            if deficit[a] <= old_deficit:
+                level[a], deficit[a] = old_level, old_deficit
+                continue
+            new_extra, new_remaining = solve()
+            if new_remaining.clip(min=0).sum() < remaining.clip(min=0).sum():
+                extra, remaining = new_extra, new_remaining
+                improved = True
+            else:
+                level[a], deficit[a] = old_level, old_deficit
+        if not improved:
+            break
 
-    neighbors = graph.neighbors(atom_j)
-    current_valence = sum(graph.bond_order(atom_j, n) for n in neighbors)
-
-    if increase:
-        return current_valence < max_valence
-    else:
-        return current_valence > 1
+    for k, e in extra.items():
+        orders[k] += e
+    return orders
 
 
 def get_bond_order(graph: "MolecularGraph", atom_i: int, atom_j: int) -> float:
