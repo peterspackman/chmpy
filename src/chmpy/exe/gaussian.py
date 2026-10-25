@@ -103,4 +103,5 @@ class Gaussian(AbstractExecutable):
         return result
 
     def run(self, *args, **kwargs):
-        self._run_raw(self.job_file)
+        # relative to working_directory, as that is where gaussian is run
+        self._run_raw(self.job_file.name)

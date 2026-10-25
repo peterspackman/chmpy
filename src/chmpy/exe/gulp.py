@@ -1,4 +1,3 @@
-import copy
 import logging
 from os import environ
 from pathlib import Path
@@ -32,7 +31,8 @@ class Gulp(AbstractExecutable):
         self.restart_contents = None
         self.kwargs = kwargs.copy()
         self.working_directory = working_directory
-        self.arg = Path(self.input_file).with_suffix("")
+        # relative to working_directory, as that is where gulp is run
+        self.arg = Path(self._input_file).with_suffix("")
         LOG.debug("Initializing gulp calculation, timeout = %s", self.timeout)
         self.error_contents = None
 
@@ -79,7 +79,7 @@ class Gulp(AbstractExecutable):
         LOG.debug("Running %s %s", self._executable_location, self.arg)
         try:
             with TemporaryFile() as tmp:
-                env = copy.deepcopy(environ)
+                env = dict(environ)
                 env.update(
                     {
                         "OMP_NUM_THREADS": str(self.threads) + ",1",

@@ -1,4 +1,3 @@
-import copy
 import json
 import logging
 import shutil
@@ -192,7 +191,7 @@ class Raspa(AbstractExecutable):
         LOG.debug("Running %s in %s", self._executable_location, self.working_directory)
         try:
             with TemporaryFile() as tmp:
-                env = copy.deepcopy(environ)
+                env = dict(environ)
                 env.update(
                     {
                         "OMP_NUM_THREADS": str(self.threads) + ",1",

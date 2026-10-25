@@ -89,7 +89,8 @@ class AbstractExecutable(ABC):
 
     @executable.setter
     def executable(self, value):
-        os.access(value)
+        if not os.access(value, os.X_OK):
+            LOG.warning("%s is not an executable file", value)
         self._executable_location = os.path.abspath(value)
 
     @property
@@ -153,7 +154,8 @@ class AbstractExecutable(ABC):
     @property
     def output_file(self):
         if not self._output_file:
-            self._output_file = tempfile.mkstemp(prefix="cspy-", suffix=".txt")
+            fd, self._output_file = tempfile.mkstemp(prefix="cspy-", suffix=".txt")
+            os.close(fd)
         return self._output_file
 
     @output_file.setter

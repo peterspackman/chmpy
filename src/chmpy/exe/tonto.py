@@ -96,13 +96,12 @@ class Tonto(AbstractExecutable):
             output_file.write_text(self.stdout_contents)
 
     def run(self, *args, **kwargs):
-        from copy import deepcopy
         from os import environ
 
-        env = deepcopy(environ)
+        env = dict(environ)
         env.update(
             {
                 "TONTO_BASIS_SET_DIRECTORY": str(self.basis_set_directory),
             }
         )
-        self._run_raw()
+        self._run_raw(env=env)

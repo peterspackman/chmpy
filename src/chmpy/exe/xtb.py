@@ -1,4 +1,3 @@
-import copy
 import logging
 from os import environ
 from os.path import exists, join
@@ -39,7 +38,8 @@ class Xtb(AbstractExecutable):
         self.kwargs = kwargs.copy()
         self.esp = None
         self.working_directory = working_directory
-        self.args = [self.input_file, f"--gfn{self.gfn}"]
+        # relative to working_directory, as that is where xtb is run
+        self.args = [self._input_file, f"--gfn{self.gfn}"]
         if self.solvent is not None:
             self.args += ["--gbsa", self.solvent]
         LOG.debug(
@@ -66,7 +66,7 @@ class Xtb(AbstractExecutable):
 
     @property
     def uhf_file(self):
-        return join(self.working_directory, self._charge_file)
+        return join(self.working_directory, self._uhf_file)
 
     @property
     def output_file(self):
@@ -111,7 +111,7 @@ class Xtb(AbstractExecutable):
         LOG.debug("Running `xtb %s`", " ".join(self.args))
         try:
             with TemporaryFile() as tmp:
-                env = copy.deepcopy(environ)
+                env = dict(environ)
                 env.update(
                     {
                         "OMP_NUM_THREADS": str(self.threads) + ",1",
