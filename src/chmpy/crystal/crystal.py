@@ -194,15 +194,17 @@ class Crystal:
         atoms = self.site_atoms
         natom = self.nsites
         nsymops = len(self.space_group.symmetry_operations)
-        occupation = np.tile(
-            self.asymmetric_unit.properties.get("occupation", np.ones(natom)), nsymops
-        )
+        occupation = self.asymmetric_unit.properties.get("occupation")
+        if occupation is None:
+            occupation = np.ones(natom)
+        occupation = np.tile(occupation, nsymops)
         labels = np.tile(self.asymmetric_unit.labels, nsymops)
         uc_nums = np.tile(atoms, nsymops)
         asym = np.arange(len(uc_nums)) % natom
         sym, uc_pos = self.space_group.apply_all_symops(pos)
         translated = np.fmod(uc_pos + 7.0, 1)
-        tree = KDTree(translated)
+        # periodic: an image at x = 0.999 is the same site as one at 0.001
+        tree = KDTree(translated, boxsize=1.0)
         dist = tree.sparse_distance_matrix(tree, max_distance=tolerance)
         mask = np.ones(len(uc_pos), dtype=bool)
         # sites that coincide have to be merged: a site on a special position
@@ -432,7 +434,7 @@ class Crystal:
         """
         mol = self.symmetry_unique_molecules()[mol_idx]
         frac_origin = self.to_fractional(mol.center_of_mass)
-        frac_radius = radius / np.array(self.unit_cell.lengths)
+        frac_radius = self._fractional_extent(radius)
         hmax, kmax, lmax = np.ceil(frac_radius + frac_origin).astype(int) + 1
         hmin, kmin, lmin = np.floor(frac_origin - frac_radius).astype(int) - 1
         uc_mols = self.unit_cell_molecules()
@@ -533,6 +535,12 @@ class Crystal:
                     )
         return molecules
 
+    def _fractional_extent(self, radius) -> np.ndarray:
+        """How far a sphere of `radius` Angstroms reaches along each axis, in
+        fractional coordinates: `radius * |a*|`, not `radius / |a|`, which
+        falls short in oblique cells."""
+        return radius * np.linalg.norm(self.unit_cell.reciprocal_lattice, axis=1)
+
     def slab(self, bounds=((-1, -1, -1), (1, 1, 1))) -> dict:
         """
         Calculate the atoms and associated information
@@ -608,7 +616,7 @@ class Crystal:
             of those atoms within `radius` of the `origin`.
         """
         frac_origin = self.to_fractional(origin)
-        frac_radius = radius / np.array(self.unit_cell.lengths)
+        frac_radius = self._fractional_extent(radius)
         hmax, kmax, lmax = np.ceil(frac_radius + frac_origin).astype(int)
         hmin, kmin, lmin = np.floor(frac_origin - frac_radius).astype(int)
         slab = self.slab(bounds=((hmin, kmin, lmin), (hmax, kmax, lmax)))
@@ -634,7 +642,7 @@ class Crystal:
         cart_asym = self.to_cartesian(self.asymmetric_unit.positions)
         hklmax = np.array([-np.inf, -np.inf, -np.inf])
         hklmin = np.array([np.inf, np.inf, np.inf])
-        frac_radius = radius / np.array(self.unit_cell.lengths)
+        frac_radius = self._fractional_extent(radius)
         for pos in self.asymmetric_unit.positions:
             hklmax = np.maximum(hklmax, np.ceil(frac_radius + pos))
             hklmin = np.minimum(hklmin, np.floor(pos - frac_radius))
@@ -684,7 +692,7 @@ class Crystal:
         """
         hklmax = np.array([-np.inf, -np.inf, -np.inf])
         hklmin = np.array([np.inf, np.inf, np.inf])
-        frac_radius = radius / np.array(self.unit_cell.lengths)
+        frac_radius = self._fractional_extent(radius)
         mol = self.symmetry_unique_molecules()[0]
         central_positions = self.to_fractional(mol.positions[atoms])
         central_elements = mol.atomic_numbers[atoms]
@@ -737,7 +745,7 @@ class Crystal:
 
         hklmax = np.array([-np.inf, -np.inf, -np.inf])
         hklmin = np.array([np.inf, np.inf, np.inf])
-        frac_radius = radius / np.array(self.unit_cell.lengths)
+        frac_radius = self._fractional_extent(radius)
         for pos in self.to_fractional(mol.positions):
             hklmax = np.maximum(hklmax, np.ceil(frac_radius + pos))
             hklmin = np.minimum(hklmin, np.floor(pos - frac_radius))
@@ -801,7 +809,7 @@ class Crystal:
         for mol in self.symmetry_unique_molecules():
             hklmax = np.array([-np.inf, -np.inf, -np.inf])
             hklmin = np.array([np.inf, np.inf, np.inf])
-            frac_radius = radius / np.array(self.unit_cell.lengths)
+            frac_radius = self._fractional_extent(radius)
             for pos in self.to_fractional(mol.positions):
                 hklmax = np.maximum(hklmax, np.ceil(frac_radius + pos))
                 hklmin = np.minimum(hklmin, np.floor(pos - frac_radius))
@@ -1233,10 +1241,10 @@ class Crystal:
         from itertools import product
 
         hmax, kmax, lmax = supercell
-        a, b, c = self.unit_cell.lengths
-        sc = UnitCell.from_lengths_and_angles(
-            (hmax * a, kmax * b, lmax * c), self.unit_cell.angles
-        )
+        # scale the lattice vectors themselves: rebuilding the cell from
+        # lengths and angles would put it in the standard orientation while
+        # the molecules stay in this one
+        sc = UnitCell(np.diag((hmax, kmax, lmax)) @ self.unit_cell.direct)
 
         h = np.arange(hmax)
         k = np.arange(kmax)
@@ -1757,10 +1765,10 @@ class Crystal:
         import itertools as it
 
         umax, vmax, wmax = size
-        a, b, c = self.unit_cell.lengths
-        sc = UnitCell.from_lengths_and_angles(
-            (umax * a, vmax * b, wmax * c), self.unit_cell.angles
-        )
+        # scale the lattice vectors themselves: rebuilding the cell from
+        # lengths and angles would put it in the standard orientation while
+        # the molecules stay in this one
+        sc = UnitCell(np.diag((umax, vmax, wmax)) @ self.unit_cell.direct)
 
         u = np.arange(umax)
         v = np.arange(vmax)
@@ -1823,7 +1831,7 @@ class Crystal:
 
         hklmax = np.array([-np.inf, -np.inf, -np.inf])
         hklmin = np.array([np.inf, np.inf, np.inf])
-        frac_radius = radius * 2 / np.array(self.unit_cell.lengths)
+        frac_radius = self._fractional_extent(radius * 2)
 
         for pos in self.asymmetric_unit.positions:
             hklmax = np.maximum(hklmax, np.ceil(frac_radius + pos))
@@ -1835,7 +1843,9 @@ class Crystal:
         hmin, kmin, lmin = hklmin.astype(int)
 
         shifts_frac = cartesian_product(
-            np.arange(hmin, hmax), np.arange(kmin, kmax), np.arange(lmin, lmax)
+            np.arange(hmin, hmax + 1),
+            np.arange(kmin, kmax + 1),
+            np.arange(lmin, lmax + 1),
         )
 
         shifts = self.to_cartesian(shifts_frac)
@@ -1907,6 +1917,12 @@ class Crystal:
         return neighbour_info, nidx[idx]
 
     def normalize_hydrogen_bondlengths(self, bond_tolerance=0.4, **kwargs):
+        """Move each hydrogen along its bond to the neutron-diffraction X-H
+        length (C, N, O, B), as X-ray structures put it too close.
+
+        The bonded atom is the nearest non-hydrogen, in any cell, within the
+        sum of covalent radii plus `bond_tolerance`.
+        """
         BONDLENGTHS = {
             "C": 1.083,
             "N": 1.009,
@@ -1914,24 +1930,44 @@ class Crystal:
             "B": 1.180,
         }
         nums = self.asymmetric_unit.atomic_numbers
-        pos_cart = self.to_cartesian(self.asymmetric_unit.positions)
+        frac = self.asymmetric_unit.positions
+        pos_cart = self.to_cartesian(frac)
         H_idxs = np.where(nums == 1)[0]
-        conn, t = self.unit_cell_connectivity(bond_tolerance=bond_tolerance, **kwargs)
-        for key in conn.keys():
-            for h in H_idxs:
-                if h in key:
-                    at = key[1 if key.index(h) == 0 else 0]
-                    conn[key]
-                    break
-            else:
+        if len(H_idxs) == 0:
+            return
+        lower = np.floor(frac.min(axis=0)).astype(int) - 1
+        upper = np.floor(frac.max(axis=0)).astype(int) + 1
+        slab = self.slab(bounds=(tuple(lower), tuple(upper)))
+        heavy = slab["element"] != 1
+        heavy_numbers = slab["element"][heavy]
+        heavy_pos = slab["cart_pos"][heavy]
+        if len(heavy_pos) == 0:
+            return
+        tree = KDTree(heavy_pos)
+        distances, nearest = tree.query(pos_cart[H_idxs])
+        h_radius = Element[1].covalent_radius
+        for h, d, idx in zip(H_idxs, distances, nearest, strict=True):
+            el = Element[int(heavy_numbers[idx])]
+            if d > h_radius + el.covalent_radius + bond_tolerance:
                 continue
-            el = str(Element[nums[at]])
-            if el in BONDLENGTHS:
-                v_xh = pos_cart[h, :] - pos_cart[at, :]
-                norm = np.linalg.norm(v_xh)
-                v_xh = BONDLENGTHS[el] * v_xh / norm
-                pos_cart[h, :] = pos_cart[at, :] + v_xh
+            if el.symbol in BONDLENGTHS:
+                v_xh = pos_cart[h] - heavy_pos[idx]
+                pos_cart[h] = heavy_pos[idx] + BONDLENGTHS[el.symbol] * v_xh / d
         self.asymmetric_unit.positions = self.to_fractional(pos_cart)
+        self._clear_cached_structure()
+
+    def _clear_cached_structure(self):
+        "Forget everything derived from the atomic positions"
+        for name in (
+            "_unit_cell_atom_dict",
+            "_uc_graph",
+            "_unit_cell_molecules",
+            "_symmetry_unique_molecules",
+            "_unit_cell_coordination_numbers",
+            "_asymmetric_unit_coordination_numbers",
+            "_unit_cell_partial_charges",
+        ):
+            self.__dict__.pop(name, None)
 
     def _warn_if_disordered(self, what):
         """Say so, once, before deriving ``what`` from overlapping alternatives.

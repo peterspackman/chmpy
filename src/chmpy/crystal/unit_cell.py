@@ -197,7 +197,7 @@ class UnitCell:
             self.cell_type_index = 1
             self.cell_type = "monoclinic"
             self.unique_parameters = self.a, self.b, self.c, self.beta
-            self.unique_parameters_deg = (self.a, self.b, np.degrees(self.beta))
+            self.unique_parameters_deg = (self.a, self.b, self.c, np.degrees(self.beta))
         else:
             self.cell_type_index = 0
             self.cell_type = "triclinic"

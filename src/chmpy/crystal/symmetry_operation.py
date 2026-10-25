@@ -185,7 +185,8 @@ def encode_symm_int(rotation, translation):
             shift *= 3
     t = 0
     shift = 1
-    translation = np.round(np.array(translation) * 12).astype(int)
+    # modulo 12: a translation just below 1, e.g. -1e-7 from a CIF, is 0
+    translation = np.round(np.array(translation) * 12).astype(int) % 12
     for i in (2, 1, 0):
         t += translation[i] * shift
         shift *= 12
