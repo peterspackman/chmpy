@@ -137,7 +137,10 @@ def promolecule_density_isosurface(
         verts, faces, normals, _ = marching_cubes(
             d, isovalue, spacing=(sep, sep, sep), gradient_direction="descent"
         )
-        verts = np.c_[verts[:, 1], verts[:, 0], verts[:, 2]] + l
+        # marching_cubes gives (axis 2, axis 1, axis 0) of the volume, and
+        # meshgrid's default indexing puts y on axis 0 and x on axis 1
+        verts = verts[:, [1, 2, 0]] + l
+        normals = normals[:, [1, 2, 0]]
     LOG.debug("Surface centroid: %s", np.mean(verts, axis=0))
     LOG.debug("Mol centroid: %s", np.mean(promol.positions, axis=0))
     LOG.debug("Max (x,y,z): %s", np.max(verts, axis=0))
@@ -204,7 +207,9 @@ def stockholder_weight_isosurface(
         verts, faces, normals, _ = marching_cubes(
             weights, isovalue, spacing=separations, gradient_direction="descent"
         )
-        verts = np.c_[verts[:, 1], verts[:, 0], verts[:, 2]] + l
+        # as in promolecule_density_isosurface: (axis 2, 1, 0) is (z, x, y)
+        verts = verts[:, [1, 2, 0]] + l
+        normals = normals[:, [1, 2, 0]]
 
     if smoothing == "laplacian":
         nverts_pre = len(verts)

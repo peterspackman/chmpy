@@ -154,12 +154,22 @@ def void_surface(crystal, *args, **kwargs) -> Trimesh:
     rho = density.rho(pts[mask])
     values[mask] = rho
     values = values.reshape(shape)
-    verts, faces, normals, _ = marching_cubes(
-        values, isovalue, spacing=seps, gradient_direction="ascent"
-    )
+    verts, faces, _, _ = marching_cubes(values, isovalue, gradient_direction="ascent")
+    # marching_cubes gives grid indices as (axis 2, axis 1, axis 0); undoing
+    # that reflection reverses the winding, so reverse the faces to match
+    index = verts[:, ::-1]
+    faces = faces[:, ::-1]
     if grid_type == "uc":
-        verts = crystal.to_cartesian(np.c_[verts[:, 1], verts[:, 0], verts[:, 2]])
-    mesh = trimesh.Trimesh(vertices=verts, faces=faces, normals=normals)
+        # meshgrid's default indexing puts fractional y on axis 0, x on axis 1
+        frac = np.c_[
+            index[:, 1] * seps[0], index[:, 0] * seps[1], index[:, 2] * seps[2]
+        ]
+        verts = crystal.to_cartesian(frac)
+    else:
+        verts = np.array((x0, y0, z0)) + index * sep
+    # the map from grid to Cartesian space may be oblique, so let trimesh
+    # work out the normals in the space the vertices are in
+    mesh = trimesh.Trimesh(vertices=verts, faces=faces)
 
     if kwargs.get("subdivide", False):
         for _ in range(int(kwargs.get("subdivide", False))):

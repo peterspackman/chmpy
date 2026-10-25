@@ -101,10 +101,13 @@ class CubeData:
         from chmpy.mc import marching_cubes
 
         vol = self.data.reshape((self.nx, self.ny, self.nz))
-        seps = (
-            np.linalg.norm(self.x_basis),
-            np.linalg.norm(self.y_basis),
-            np.linalg.norm(self.z_basis),
-        )
-        verts, faces, normals, _ = marching_cubes(vol, level=isovalue, spacing=seps)
-        return Trimesh(vertices=verts, faces=faces, normals=normals)
+        verts, faces, _, _ = marching_cubes(vol, level=isovalue)
+        # marching_cubes gives grid indices as (axis 2, axis 1, axis 0); the
+        # volume's axes are the cube's x, y and z basis vectors, which need
+        # not be orthogonal
+        verts = verts[:, ::-1] @ self.basis + self.volume_origin
+        # undoing the axis reversal (a reflection) reverses the winding, as
+        # would a left-handed basis
+        if np.linalg.det(self.basis) > 0:
+            faces = faces[:, ::-1]
+        return Trimesh(vertices=verts, faces=faces)
