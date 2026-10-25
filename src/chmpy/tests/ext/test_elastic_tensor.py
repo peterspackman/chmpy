@@ -27,6 +27,37 @@ class ElasticTensorTestCase(unittest.TestCase):
         lc = self.elastic.linear_compressibility([[0, 0, 1]])
         self.assertAlmostEqual(lc[0], 28.214314777188065)
 
+    def test_second_direction_is_perpendicular_unit(self):
+        from chmpy.ext.elastic_tensor import angles_to_cartesian, angles_to_cartesian_2
+
+        th, ph, ch = np.array([0.7]), np.array([1.1]), np.array([0.4])
+        a = angles_to_cartesian(th, ph)
+        b = angles_to_cartesian_2(th, ph, ch)
+        self.assertAlmostEqual(np.linalg.norm(b), 1.0)
+        self.assertAlmostEqual((a @ b.T).item(), 0.0)
+
+    def test_isotropic_shear_and_poisson(self):
+        c11, c12 = 300.0, 100.0
+        c44 = (c11 - c12) / 2
+        c = np.zeros((6, 6))
+        c[:3, :3] = c12
+        np.fill_diagonal(c, [c11] * 3 + [c44] * 3)
+        t = ElasticTensor(c)
+        th, ph, ch = np.array([0.7]), np.array([1.1]), np.array([0.4])
+        self.assertAlmostEqual(t.shear_modulus_angular(th, ph, ch)[0], c44)
+        self.assertAlmostEqual(
+            t.poisson_ratio_angular(th, ph, ch)[0], c12 / (c11 + c12)
+        )
+
+    def test_triangular_input(self):
+        c = self.elastic.c_voigt
+        upper = [list(c[i, i:]) for i in range(6)]
+        lower = [list(c[i, : i + 1]) for i in range(6)]
+        np.testing.assert_allclose(ElasticTensor(upper).c_voigt, c)
+        np.testing.assert_allclose(ElasticTensor(lower).c_voigt, c)
+        upper_str = "\n".join(" ".join(str(x) for x in row) for row in upper)
+        np.testing.assert_allclose(ElasticTensor.from_string(upper_str).c_voigt, c)
+
     # averages() integrates over a trimesh icosphere
     @unittest.skipUnless(have("trimesh"), "needs chmpy[mesh]")
     def test_reorientation_to_standard_frame(self):

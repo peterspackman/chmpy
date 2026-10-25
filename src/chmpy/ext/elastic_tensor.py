@@ -32,7 +32,7 @@ def angles_to_cartesian_2(theta, phi, chi):
     sinc = np.sin(chi)
     cosc = np.cos(chi)
     return np.c_[
-        cost * cosp * cosp - sinp * sinc, cost * sinp * cosc + cosp * sinc, -sint * cosc
+        cost * cosp * cosc - sinp * sinc, cost * sinp * cosc + cosp * sinc, -sint * cosc
     ]
 
 
@@ -57,18 +57,18 @@ class ElasticTensor:
     """
 
     def __init__(self, mat):
-        mat = np.asarray(mat, dtype=np.float64)
-        if mat.shape != (6, 6):
+        # rows may be ragged (triangular), so only convert to an array after
+        if len(mat) == 6 and all(np.ndim(row) == 1 for row in mat):
+            rows = [list(row) for row in mat]
             # Is it upper triangular?
-            if list(map(len, mat)) == [6, 5, 4, 3, 2, 1]:
-                mat = [[0] * i + mat[i] for i in range(6)]
-                mat = np.array(mat)
+            if list(map(len, rows)) == [6, 5, 4, 3, 2, 1]:
+                mat = [[0] * i + rows[i] for i in range(6)]
 
             # Is it lower triangular?
-            if list(map(len, mat)) == [1, 2, 3, 4, 5, 6]:
-                mat = [mat[i] + [0] * (5 - i) for i in range(6)]
-                mat = np.array(mat)
+            elif list(map(len, rows)) == [1, 2, 3, 4, 5, 6]:
+                mat = [rows[i] + [0] * (5 - i) for i in range(6)]
 
+        mat = np.asarray(mat, dtype=np.float64)
         if mat.shape != (6, 6):
             raise ValueError("should be a square matrix")
 
