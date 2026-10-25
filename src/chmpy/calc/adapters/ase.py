@@ -139,7 +139,10 @@ class AseCalculator(Calculator):
         self.ase_calculator.reset()
         atoms.calc = self.ase_calculator
         try:
-            atoms.get_potential_energy()
+            # each property by name: a calculator that computes only what it
+            # is asked for has no forces after get_potential_energy()
+            for name in properties:
+                self.ase_calculator.get_property(name, atoms)
         except Exception as exc:
             direct, self._direct_error = self._direct_error, None
             if direct is not None and _same_failure(direct, exc):
@@ -151,7 +154,7 @@ class AseCalculator(Calculator):
                 raise RuntimeError(
                     f"{type(self.ase_calculator).__name__} failed both when its "
                     f"calculate() was called directly ({_first_line(direct)}) and "
-                    f"through ase.Atoms.get_potential_energy() (below)"
+                    f"through its get_property() (below)"
                 ) from exc
             raise
         return self._unpack(self.ase_calculator.results, system, want)

@@ -209,3 +209,30 @@ def test_a_long_error_is_quoted_by_its_last_line():
 
     error = RuntimeError("Traceback...\n  frame\n\nscatter(): bad index\n")
     assert _first_line(error) == "RuntimeError: scatter(): bad index"
+
+
+def test_fallback_route_asks_for_every_property():
+    """A calculator that only works through get_property, and only computes
+    what it is asked for, still gives forces."""
+    from ase.calculators.calculator import Calculator as AseBase
+    from ase.calculators.calculator import all_changes
+
+    class Lazy(AseBase):
+        implemented_properties = ["energy", "forces"]
+        refused = False
+
+        def calculate(self, atoms=None, properties=("energy",), changes=all_changes):
+            if not self.refused:
+                # the first, direct call fails, which sends the adapter round
+                # by the slower route for good
+                self.refused = True
+                raise RuntimeError("drive me through get_property")
+            super().calculate(atoms, properties, changes)
+            x = self.atoms.positions
+            self.results["energy"] = float((x**2).sum())
+            if "forces" in properties:
+                self.results["forces"] = -2 * x
+
+    system = System([1, 1], [[0, 0, 0], [0, 0, 1.0]])
+    result = Calculator.from_ase(Lazy())(system, ("energy", "forces"))
+    np.testing.assert_allclose(result.forces, -2 * system.positions)
