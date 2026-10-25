@@ -130,6 +130,12 @@ class SymmetryAdapted(Strain):
         )
         super().__init__(system, basis=basis)
         self.atom_map = crystal_atom_map(crystal, self.system, tolerance)
+        # unit-cell atoms whose asymmetric-unit atom is free to move
+        self.free = ~self._fixed[self._asym_index]
+        if not len(self.basis):
+            # at fixed cell nothing reads the stress, and a calculator without
+            # it would finite-difference it on every step
+            self.wanted = frozenset({ENERGY, FORCES})
 
     # -- construction --------------------------------------------------------
 
@@ -165,6 +171,7 @@ class SymmetryAdapted(Strain):
             if fixed is None
             else np.asarray(fixed, dtype=bool)
         )
+        self._fixed = fixed
 
         bases, offsets, total = [], [], 0
         for index, position in enumerate(reference):
@@ -296,7 +303,9 @@ class SymmetryAdapted(Strain):
         return self.get()
 
     def measures(self, result) -> dict:
-        return symmetric_measures(result, self.atom_map, self.system.cell, self.basis)
+        return symmetric_measures(
+            result, self.atom_map, self.system.cell, self.basis, free=self.free
+        )
 
     # -- results -------------------------------------------------------------
 
@@ -456,7 +465,7 @@ class AtomMap:
         return self.subset(kept)
 
 
-def symmetric_measures(result, atom_map, cell, basis=None) -> dict:
+def symmetric_measures(result, atom_map, cell, basis=None, free=None) -> dict:
     """Convergence measures for a symmetry-constrained relaxation.
 
     `fmax` and `smax` are taken on the symmetric parts of the forces and
@@ -470,6 +479,8 @@ def symmetric_measures(result, atom_map, cell, basis=None) -> dict:
         atom_map: the operations the relaxation preserves
         cell: the current lattice vectors
         basis: (k, 3, 3) the allowed strains, or None at fixed cell
+        free: (N,) mask of the atoms that may move; the force on a fixed atom
+            is no measure of convergence
 
     Returns:
         {"fmax", "forbidden"}, plus "smax" when the cell varies
@@ -477,8 +488,9 @@ def symmetric_measures(result, atom_map, cell, basis=None) -> dict:
     from chmpy.calc.result import EV_PER_ANGSTROM3_TO_GPA
 
     symmetric = atom_map.symmetrise(result.forces, cell)
+    moving = symmetric if free is None else symmetric[free]
     measures = {
-        "fmax": float(np.abs(symmetric).max(initial=0.0)),
+        "fmax": float(np.abs(moving).max(initial=0.0)),
         "forbidden": float(np.abs(result.forces - symmetric).max(initial=0.0)),
     }
     if basis is not None and len(basis):

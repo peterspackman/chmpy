@@ -203,13 +203,19 @@ def lattice_energy(
                 outcome.measures.get("smax", float("nan")),
             )
         crystal = outcome.structure
-        crystal_energy = outcome.energy
+        # the energy, not the enthalpy the relaxation minimised under a pressure
+        crystal_energy = outcome.result.energy
         # the relaxation can change the bonding, and a cell that collapsed is
         # not caught by anything downstream: the arithmetic still works, and
         # the molecules cut out of the wreckage give a confident nonsense
         # number rather than an error
         _check_still_molecular(crystal, z)
         unique = crystal.symmetry_unique_molecules()
+        # the unique molecules may come back in another order
+        counts = np.bincount(
+            [m.properties["asym_mol_idx"] for m in crystal.unit_cell_molecules()],
+            minlength=len(unique),
+        )
         announce("crystal", f"crystal: {outcome!r}", done=True)
     else:
         from chmpy.calc.system import System
@@ -239,7 +245,7 @@ def lattice_energy(
                     index,
                     fmax,
                 )
-            relaxed.append(outcome.energy)
+            relaxed.append(outcome.result.energy)
             molecules.append(outcome.structure)
             announce(stage, f"{stage}: {outcome!r}", done=True)
         else:

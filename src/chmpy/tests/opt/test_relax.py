@@ -106,3 +106,70 @@ def _acetic():
     from .. import TEST_FILES
 
     return TEST_FILES["acetic_acid.cif"]
+
+
+def _argon_p21c():
+    from chmpy import Crystal
+    from chmpy.core import Element
+    from chmpy.crystal import AsymmetricUnit, SpaceGroup, UnitCell
+
+    cell = UnitCell.from_lengths_and_angles((5.9, 6.3, 7.1), np.radians((90, 104, 90)))
+    return Crystal(
+        cell,
+        SpaceGroup(14),
+        AsymmetricUnit(
+            [Element[18]] * 2, np.array([[0.11, 0.21, 0.31], [0.6, 0.4, 0.05]])
+        ),
+    )
+
+
+def test_relaxation_under_pressure_converges_at_minus_p():
+    # the enthalpy minimum has stress -P I, so smax is measured from there
+    from chmpy.calc import LennardJones, System
+
+    a = 5.3
+    fcc = np.array([[0, 0, 0], [0.5, 0.5, 0], [0.5, 0, 0.5], [0, 0.5, 0.5]]) * a
+    system = System([18] * 4, fcc, np.eye(3) * a, True)
+    result = relax(
+        system, LennardJones(), symmetry=False, pressure=1.0, smax=0.01, steps=100
+    )
+    assert result.converged
+    assert result.result.pressure == pytest.approx(1.0, abs=0.02)
+
+
+def test_force_on_a_fixed_atom_does_not_block_convergence():
+    from chmpy.calc import LennardJones, System
+
+    # the fixed pair is held off its equilibrium spacing
+    positions = np.array([[0, 0, 0], [3.4, 0, 0], [1.7, 3.3, 0], [1.7, 1.1, 3.2]])
+    fixed = np.array([True, True, False, False])
+    result = relax(
+        System([18] * 4, positions), LennardJones(), fixed=fixed, fmax=1e-3, steps=100
+    )
+    assert result.converged
+    assert np.abs(result.result.forces[fixed]).max() > 1e-3
+
+
+def test_force_on_a_fixed_asymmetric_atom_does_not_block_convergence():
+    from chmpy.calc import LennardJones
+
+    result = relax(
+        _argon_p21c(),
+        LennardJones(),
+        cell=False,
+        fixed=[True, False],
+        fmax=1e-3,
+        steps=100,
+    )
+    assert result.converged
+
+
+def test_fixed_cell_symmetry_relaxation_does_not_ask_for_stress():
+    from chmpy.calc import LennardJones
+
+    class EnergyAndForces(LennardJones):
+        provides = {"energy", "forces"}
+
+    calculator = EnergyAndForces()
+    relax(_argon_p21c(), calculator, cell=False, steps=5)
+    assert calculator.stats.finite_difference_calls == 0

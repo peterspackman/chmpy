@@ -96,6 +96,11 @@ class Coordinates(ABC):
         return f"<{type(self).__name__} {self.n_dof} dof>"
 
 
+def _free_fmax(result, free) -> float:
+    "Largest force component on an atom that may move, eV/A"
+    return float(np.abs(result.forces[free]).max(initial=0.0))
+
+
 class Atomic(Coordinates):
     """Cartesian atomic positions at a fixed cell.
 
@@ -131,6 +136,9 @@ class Atomic(Coordinates):
 
     def scale(self) -> np.ndarray:
         return np.ones(self.n_dof)
+
+    def measures(self, result) -> dict:
+        return {"fmax": _free_fmax(result, self.free)}
 
 
 class Strain(Coordinates):
@@ -304,7 +312,7 @@ class AtomicStrain(Strain):
         return self.get()
 
     def measures(self, result) -> dict:
-        return {"fmax": result.fmax, "smax": result.smax}
+        return {"fmax": _free_fmax(result, self.free), "smax": result.smax}
 
 
 def strain_basis_for(structure, symmetry: bool = True) -> np.ndarray:
