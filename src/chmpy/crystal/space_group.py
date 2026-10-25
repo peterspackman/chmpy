@@ -34,6 +34,33 @@ SG_FROM_SYMOPS = {tuple(x.symops): x for k, sgs in SG_FROM_NUMBER.items() for x 
 SG_FROM_SYMBOL = {
     x.international.split("=")[-1]: x for k, sgs in SG_FROM_NUMBER.items() for x in sgs
 }
+
+
+def _normalise_symbol(symbol):
+    return symbol.replace(" ", "").replace("_", "")
+
+
+# A full symbol names one setting, unless origin choices share it (Fd-3m 1
+# and 2); the short ones (the first alias of `international`, and `short`)
+# stand for the group, in its default setting
+_SG_FROM_SETTING_SYMBOL = {}
+_SG_NUMBER_FROM_SYMBOL = {}
+for _sgs in SG_FROM_NUMBER.values():
+    for _sg in _sgs:
+        _aliases = _sg.international.split("=")
+        for _alias in {_normalise_symbol(_sg.full), _normalise_symbol(_aliases[-1])}:
+            _SG_FROM_SETTING_SYMBOL.setdefault(_alias, []).append(_sg)
+        for _alias in (_aliases[0], _sg.short):
+            _SG_NUMBER_FROM_SYMBOL.setdefault(_normalise_symbol(_alias), _sg.number)
+_SG_FROM_SETTING_SYMBOL = {
+    k: v[0] for k, v in _SG_FROM_SETTING_SYMBOL.items() if len(v) == 1
+}
+_SG_NUMBER_FROM_FULL = {
+    _normalise_symbol(_sg.full): _sg.number
+    for _sgs in SG_FROM_NUMBER.values()
+    for _sg in _sgs
+}
+
 SG_CHOICES = {int(k): [x.choice for x in v] for k, v in SG_FROM_NUMBER.items()}
 
 with open(os.path.join(os.path.dirname(__file__), "hall_symbols.json")) as f:
@@ -518,28 +545,19 @@ class SpaceGroup:
 
     @classmethod
     def from_symbol(cls, symbol):
-        symbol = symbol.replace(" ", "")
-        sgdata = SG_FROM_SYMBOL.get(symbol, None)
-        special_cases = {
-            "P21/a": "P12_1/a1",
-            "P21/n": "P12_1/n1",
-        }
-        symbol = special_cases.get(symbol, symbol)
-        if sgdata is None:
-            for number, groups in SG_FROM_NUMBER.items():
-                if int(number) > 14:
-                    continue
-                for g in groups:
-                    intl = g.international.split("=")[-1]
-                    if symbol == intl:
-                        sgdata = g
-                        break
-                    elif symbol == intl.replace("_", ""):
-                        sgdata = g
-                        break
-                if sgdata is not None:
-                    break
-            else:
-                raise ValueError(f"Could not find matching space group for '{symbol}'")
+        """The space group with this Hermann-Mauguin symbol.
 
-        return SpaceGroup(sgdata.number, choice=sgdata.choice)
+        Spaces and the underscores of screw axes are optional ("P 21/c",
+        "P2_1/c"). A full symbol names its setting ("P 1 21/n 1", "A 1 2/n 1");
+        a short one shared by several settings ("P21/c", "Fd-3m", "R-3") gives
+        the default setting, as `SpaceGroup(number)` does.
+        """
+        key = _normalise_symbol(symbol)
+        key = {"P21/a": "P121/a1", "P21/n": "P121/n1"}.get(key, key)
+        sgdata = _SG_FROM_SETTING_SYMBOL.get(key)
+        if sgdata is not None:
+            return SpaceGroup(sgdata.number, choice=sgdata.choice)
+        number = _SG_NUMBER_FROM_SYMBOL.get(key, _SG_NUMBER_FROM_FULL.get(key))
+        if number is None:
+            raise ValueError(f"Could not find matching space group for '{symbol}'")
+        return SpaceGroup(number)
