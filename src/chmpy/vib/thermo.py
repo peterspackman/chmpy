@@ -45,6 +45,7 @@ class ThermalProperties:
         n_modes: modes included over the whole mesh
         n_imaginary: modes excluded as imaginary
         gamma: (T, 3) the Gamma correction included in F, S and Cv, or None
+        shift: offset of the mesh from Gamma in mesh steps
     """
 
     temperatures: np.ndarray
@@ -56,18 +57,41 @@ class ThermalProperties:
     n_modes: int
     n_imaginary: int
     gamma: np.ndarray | None = None
+    shift: tuple = (0.0, 0.0, 0.0)
 
 
-def q_mesh(mesh) -> np.ndarray:
-    """A Gamma-centred mesh of fractional wavevectors in [-0.5, 0.5).
+def mesh_shift(mesh, shift=0.0) -> np.ndarray:
+    """The offset of a mesh from Gamma along each axis, in mesh steps.
 
     Args:
         mesh: (3,) points along each reciprocal axis
+        shift: 0 for a Gamma-centred mesh, 0.5 for one centred half a step
+            away along every axis, or (3,) of either per axis
+
+    Returns:
+        (3,) each 0 or 0.5
+    """
+    shift = np.broadcast_to(np.asarray(shift, dtype=float), (3,)) % 1.0
+    if not np.all(np.isclose(shift, 0.0) | np.isclose(shift, 0.5)):
+        raise ValueError(
+            f"a mesh shift must be 0 or half a step along each axis, got {shift}; "
+            "other shifts break the q, -q pairing the mesh sums rely on"
+        )
+    return np.where(np.isclose(shift, 0.5), 0.5, 0.0)
+
+
+def q_mesh(mesh, shift=0.0) -> np.ndarray:
+    """A mesh of fractional wavevectors in [-0.5, 0.5).
+
+    Args:
+        mesh: (3,) points along each reciprocal axis
+        shift: offset from Gamma in mesh steps; see `mesh_shift`
 
     Returns:
         (n1 n2 n3, 3) fractional q-points
     """
-    axes = [np.arange(n) / n for n in mesh]
+    offset = mesh_shift(mesh, shift)
+    axes = [(np.arange(n) + o) / n for n, o in zip(mesh, offset, strict=True)]
     grid = np.array(np.meshgrid(*axes, indexing="ij")).reshape(3, -1).T
     return grid - np.round(grid + 1e-12)
 
@@ -103,7 +127,7 @@ def harmonic_properties(frequencies, temperature: float):
     return free_energy, entropy, heat_capacity
 
 
-def mesh_frequencies(constants, mesh):
+def mesh_frequencies(constants, mesh, shift=0.0):
     """Mode frequencies over a q-mesh, with the zero and imaginary ones removed.
 
     Frequencies at `q` and `-q` are the same, so only one of each such pair
@@ -116,7 +140,7 @@ def mesh_frequencies(constants, mesh):
         imaginary modes removed). Each q-point's modes appear once per point
         of the full mesh they stand for.
     """
-    points, multiplicity = _irreducible_by_inversion(q_mesh(mesh))
+    points, multiplicity = _irreducible_by_inversion(q_mesh(mesh, shift))
     gamma = np.all(points == 0, axis=1)
     kept, imaginary = [], 0
 
@@ -158,7 +182,7 @@ def _irreducible_by_inversion(points):
 
 
 def thermal_properties(
-    constants, temperatures, mesh=(8, 8, 8), gamma_correction=None
+    constants, temperatures, mesh=(8, 8, 8), gamma_correction=None, shift=0.0
 ) -> ThermalProperties:
     """Harmonic thermodynamics of a crystal from its force constants.
 
@@ -170,13 +194,18 @@ def thermal_properties(
             mesh drops (see `chmpy.vib.gamma`). True takes the long-wave
             acoustic tensor from `constants`; an elastic tensor (a (6, 6)
             array in GPa, `ElasticTensor` or `ElasticResult`) takes it from
-            that instead. None or False leaves them out.
+            that instead. None or False leaves them out. On a shifted mesh
+            no mode is dropped, and the correction is instead for the
+            acoustic branches' singular behaviour near Gamma.
+        shift: offset of the mesh from Gamma in mesh steps: 0.5 centres it
+            half a step away along every axis; see `mesh_shift`
 
     Returns:
         ThermalProperties, per unit cell
     """
     temperatures = np.atleast_1d(np.asarray(temperatures, dtype=float))
-    frequencies, imaginary = mesh_frequencies(constants, mesh)
+    offset = mesh_shift(mesh, shift)
+    frequencies, imaginary = mesh_frequencies(constants, mesh, offset)
     n_q = int(np.prod(mesh))
     values = np.array([harmonic_properties(frequencies, T) for T in temperatures])
     values = values.reshape(-1, 3) / n_q
@@ -188,7 +217,7 @@ def thermal_properties(
 
         elastic = None if gamma_correction is True else gamma_correction
         tensor = long_wave_tensor(constants, elastic)
-        weights = gamma_weight(tensor, mesh, np.append(temperatures, 0.0))
+        weights = gamma_weight(tensor, mesh, np.append(temperatures, 0.0), shift=offset)
         gamma = np.array(weights).T / n_q
         zero_point += gamma[-1, 0]
         gamma = gamma[:-1]
@@ -204,4 +233,5 @@ def thermal_properties(
         n_modes=len(frequencies),
         n_imaginary=imaginary,
         gamma=gamma,
+        shift=tuple(offset.tolist()),
     )

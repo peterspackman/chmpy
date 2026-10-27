@@ -17,6 +17,11 @@ doi:10.1088/1361-6544/ac73d0). Adding `W / N` to the mesh average replaces
 the dropped modes; for F the error then falls as h^4-h^5 rather than
 h^3 ln h.
 
+A mesh shifted half a step from Gamma is the lattice `m + 1/2` instead. It
+contains no zero-frequency mode to put back, but the sum still misses the
+singular part of the acoustic free energy near Gamma, and the same finite
+part, now over every point of the shifted lattice, recovers it.
+
 Everything here is in angular frequency: `tau = kT / hbar` and `omega` in
 rad/s, `K` in (rad/s)^2 per (fractional unit)^2.
 """
@@ -147,21 +152,22 @@ def _from_constants(constants, step) -> np.ndarray:
 # -- the Gamma weight ----------------------------------------------------------
 
 
-def gamma_weight(tensor, mesh, temperatures):
+def gamma_weight(tensor, mesh, temperatures, shift=(0.0, 0.0, 0.0)):
     """What the three dropped acoustic modes at Gamma contribute, per Gamma cell.
 
     Divide by the number of mesh points and add to the mesh average.
 
     Args:
         tensor: (3, 3, 3, 3) long-wave tensor from `long_wave_tensor`
-        mesh: (3,) Gamma-centred mesh
+        mesh: (3,) mesh
         temperatures: K
+        shift: (3,) offset of the mesh from Gamma, 0 or 0.5 mesh steps
 
     Returns:
         (free energy eV, entropy eV/K, heat capacity eV/K), each (T,)
     """
     temperatures = np.atleast_1d(np.asarray(temperatures, dtype=float))
-    lattice = _GammaLattice(tensor, mesh)
+    lattice = _GammaLattice(tensor, mesh, shift)
     values = np.array([lattice.weight(T) for T in temperatures]).reshape(-1, 3)
     return values[:, 0], values[:, 1], values[:, 2]
 
@@ -169,8 +175,11 @@ def gamma_weight(tensor, mesh, temperatures):
 class _GammaLattice:
     """The mesh-index lattice, its cutoff, and the sums that do not depend on T."""
 
-    def __init__(self, tensor, mesh):
+    def __init__(self, tensor, mesh, shift=(0.0, 0.0, 0.0)):
         h = 1.0 / np.asarray(mesh, dtype=float)
+        self.shift = np.broadcast_to(np.asarray(shift, dtype=float), (3,)) % 1.0
+        # whether the mesh contains Gamma, and so drops its three modes
+        self.centred = not np.any(self.shift)
         # D2 at mesh-index vectors m, x = m / n
         self.tensor = tensor * h[None, None, :, None] * h[None, None, None, :]
         directions, self.weights = _sphere()
@@ -188,7 +197,7 @@ class _GammaLattice:
         inverse = np.linalg.inv(self.metric)
         reach = RADIUS + 6 * WIDTH
         half = np.ceil(reach * np.linalg.norm(inverse, axis=1)).astype(int) + 1
-        points = _half_box(half)
+        points = _half_box(half, self.shift)
         radii = np.linalg.norm(points @ self.metric.T, axis=1)
         inside = radii < reach
         self.points, self.phi = points[inside], _cutoff(radii[inside])
@@ -234,6 +243,9 @@ class _GammaLattice:
         k = BOLTZMANN_EV
         if 4 * np.pi**2 * tau / self.speeds.max() >= CLASSICAL:
             constant = self.classical_constant()
+            if not self.centred:
+                # no point at the origin, so a constant has no finite part
+                return HBAR_EV_S * tau * constant, -k * constant, 0.0
             log_tau = np.log(tau)
             free = HBAR_EV_S * tau * (constant - 3 * log_tau)
             return free, k * (3 * log_tau + 3 - constant), 3 * k
@@ -241,7 +253,7 @@ class _GammaLattice:
         # Debye continuum: F = -a kT, S = 4a k, Cv = 12a k
         a = np.pi**4 / 45 * tau**3 * np.sum(self.weights[:, None] * self.speeds**-3.0)
         reach = THERMAL_RANGE * tau / self.speeds.min()
-        points = _half_box(np.full(3, int(np.ceil(reach)) + 1))
+        points = _half_box(np.full(3, int(np.ceil(reach)) + 1), self.shift)
         points = points[np.linalg.norm(points, axis=1) < reach]
         x = self._frequencies(points).ravel() / tau
         x = x[(x > 0) & (x < THERMAL_RANGE)]
@@ -254,12 +266,13 @@ class _GammaLattice:
         return free, entropy, heat_capacity
 
 
-def _half_box(half_widths) -> np.ndarray:
-    """(M, 3) one of each `m`, `-m` pair of a box about the origin, without
-    the origin. Every sum here is of an even function, so it is twice the
-    sum over these."""
-    axes = [np.arange(-k, k + 1) for k in half_widths]
+def _half_box(half_widths, shift=(0.0, 0.0, 0.0)) -> np.ndarray:
+    """(M, 3) one of each `p`, `-p` pair of the points `p = m + shift` in a box
+    about the origin, without the origin. Every sum here is of an even
+    function, so it is twice the sum over these. A shift of half a step
+    keeps the lattice closed under `p -> -p`."""
+    axes = [np.arange(-k, k + 1) + s for k, s in zip(half_widths, shift, strict=True)]
     points = np.stack(np.meshgrid(*axes, indexing="ij"), -1).reshape(-1, 3)
     first = np.argmax(points != 0, axis=1)
     positive = points[np.arange(len(points)), first] > 0
-    return points[positive].astype(float)
+    return points[positive]
