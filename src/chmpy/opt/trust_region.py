@@ -32,8 +32,8 @@ to be fixed rather than a refinement:
   the floor and keeps inching.
 
 A fifth is about the calculator rather than the algorithm: below the smallest
-energy difference a calculator can resolve, the reduction ratio carries no
-information and is not computed. See `_judge`.
+energy difference a calculator can resolve, the reduction is measured from the
+gradients at both ends of the step instead of the energies. See `_judge`.
 """
 
 from __future__ import annotations
@@ -278,8 +278,16 @@ class TrustRegion:
                 if options.energy_noise is None
                 else options.energy_noise
             )
+            # the trapezoid rule over the step, from the gradients at both ends
+            gradient_reduction = -0.5 * float((gradient + trial_gradient) @ step)
             rho, accept, unusable = _judge(
-                trial_energy, energy, predicted, options.eta, options.rho_max, noise
+                trial_energy,
+                energy,
+                predicted,
+                options.eta,
+                options.rho_max,
+                noise,
+                gradient_reduction,
             )
 
             # Both branches learn from the step: y = g(x + p) - g(x) is valid
@@ -516,43 +524,46 @@ def _dogleg(model, gradient, radius):
     return step, model.quadratic(gradient, step)
 
 
-def _judge(trial_energy, energy, predicted, eta, rho_max, noise=0.0):
+def _judge(
+    trial_energy,
+    energy,
+    predicted,
+    eta,
+    rho_max,
+    noise=0.0,
+    gradient_reduction=None,
+):
     """Accept or reject a trial step from the model-versus-actual ratio.
 
     The measured reduction is credited with one unit of `noise`, which is the
     smallest energy difference the calculator can resolve. Without it, a step
     whose true reduction is below that resolution measures as exactly zero, so
     `rho` is zero, the step is rejected, and the radius shrinks -- repeatedly,
-    until the optimiser gives up with the structure still moving. This is not
-    a hypothetical: a model running in float32 cannot resolve 1.5e-5 eV at
-    -190 eV, and the steps near a minimum are smaller than that long before the
-    forces are converged.
+    until the optimiser gives up with the structure still moving.
 
     Crediting the noise makes the test read "did the energy fall, as far as we
     can tell?" rather than "did it fall by a number we cannot measure?". When
     the predicted reduction is far above the noise the correction is
     negligible, so nothing changes where the ratio test was working.
 
-    Below the noise the ratio is abandoned rather than credited. Dividing a
-    quantity that is all noise by a prediction smaller still gives a huge
-    number, which the `rho_max` test reads as a catastrophically wrong model
-    and answers with a hard shrink -- measured stalling a quadratic at
-    `fmax = 9e-9` for a thousand iterations, at a minimum it was a few steps
-    from.
+    Below the noise the energies say nothing about the step, so the reduction
+    is taken from `gradient_reduction`, the trapezoid rule over the step,
+    `-(g0 + g1).p / 2`. Its error is third order in the step, so it resolves
+    the small steps near a minimum that the energies cannot. A step that
+    visibly raised the energy is still rejected. Without a gradient reduction,
+    the step is taken if the energy did not visibly rise.
     """
     finite = np.isfinite(trial_energy)
     has_prediction = predicted > 1e-30
     if not (finite and has_prediction):
         return -1.0, False, not finite
     if predicted <= noise:
-        # The model predicts a change smaller than the calculator can measure.
-        # The ratio is then meaningless in both directions, and computing it
-        # anyway produces an enormous number that reads as "the model is wildly
-        # wrong" -- which shrinks the radius hard and stalls the optimiser at a
-        # point it could have walked away from. Take the step if the energy did
-        # not visibly rise; there is nothing else to go on.
-        accepted = trial_energy <= energy + noise
-        return (1.0 if accepted else -1.0), accepted, False
+        risen = trial_energy > energy + noise
+        if gradient_reduction is None or not np.isfinite(gradient_reduction):
+            return (-1.0 if risen else 1.0), not risen, False
+        rho = gradient_reduction / predicted
+        unusable = rho > rho_max
+        return rho, bool(not (risen or unusable) and rho > eta), unusable
     rho = (energy - trial_energy + noise) / predicted
     unusable = rho > rho_max
     return rho, bool(not unusable and rho > eta), unusable

@@ -134,6 +134,41 @@ def test_a_quadratic_converges_from_the_identity_model():
     np.testing.assert_allclose(system.positions, calc.centre, atol=1e-8)
 
 
+class JitteredField(HarmonicField):
+    """A quadratic whose energies carry random noise and whose forces are exact."""
+
+    def __init__(self, hessian, centre, jitter, seed=0):
+        super().__init__(hessian, centre)
+        self.jitter = jitter
+        self.rng = np.random.default_rng(seed)
+
+    def compute(self, system, want):
+        result = super().compute(system, want)
+        noise = self.jitter * self.rng.uniform(-1.0, 1.0)
+        return Result(energy=result.energy + noise, forces=result.forces)
+
+    def exact_energy(self, positions):
+        displacement = (positions - self.centre).ravel()
+        return 0.5 * float(displacement @ self.hessian @ displacement)
+
+
+def test_steps_below_the_energy_noise_are_judged_by_the_gradients():
+    system, field = harmonic(n_atoms=10, seed=6, displacement=0.05)
+    calc = JitteredField(field.hessian, field.centre, jitter=1e-3)
+    accepted = []
+
+    def record(event):
+        if event.stage == "step" and event.step.accepted:
+            accepted.append(calc.exact_energy(system.positions))
+
+    options = TrustRegionOptions(energy_noise=1e-3)
+    relaxation = TrustRegion(Atomic(system), calc, options=options).run(
+        fmax=1e-4, steps=300, progress=record
+    )
+    assert relaxation.converged
+    assert np.all(np.diff(accepted) <= 1e-12)
+
+
 def test_fixed_cell_relaxation_of_a_rattled_crystal():
     system = argon(5.3, rattle=0.15, seed=1)
     calc = LennardJones()
