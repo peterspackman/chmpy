@@ -27,6 +27,9 @@ BOLTZMANN_EV = 8.617333262e-5
 #: modes below this, in rad/s (about 0.03 cm-1), count as zero
 ZERO_FREQUENCY = 2 * np.pi * 1e9
 
+#: dynamical matrices held at once while diagonalising, bytes
+FREQUENCY_BATCH_BYTES = 256 * 2**20
+
 
 @dataclass
 class ThermalProperties:
@@ -101,16 +104,55 @@ def harmonic_properties(frequencies, temperature: float):
 def mesh_frequencies(constants, mesh):
     """Mode frequencies over a q-mesh, with the zero and imaginary ones removed.
 
+    Frequencies at `q` and `-q` are the same, so only one of each such pair
+    is diagonalised and its modes counted twice. At Gamma the three uniform
+    translations are projected out rather than recognised by being small, so
+    an acoustic-sum-rule residue is never counted as an imaginary mode.
+
     Returns:
         (positive angular frequencies in rad/s as a flat array, number of
-        imaginary modes removed)
+        imaginary modes removed). Each q-point's modes appear once per point
+        of the full mesh they stand for.
     """
+    points, multiplicity = _irreducible_by_inversion(q_mesh(mesh))
+    gamma = np.all(points == 0, axis=1)
     kept, imaginary = [], 0
-    for q in q_mesh(mesh):
-        omega = constants.frequencies(q, units="rad/s")
-        imaginary += int(np.sum(omega < -ZERO_FREQUENCY))
-        kept.append(omega[omega > ZERO_FREQUENCY])
+
+    def keep(omega, count):
+        nonlocal imaginary
+        imaginary += count * int(np.sum(omega < -ZERO_FREQUENCY))
+        kept.append(np.repeat(omega[omega > ZERO_FREQUENCY], count))
+
+    if gamma.any():
+        keep(constants.optical_frequencies(units="rad/s"), 1)
+    rest, counts = points[~gamma], multiplicity[~gamma]
+    batch = max(1, FREQUENCY_BATCH_BYTES // (16 * (3 * constants.n_atoms) ** 2))
+    for start in range(0, len(rest), batch):
+        omega = constants.frequencies(rest[start : start + batch], units="rad/s")
+        for row, count in zip(omega, counts[start : start + batch], strict=True):
+            keep(row, int(count))
     return np.concatenate(kept), imaginary
+
+
+def _irreducible_by_inversion(points):
+    """One of each `q`, `-q` pair of a mesh, and how many points it stands for.
+
+    `points` are in [-0.5, 0.5), so `-q` of a point on the -0.5 face is folded
+    back onto the same face before matching.
+    """
+    folded = -points
+    folded = folded - np.round(folded + 1e-12)
+    keys = {tuple(np.round(p * 1e8).astype(np.int64)): k for k, p in enumerate(points)}
+    chosen, multiplicity = [], []
+    seen = np.zeros(len(points), dtype=bool)
+    for k, p in enumerate(folded):
+        if seen[k]:
+            continue
+        partner = keys[tuple(np.round(p * 1e8).astype(np.int64))]
+        seen[k] = seen[partner] = True
+        chosen.append(k)
+        multiplicity.append(1 if partner == k else 2)
+    return points[chosen], np.array(multiplicity)
 
 
 def thermal_properties(constants, temperatures, mesh=(8, 8, 8)) -> ThermalProperties:

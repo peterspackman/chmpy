@@ -277,3 +277,60 @@ def test_symmetric_force_constants_in_a_hexagonal_cell():
         np.testing.assert_allclose(
             reduced.frequencies(q, "cm-1"), full.frequencies(q, "cm-1"), atol=1e-2
         )
+
+
+def test_symmetrise_imposes_both_constraints_on_noisy_constants(argon):
+    """Noise that breaks permutation symmetry and the sum rule at once comes
+    out satisfying both, to round-off, not just the one imposed last."""
+    import dataclasses
+
+    from chmpy.vib import symmetrise
+    from chmpy.vib.force_constants import _permutation_partners
+
+    _, _, constants, _ = argon
+    rng = np.random.default_rng(7)
+    noisy = dataclasses.replace(
+        constants,
+        blocks=constants.blocks + 1e-3 * rng.normal(size=constants.blocks.shape),
+    )
+    cleaned = symmetrise(noisy)
+
+    residual = np.zeros((cleaned.n_atoms, 3, 3))
+    np.add.at(
+        residual, cleaned.pairs[:, 0], cleaned.weights[:, None, None] * cleaned.blocks
+    )
+    assert np.abs(residual).max() < 1e-10
+    partner = _permutation_partners(cleaned.pairs, cleaned.shifts)
+    assert np.all(partner >= 0)
+    np.testing.assert_allclose(
+        cleaned.blocks, cleaned.blocks[partner].transpose(0, 2, 1), atol=1e-12
+    )
+    assert cleaned.acoustic_error("cm-1") < 1e-4
+
+
+def test_scattered_and_per_shift_dynamical_matrices_agree(argon, monkeypatch):
+    import dataclasses
+    import sys
+
+    _, _, constants, _ = argon
+    qs = np.array([[0.13, -0.27, 0.41], [0.5, 0.0, 0.25], [0.0, 0.0, 0.0]])
+    per_shift = constants.dynamical_matrices(qs)
+    module = sys.modules["chmpy.vib.force_constants"]
+    monkeypatch.setattr(module, "BY_SHIFT_BYTES", 0)
+    fresh = dataclasses.replace(constants)
+    np.testing.assert_allclose(fresh.dynamical_matrices(qs), per_shift, atol=1e-12)
+    assert fresh._cache["by_shift"] is None
+    np.testing.assert_allclose(
+        constants.frequencies(qs),
+        np.array([constants.frequencies(q) for q in qs]),
+        atol=1e-6,
+    )
+
+
+def test_optical_frequencies_drop_exactly_the_translations(argon):
+    _, _, constants, _ = argon
+    optical = constants.optical_frequencies("cm-1")
+    assert len(optical) == 3 * constants.n_atoms - 3
+    np.testing.assert_allclose(
+        optical, constants.frequencies([0, 0, 0], "cm-1")[3:], atol=1e-6
+    )

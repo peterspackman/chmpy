@@ -90,3 +90,37 @@ def test_argon_has_no_imaginary_modes(argon_constants):
     assert result.n_modes == 12 * 6**3 - 3
     assert result.free_energy[0] == pytest.approx(result.zero_point)
     assert result.free_energy[1] < result.free_energy[0]
+
+
+def test_the_inversion_reduced_mesh_matches_a_full_loop(argon_constants):
+    from chmpy.vib.thermo import ZERO_FREQUENCY
+
+    mesh = (5, 4, 3)
+    frequencies = [argon_constants.frequencies(q, units="rad/s") for q in q_mesh(mesh)]
+    frequencies = np.concatenate(frequencies)
+    frequencies = frequencies[frequencies > ZERO_FREQUENCY]
+    result = thermal_properties(argon_constants, [0.0, 60.0], mesh=mesh)
+    assert result.n_modes == len(frequencies)
+    for k, T in enumerate((0.0, 60.0)):
+        F, S, C = harmonic_properties(frequencies, T)
+        n_q = np.prod(mesh)
+        assert result.free_energy[k] == pytest.approx(F / n_q, rel=1e-12)
+        assert result.entropy[k] == pytest.approx(S / n_q, rel=1e-12, abs=1e-30)
+        assert result.heat_capacity[k] == pytest.approx(C / n_q, rel=1e-12, abs=1e-30)
+
+
+def test_a_sum_rule_residue_is_not_counted_as_imaginary(argon_constants):
+    """Acoustic modes at Gamma a little below zero are still the translations."""
+    import dataclasses
+
+    blocks = np.array(argon_constants.blocks)
+    selves = np.flatnonzero(
+        (argon_constants.pairs[:, 0] == argon_constants.pairs[:, 1])
+        & ~np.any(argon_constants.shifts != 0, axis=1)
+    )
+    blocks[selves] -= 1e-4 * np.eye(3)
+    broken = dataclasses.replace(argon_constants, blocks=blocks)
+    assert broken.frequencies([0, 0, 0], "cm-1")[0] < -0.1
+    result = thermal_properties(broken, [50.0], mesh=(4, 4, 4))
+    assert result.n_imaginary == 0
+    assert result.n_modes == 12 * 4**3 - 3

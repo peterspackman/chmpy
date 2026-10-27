@@ -33,7 +33,7 @@ fixed and documented in `symmetrise`:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -59,6 +59,14 @@ EV_PER_ANGSTROM2_AMU_TO_RAD2_S2 = 1.602176634e-19 / (1e-20 * 1.66053906660e-27)
 RAD_S_TO_THZ = 1e-12 / (2 * np.pi)
 RAD_S_TO_PER_CM = 1.0 / (2 * np.pi * 2.99792458e10)
 
+#: largest size of the per-shift real matrices `dynamical_matrices` keeps
+BY_SHIFT_BYTES = 512 * 2**20
+
+#: the acoustic sum rule is imposed until each atom's residual is below this
+#: fraction of its largest block, or this many sweeps have been made
+SUM_RULE_TOLERANCE = 1e-12
+SUM_RULE_SWEEPS = 200
+
 
 @dataclass
 class ForceConstants:
@@ -81,6 +89,7 @@ class ForceConstants:
     masses: np.ndarray
     cell: np.ndarray
     positions: np.ndarray
+    _cache: dict = field(default_factory=dict, init=False, repr=False, compare=False)
 
     @property
     def n_atoms(self) -> int:
@@ -104,47 +113,126 @@ class ForceConstants:
         Returns:
             (3N, 3N) complex Hermitian matrix in eV/(Angstrom^2 amu)
         """
-        q = np.asarray(q, dtype=float)
-        n = self.n_atoms
-        i, j = self.pairs[:, 0], self.pairs[:, 1]
+        return self.dynamical_matrices(np.reshape(q, (1, 3)))[0]
 
-        root_mass = np.sqrt(self.masses)
-        phases = (
-            np.exp(2j * np.pi * (self.shifts @ q))
-            * self.weights
-            / (root_mass[i] * root_mass[j])
-        )
-        blocks = np.zeros((n, n, 3, 3), dtype=complex)
-        np.add.at(blocks, (i, j), phases[:, None, None] * self.blocks)
-        matrix = blocks.transpose(0, 2, 1, 3).reshape(3 * n, 3 * n)
+    def dynamical_matrices(self, qs) -> np.ndarray:
+        """Dynamical matrices at several fractional wavevectors at once.
 
+        The blocks are first summed into one mass-weighted real matrix per
+        distinct shift `S`, which needs doing once, and then each `D(q)` is a
+        phase-weighted sum of those -- one matrix product for every q at once,
+        instead of a scatter over every block for each. Where the per-shift
+        matrices would be too large to hold, each q is scattered instead.
+
+        Args:
+            qs: (M, 3) fractional wavevectors
+
+        Returns:
+            (M, 3N, 3N) complex Hermitian matrices in eV/(Angstrom^2 amu)
+        """
+        qs = np.asarray(qs, dtype=float).reshape(-1, 3)
+        n3 = 3 * self.n_atoms
+        by_shift = self._by_shift()
+        if by_shift is not None:
+            shifts, matrices = by_shift
+            phases = np.exp(2j * np.pi * (qs @ shifts.T))
+            result = (phases @ matrices.reshape(len(shifts), -1)).reshape(-1, n3, n3)
+        else:
+            result = np.stack([self._scatter(q) for q in qs])
         # the sum is Hermitian in exact arithmetic; make it so in practice
-        return 0.5 * (matrix + matrix.conj().T)
+        return 0.5 * (result + result.conj().transpose(0, 2, 1))
+
+    def _mass_weighted(self) -> np.ndarray:
+        "(P, 3, 3) blocks times their weights over sqrt(m_i m_j)"
+        root_mass = np.sqrt(self.masses)
+        i, j = self.pairs[:, 0], self.pairs[:, 1]
+        scale = self.weights / (root_mass[i] * root_mass[j])
+        return scale[:, None, None] * self.blocks
+
+    def _flat_index(self) -> np.ndarray:
+        "(P, 3, 3) index of each block element in a flattened (3N, 3N) matrix"
+        n3 = 3 * self.n_atoms
+        rows = 3 * self.pairs[:, 0, None] + np.arange(3)
+        cols = 3 * self.pairs[:, 1, None] + np.arange(3)
+        return rows[:, :, None] * n3 + cols[:, None, :]
+
+    def _by_shift(self):
+        """(shifts, (S, 3N, 3N) real matrices), or None if too large to keep."""
+        if self._cache.get("by_shift", False) is not False:
+            return self._cache["by_shift"]
+        n3 = 3 * self.n_atoms
+        shifts, which = np.unique(
+            np.rint(self.shifts).astype(np.int64), axis=0, return_inverse=True
+        )
+        which = which.ravel()
+        if len(shifts) * n3 * n3 * 8 > BY_SHIFT_BYTES:
+            self._cache["by_shift"] = None
+            return None
+        index = which[:, None, None] * (n3 * n3) + self._flat_index()
+        matrices = np.bincount(
+            index.ravel(),
+            weights=self._mass_weighted().ravel(),
+            minlength=len(shifts) * n3 * n3,
+        ).reshape(len(shifts), n3, n3)
+        self._cache["by_shift"] = (shifts.astype(float), matrices)
+        return self._cache["by_shift"]
+
+    def _scatter(self, q) -> np.ndarray:
+        "One dynamical matrix, summed straight from the blocks"
+        n3 = 3 * self.n_atoms
+        phases = np.exp(2j * np.pi * (self.shifts @ q))
+        values = phases[:, None, None] * self._mass_weighted()
+        index = self._flat_index().ravel()
+        real = np.bincount(index, weights=values.real.ravel(), minlength=n3 * n3)
+        imag = np.bincount(index, weights=values.imag.ravel(), minlength=n3 * n3)
+        return (real + 1j * imag).reshape(n3, n3)
 
     def frequencies(self, q, units: str = "thz") -> np.ndarray:
-        """Phonon frequencies at a wavevector, ordered low to high.
+        """Phonon frequencies at one or more wavevectors, ordered low to high.
 
         A negative frequency is reported for an imaginary mode, which is the
         usual convention and keeps the array real.
 
         Args:
-            q: (3,) fractional wavevector
+            q: (3,) fractional wavevector, or (M, 3) for several
             units: "thz", "cm-1", or "rad/s"
 
         Returns:
-            (3N,) frequencies
+            (3N,) frequencies, or (M, 3N) for several wavevectors
         """
-        eigenvalues = np.linalg.eigvalsh(self.dynamical_matrix(q))
-        omega_squared = eigenvalues * EV_PER_ANGSTROM2_AMU_TO_RAD2_S2
-        omega = np.sign(omega_squared) * np.sqrt(np.abs(omega_squared))
-        factor = {
-            "rad/s": 1.0,
-            "thz": RAD_S_TO_THZ,
-            "cm-1": RAD_S_TO_PER_CM,
-        }
-        if units not in factor:
-            raise ValueError(f"unknown units {units!r}, expected one of {list(factor)}")
-        return omega * factor[units]
+        factor = _unit_factor(units)
+        q = np.asarray(q, dtype=float)
+        eigenvalues = np.linalg.eigvalsh(self.dynamical_matrices(q.reshape(-1, 3)))
+        omega = _omega(eigenvalues) * factor
+        return omega[0] if q.ndim == 1 else omega
+
+    def optical_frequencies(self, units: str = "thz") -> np.ndarray:
+        """The 3N - 3 optical frequencies at Gamma, ordered low to high.
+
+        The three uniform translations are projected out of the dynamical
+        matrix before it is diagonalised, rather than dropped as the three
+        lowest frequencies or those under a threshold. That way a soft optical
+        mode is never mistaken for an acoustic one, and an imaginary optical
+        mode is still reported as one.
+        """
+        factor = _unit_factor(units)
+        complement = self._translation_complement()
+        matrix = self.dynamical_matrix(np.zeros(3)).real
+        projected = complement.T @ matrix @ complement
+        eigenvalues = np.linalg.eigvalsh(0.5 * (projected + projected.T))
+        return _omega(eigenvalues) * factor
+
+    def _translation_complement(self) -> np.ndarray:
+        """(3N, 3N - 3) orthonormal basis orthogonal to uniform translations.
+
+        A translation by `t` displaces every atom by `t`; in mass-weighted
+        coordinates that is `sqrt(m_i) t`, which is what the dynamical matrix
+        acts on.
+        """
+        root_mass = np.sqrt(self.masses)
+        translations = np.kron(root_mass[:, None], np.eye(3))
+        basis, _ = np.linalg.qr(translations, mode="complete")
+        return basis[:, 3:]
 
     def acoustic_error(self, units: str = "cm-1") -> float:
         """How far the three acoustic modes at Gamma are from zero.
@@ -155,6 +243,23 @@ class ForceConstants:
         the finite differences.
         """
         return float(np.abs(self.frequencies(np.zeros(3), units=units)[:3]).max())
+
+
+def _unit_factor(units: str) -> float:
+    factor = {
+        "rad/s": 1.0,
+        "thz": RAD_S_TO_THZ,
+        "cm-1": RAD_S_TO_PER_CM,
+    }
+    if units not in factor:
+        raise ValueError(f"unknown units {units!r}, expected one of {list(factor)}")
+    return factor[units]
+
+
+def _omega(eigenvalues) -> np.ndarray:
+    "Signed angular frequencies, rad/s, from dynamical-matrix eigenvalues"
+    omega_squared = np.asarray(eigenvalues) * EV_PER_ANGSTROM2_AMU_TO_RAD2_S2
+    return np.sign(omega_squared) * np.sqrt(np.abs(omega_squared))
 
 
 # -- measuring them -----------------------------------------------------------
@@ -412,93 +517,88 @@ def _flat(image, atom, n_atoms) -> int:
 
 def _assemble(system, repeats, blocks) -> ForceConstants:
     """Turn per-image blocks into (i, j, shift) triples with multiplicity weights."""
-    n = len(system)
     cell = np.asarray(system.cell)
-    offsets = (
-        np.array(np.meshgrid(*[np.arange(r) for r in repeats], indexing="ij"))
-        .reshape(3, -1)
-        .T
-    )
+    positions = np.asarray(system.positions)
+    offsets = _cell_offsets(repeats)
 
+    i, j, image = np.nonzero(np.any(blocks != 0, axis=(3, 4)))
     pairs, shifts, kept, weights = [], [], [], []
-    for i in range(n):
-        for j in range(n):
-            for image, offset in enumerate(offsets):
-                block = blocks[i, j, image]
-                if not np.any(block):
-                    continue
-                images, weight = _equivalent_images(
-                    system.positions[i], system.positions[j], offset, repeats, cell
-                )
-                for shift in images:
-                    pairs.append((i, j))
-                    shifts.append(shift)
-                    kept.append(block)
-                    weights.append(weight)
+    for chunk in range(0, len(i), ASSEMBLE_CHUNK):
+        part = slice(chunk, chunk + ASSEMBLE_CHUNK)
+        tied, share = _equivalent_images(
+            positions[i[part]], positions[j[part]], offsets[image[part]], repeats, cell
+        )
+        row, candidate = np.nonzero(tied)
+        pairs.append(np.c_[i[part][row], j[part][row]])
+        shifts.append(
+            offsets[image[part]][row] + _IMAGE_CANDIDATES[candidate] * repeats
+        )
+        kept.append(blocks[i[part][row], j[part][row], image[part][row]])
+        weights.append(share[row])
 
     masses = np.array([Element.from_atomic_number(int(z)).mass for z in system.numbers])
     return ForceConstants(
-        pairs=np.array(pairs, dtype=int).reshape(-1, 2),
-        shifts=np.array(shifts, dtype=float).reshape(-1, 3),
-        blocks=np.array(kept).reshape(-1, 3, 3),
-        weights=np.array(weights),
+        pairs=np.concatenate(pairs or [np.zeros((0, 2))]).astype(int),
+        shifts=np.concatenate(shifts or [np.zeros((0, 3))]).astype(float),
+        blocks=np.concatenate(kept or [np.zeros((0, 3, 3))]),
+        weights=np.concatenate(weights or [np.zeros(0)]),
         masses=masses,
         cell=cell,
-        positions=np.array(system.positions),
+        positions=np.array(positions),
     )
 
 
 def symmetrise(constants: ForceConstants) -> ForceConstants:
-    """Impose permutation symmetry and the acoustic sum rule, in that order.
+    """Impose permutation symmetry and the acoustic sum rule together.
 
-    The two do not commute and neither is idempotent with respect to the
-    other, so the order is fixed here rather than left to the caller:
+    * **Permutation.** `Phi_ab(i,j,S)` and `Phi_ba(j,i,-S)` are the same
+      second derivative measured from opposite ends. Finite differences give
+      them slightly differently, and their average is the better estimate --
+      the same free error signal the elastic tensor gets from its asymmetry.
+    * **Acoustic sum rule.** Translating the whole crystal costs nothing, so
+      `sum_(j,S) w Phi(i,j,S) = 0` for every `i`.
 
-    1. **Permutation.** `Phi_ab(i,j,S)` and `Phi_ba(j,i,-S)` are the same
-       second derivative measured from opposite ends. Finite differences give
-       them slightly differently, and their average is the better estimate --
-       the same free error signal the elastic tensor gets from its asymmetry.
-    2. **Acoustic sum rule.** Translating the whole crystal costs nothing, so
-       `sum_(j,S) w Phi(i,j,S) = 0` for every `i`. Whatever is left over is
-       put on the self block `Phi(i,i,0)`, which is the one the finite
-       difference measures least well, since it is the difference of a large
-       cancelling sum.
+    Each is a linear constraint, and the answer wanted is the closest set of
+    constants satisfying both. Imposing them once each in turn does not get
+    there: a residual that is not symmetric cannot be removed by changing only
+    the symmetric self block, and the part left over reappears as a
+    sum-rule error in the dynamical matrix, which is Hermitian, of a size
+    that shows up as acoustic modes at Gamma that are not quite zero.
+    Alternating the two orthogonal projections converges to the projection
+    onto both, so that is what is done until the residual is at round-off.
 
-    Doing the sum rule first and the permutation second would break the sum
-    rule again, by an amount that shows up directly in the acoustic branches.
+    The sum-rule projection is the least-squares one: each block of atom
+    `i`'s row takes a share of the residual in proportion to its weight.
     """
     blocks = np.array(constants.blocks)
-    pairs, shifts = constants.pairs, constants.shifts
-
-    index = {
-        (int(i), int(j), *np.rint(shift).astype(int)): position
-        for position, ((i, j), shift) in enumerate(zip(pairs, shifts, strict=True))
-    }
-    for position, ((i, j), shift) in enumerate(zip(pairs, shifts, strict=True)):
-        key = (int(j), int(i), *(-np.rint(shift).astype(int)))
-        partner = index.get(key)
-        if partner is None or partner < position:
-            continue
-        averaged = 0.5 * (blocks[position] + blocks[partner].T)
-        blocks[position] = averaged
-        blocks[partner] = averaged.T
-
-    weighted = constants.weights[:, None, None] * blocks
-    for i in range(constants.n_atoms):
-        belongs = pairs[:, 0] == i
-        residual = weighted[belongs].sum(axis=0)
-        self_block = np.flatnonzero(
-            belongs & (pairs[:, 1] == i) & ~np.any(shifts != 0, axis=1)
+    pairs, shifts, weights = constants.pairs, constants.shifts, constants.weights
+    n = constants.n_atoms
+    partner = _permutation_partners(pairs, shifts)
+    has_partner = partner >= 0
+    row = pairs[:, 0]
+    norm = np.bincount(row, weights=weights * weights, minlength=n)
+    if np.any(norm == 0):
+        LOG.warning(
+            "atoms %s have no force constants, so the acoustic sum rule cannot "
+            "be imposed on them",
+            np.flatnonzero(norm == 0).tolist(),
         )
-        if len(self_block) == 0:
-            LOG.warning(
-                "atom %d has no self block, so the acoustic sum rule cannot be "
-                "imposed; its acoustic modes will not come out at zero",
-                i,
-            )
-            continue
-        target = self_block[0]
-        blocks[target] -= residual / constants.weights[target]
+    norm[norm == 0] = np.inf
+
+    scale = max(float(np.abs(blocks).max(initial=0.0)), 1e-300)
+    for _ in range(SUM_RULE_SWEEPS):
+        mirrored = blocks[partner[has_partner]].transpose(0, 2, 1)
+        blocks[has_partner] = 0.5 * (blocks[has_partner] + mirrored)
+        residual = np.zeros((n, 3, 3))
+        np.add.at(residual, row, weights[:, None, None] * blocks)
+        if np.abs(residual).max(initial=0.0) <= SUM_RULE_TOLERANCE * scale:
+            break
+        blocks -= (weights / norm[row])[:, None, None] * residual[row]
+    else:
+        LOG.warning(
+            "the acoustic sum rule converged only to %.1e of the largest block",
+            np.abs(residual).max() / scale,
+        )
 
     return ForceConstants(
         pairs=pairs,
@@ -511,6 +611,26 @@ def symmetrise(constants: ForceConstants) -> ForceConstants:
     )
 
 
+def _permutation_partners(pairs, shifts) -> np.ndarray:
+    """For each block `(i, j, S)` the index of `(j, i, -S)`, or -1 if absent."""
+    shifts = np.rint(shifts).astype(np.int64)
+    n = int(pairs.max(initial=0)) + 1
+    span = int(np.abs(shifts).max(initial=0))
+    width = 2 * span + 1
+
+    def encode(i, j, s):
+        cells = ((s[:, 0] + span) * width + s[:, 1] + span) * width + s[:, 2] + span
+        return (i * n + j) * width**3 + cells
+
+    keys = encode(pairs[:, 0], pairs[:, 1], shifts)
+    wanted = encode(pairs[:, 1], pairs[:, 0], -shifts)
+    order = np.argsort(keys, kind="stable")
+    found = np.searchsorted(keys, wanted, sorter=order)
+    found = np.minimum(found, len(keys) - 1)
+    partner = order[found]
+    return np.where(keys[partner] == wanted, partner, -1)
+
+
 def _equivalent_images(position_i, position_j, offset, repeats, cell):
     """The shortest lattice translations reaching `j` from `i`, and their share.
 
@@ -518,15 +638,26 @@ def _equivalent_images(position_i, position_j, offset, repeats, cell):
     several equally distant images of the same pair. Each gets `1 / M` of it.
     The degeneracy is exact -- it comes from the lattice -- so the tie test is
     a comparison of squared distances well below any real spacing.
+
+    Args:
+        position_i, position_j: (P, 3) Cartesian positions of each pair
+        offset: (P, 3) supercell offset each block was measured at
+        repeats: (3,) supercell repetitions
+        cell: (3, 3) primitive lattice vectors as rows
+
+    Returns:
+        ((P, 27) mask of which of `_IMAGE_CANDIDATES` are among the shortest,
+         (P,) the share each of them gets)
     """
-    candidates = (
-        np.array(np.meshgrid(*[np.arange(-1, 2) for _ in range(3)], indexing="ij"))
-        .reshape(3, -1)
-        .T
-    )
-    shifts = offset + candidates * repeats
-    vectors = position_j - position_i + shifts @ cell
-    squared = np.einsum("ij,ij->i", vectors, vectors)
-    closest = squared.min()
-    tied = squared <= closest + TIE_TOLERANCE
-    return shifts[tied], 1.0 / float(tied.sum())
+    shifts = offset[:, None, :] + _IMAGE_CANDIDATES[None, :, :] * repeats
+    vectors = (position_j - position_i)[:, None, :] + shifts @ cell
+    squared = np.einsum("pci,pci->pc", vectors, vectors)
+    tied = squared <= squared.min(axis=1, keepdims=True) + TIE_TOLERANCE
+    return tied, 1.0 / tied.sum(axis=1)
+
+
+#: supercell images considered for the shortest translation, in a fixed order
+_IMAGE_CANDIDATES = _cell_offsets((3, 3, 3)) - 1
+
+#: blocks handled at once when assembling, to bound the memory used
+ASSEMBLE_CHUNK = 65536
