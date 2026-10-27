@@ -37,6 +37,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from chmpy.calc.result import FORCES
 from chmpy.calc.system import System
 from chmpy.core import Element
 from chmpy.opt.progress import reporter
@@ -234,6 +235,23 @@ class ForceConstants:
         basis, _ = np.linalg.qr(translations, mode="complete")
         return basis[:, 3:]
 
+    def gamma_hessian(self) -> np.ndarray:
+        """(3N, 3N) d2E/du du for displacements repeated in every cell, eV/A^2.
+
+        The q = 0 sum of each block over its images, without the mass
+        weighting of the dynamical matrix: the Hessian of the unit cell with
+        periodic boundary conditions, which is what relaxing the atoms of a
+        strained cell responds to.
+        """
+        n = self.n_atoms
+        hessian = np.zeros((n, n, 3, 3))
+        np.add.at(
+            hessian,
+            (self.pairs[:, 0], self.pairs[:, 1]),
+            self.weights[:, None, None] * self.blocks,
+        )
+        return hessian.transpose(0, 2, 1, 3).reshape(3 * n, 3 * n)
+
     def acoustic_error(self, units: str = "cm-1") -> float:
         """How far the three acoustic modes at Gamma are from zero.
 
@@ -274,6 +292,7 @@ def force_constants(
     info=None,
     progress=None,
     symmetry: bool = True,
+    batch: bool = False,
 ) -> ForceConstants:
     """Measure force constants by displacing atoms in a supercell.
 
@@ -295,6 +314,9 @@ def force_constants(
             a `chmpy.opt.progress.Progress` for each
         symmetry: use a `Crystal`'s space group to reduce the displacements.
             A `System` carries no symmetry and every atom is displaced.
+        batch: evaluate every displaced cell in one `calculator.batch` call
+            rather than one at a time. Worth it for small cells on a model
+            with a native batch path; for large supercells it can be slower.
 
     Returns:
         ForceConstants
@@ -308,69 +330,129 @@ def force_constants(
         if supercell is not None
         else _supercell_for(system, cutoff or 8.0)
     )
-    if np.any(repeats < 1):
-        raise ValueError(f"supercell repetitions must be positive, got {repeats}")
-
-    atom_map = _symmetry_for(structure, system, repeats, symmetry)
-    big, origin, _ = _build_supercell(system, repeats)
-    n = len(system)
-    n_cells = int(np.prod(repeats))
-    cartesian = atom_map.cartesian(system.cell)
-
-    # plan the displacements first so progress can report a total
-    plan, measured = [], np.zeros(n, dtype=bool)
-    for representative in range(n):
-        if measured[representative]:
-            continue
-        images = atom_map.permutation[:, representative]
-        stabiliser = np.flatnonzero(images == representative)
-        plan.append(
-            (representative, stabiliser, _directions_to_displace(cartesian[stabiliser]))
-        )
-        measured[images] = True
-    total = sum(len(directions) for _, _, directions in plan)
+    plan = DisplacementPlan(structure, system, repeats, symmetry, displacement)
 
     report = reporter(progress)
     report(
         "force constants",
         "setup",
-        f"force constants: {total} displacements of {len(plan)} of {n} atoms, "
-        f"{len(atom_map)} operations, supercell {repeats.tolist()} "
-        f"({len(big)} atoms)",
+        f"force constants: {plan.total} displacements of {len(plan.plan)} of "
+        f"{len(system)} atoms, {len(plan.atom_map)} operations, supercell "
+        f"{repeats.tolist()} ({len(plan.supercell)} atoms)",
     )
 
-    blocks = np.zeros((n, n, n_cells, 3, 3))
-    scratch = big.copy()
-    done = 0
-    for representative, stabiliser, directions in plan:
-        rows, responses = [], []
-        for direction in directions:
+    if batch:
+        results = calculator.batch(plan.systems(), (FORCES,))
+        return plan.solve([result.forces for result in results])
+
+    forces = []
+    scratch = plan.supercell.copy()
+    for done, (representative, direction, sign) in enumerate(plan.displacements()):
+        if sign > 0:
             stage = f"atom {representative} along {np.round(direction, 4).tolist()}"
-            report("force constants", stage, stage, index=done, total=total)
-            done += 1
-            shifted = []
-            for sign in (1, -1):
-                positions = np.array(big.positions)
-                positions[origin[representative]] += sign * displacement * direction
-                scratch.set_positions(positions)
-                shifted.append(calculator.forces(scratch))
-            # d . Phi(r, k) = -dF_k / du along d, for every supercell atom k
-            response = -(shifted[0] - shifted[1]) / (2 * displacement)
-            # each site-symmetry operation s gives another equation:
-            # (R^T d) . Phi(r, k) = (d . Phi(r, s(k))) R
-            for operation in stabiliser:
-                rotation = cartesian[operation]
-                target = _supercell_image(atom_map, operation, representative, repeats)
-                rows.append(rotation.T @ direction)
-                responses.append(response[target] @ rotation)
+            report("force constants", stage, stage, index=done // 2, total=plan.total)
+        scratch.set_positions(plan.positions(representative, direction, sign))
+        forces.append(calculator.forces(scratch))
+    return plan.solve(forces)
 
-        # least squares for every supercell atom at once
-        solved = np.einsum(
-            "am,mkb->kab", np.linalg.pinv(np.array(rows)), np.array(responses)
+
+class DisplacementPlan:
+    """The displaced supercells force constants are measured from, and the
+    solve that turns their forces into force constants.
+
+    With symmetry, one atom per orbit is displaced, along only as many
+    directions as its site symmetry needs to span all three; every
+    displacement is made in both directions, `+` then `-`. Separating the plan
+    from the evaluation lets the displaced cells be computed one at a time or
+    all in one batch.
+
+    Args:
+        structure: a `Crystal` or a periodic `System`
+        system: `structure` as a `System`
+        repeats: (3,) supercell repetitions
+        symmetry: use a `Crystal`'s space group
+        displacement: finite-difference step, Angstroms
+    """
+
+    def __init__(self, structure, system, repeats, symmetry, displacement):
+        repeats = np.asarray(repeats, dtype=int)
+        if np.any(repeats < 1):
+            raise ValueError(f"supercell repetitions must be positive, got {repeats}")
+        self.system, self.repeats, self.displacement = system, repeats, displacement
+        self.atom_map = _symmetry_for(structure, system, repeats, symmetry)
+        self.supercell, self.origin, _ = _build_supercell(system, repeats)
+        self.cartesian = self.atom_map.cartesian(system.cell)
+
+        n = len(system)
+        self.plan, measured = [], np.zeros(n, dtype=bool)
+        for representative in range(n):
+            if measured[representative]:
+                continue
+            images = self.atom_map.permutation[:, representative]
+            stabiliser = np.flatnonzero(images == representative)
+            directions = _directions_to_displace(self.cartesian[stabiliser])
+            self.plan.append((representative, stabiliser, directions))
+            measured[images] = True
+        #: displacement directions, each made with both signs
+        self.total = sum(len(directions) for _, _, directions in self.plan)
+
+    def displacements(self):
+        "(representative, direction, sign) for every displaced cell, in order"
+        for representative, _, directions in self.plan:
+            for direction in directions:
+                for sign in (1, -1):
+                    yield representative, direction, sign
+
+    def positions(self, representative, direction, sign) -> np.ndarray:
+        "(M, 3) supercell positions for one displacement"
+        positions = np.array(self.supercell.positions)
+        positions[self.origin[representative]] += (
+            sign * self.displacement * np.asarray(direction)
         )
-        _fill_orbit(blocks, solved, atom_map, cartesian, representative, repeats)
+        return positions
 
-    return symmetrise(_assemble(system, repeats, blocks))
+    def systems(self) -> list:
+        "Every displaced supercell, in the order `solve` expects their forces"
+        big = self.supercell
+        return [
+            System(big.numbers, self.positions(*key), big.cell, True, dict(big.info))
+            for key in self.displacements()
+        ]
+
+    def solve(self, forces) -> ForceConstants:
+        """Force constants from the forces on each displaced cell.
+
+        Args:
+            forces: (M, 3) forces for each cell, in the order of `displacements`
+        """
+        n = len(self.system)
+        n_cells = int(np.prod(self.repeats))
+        atom_map, cartesian, repeats = self.atom_map, self.cartesian, self.repeats
+        blocks = np.zeros((n, n, n_cells, 3, 3))
+        forces = iter(forces)
+        for representative, stabiliser, directions in self.plan:
+            rows, responses = [], []
+            for direction in directions:
+                plus, minus = np.asarray(next(forces)), np.asarray(next(forces))
+                # d . Phi(r, k) = -dF_k / du along d, for every supercell atom k
+                response = -(plus - minus) / (2 * self.displacement)
+                # each site-symmetry operation s gives another equation:
+                # (R^T d) . Phi(r, k) = (d . Phi(r, s(k))) R
+                for operation in stabiliser:
+                    rotation = cartesian[operation]
+                    target = _supercell_image(
+                        atom_map, operation, representative, repeats
+                    )
+                    rows.append(rotation.T @ direction)
+                    responses.append(response[target] @ rotation)
+
+            # least squares for every supercell atom at once
+            solved = np.einsum(
+                "am,mkb->kab", np.linalg.pinv(np.array(rows)), np.array(responses)
+            )
+            _fill_orbit(blocks, solved, atom_map, cartesian, representative, repeats)
+
+        return symmetrise(_assemble(self.system, repeats, blocks))
 
 
 def _symmetry_for(structure, system, repeats, symmetry):

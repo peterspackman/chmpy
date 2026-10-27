@@ -19,6 +19,11 @@ direction, relaxing the atoms at fixed cell, and differencing the stress.
   allows. `symmetry_residual` reports the larger of the fit misfit and the
   size of that projection, and `asymmetry` the largest `|C_ij - C_ji|`;
   both are noise estimates.
+
+`method="hessian"` gets the same relaxed-ion tensor without relaxing anything:
+`C = C0 - L^T Phi^+ L / V` from the clamped-ion constants, the internal-strain
+tensor and the Gamma-point Hessian, every piece one central difference and the
+lot one batch of evaluations. See `hessian_elastic_tensor`.
 """
 
 from __future__ import annotations
@@ -64,6 +69,13 @@ NOISE_WARNING = 0.15
 #: Strains tried in turn by `strain="auto"`, smallest first.
 AUTO_STRAINS = (0.005, 0.01, 0.02, 0.04)
 
+#: strain for the clamped-ion part of method="hessian"; nothing relaxes, so
+#: the response is linear and a small strain is safe
+HESSIAN_STRAIN = 0.005
+
+#: atomic displacement for the Gamma-point Hessian of method="hessian", A
+DEFAULT_DISPLACEMENT = 0.01
+
 #: above this, the reference structure is not at equilibrium and "the elastic
 #: constants" is no longer a well-defined thing to ask for, GPa
 RESIDUAL_STRESS_WARNING = 0.5
@@ -90,6 +102,13 @@ class ElasticResult:
         n_independent: independent elastic constants the point group allows
         strain: the engineering strain used
         strains: Voigt indices actually applied
+        method: "strain" (finite strain, atoms relaxed at each) or "hessian"
+            (clamped-ion constants corrected through the internal-strain
+            tensor and the Gamma-point Hessian)
+        internal_strain_noise: for "hessian", the disagreement between the
+            internal-strain tensor measured from strained cells and from
+            displaced ones, propagated into the constants, in GPa
+        clamped: for "hessian", the clamped-ion tensor C0 in GPa
     """
 
     tensor: object
@@ -102,6 +121,9 @@ class ElasticResult:
     strain: float
     relaxations: list = field(default_factory=list)
     strains: tuple = (0, 1, 2, 3, 4, 5)
+    method: str = "strain"
+    internal_strain_noise: float | None = None
+    clamped: np.ndarray | None = None
 
     @property
     def c_voigt(self) -> np.ndarray:
@@ -110,8 +132,10 @@ class ElasticResult:
 
     @property
     def noise(self) -> float:
-        "The larger of the two free error estimates, in GPa"
-        return max(self.asymmetry, self.symmetry_residual)
+        "The largest of the free error estimates, in GPa"
+        return max(
+            self.asymmetry, self.symmetry_residual, self.internal_strain_noise or 0.0
+        )
 
     @property
     def noise_fraction(self) -> float:
@@ -127,9 +151,9 @@ class ElasticResult:
 
     def __repr__(self) -> str:
         return (
-            f"<ElasticResult {self.n_independent} independent constants, "
-            f"{len(self.strains)} strains, {self.evaluations} evaluations, "
-            f"symmetry residual {self.symmetry_residual:.3g} GPa>"
+            f"<ElasticResult {self.method}, {self.n_independent} independent "
+            f"constants, {len(self.strains)} strains, {self.evaluations} "
+            f"evaluations, symmetry residual {self.symmetry_residual:.3g} GPa>"
         )
 
     def __str__(self) -> str:
@@ -181,6 +205,9 @@ def elastic_tensor(
     fmax: float = 0.01,
     steps: int = 200,
     progress=None,
+    method: str = "strain",
+    displacement: float = DEFAULT_DISPLACEMENT,
+    force_constants=None,
 ) -> ElasticResult:
     """Compute the elastic tensor of a relaxed structure.
 
@@ -213,10 +240,34 @@ def elastic_tensor(
         progress: True to print progress, or a callable given a
             `chmpy.opt.progress.Progress` per event. Each strain point is a
             stage; the atomic relaxation at it is nested inside.
+        method: "strain" relaxes the atoms at each strained cell. "hessian"
+            relaxes none: it takes the clamped-ion constants from strained
+            cells and corrects them with the internal-strain tensor and the
+            Gamma-point Hessian, `C = C0 - L^T Phi^+ L / V`, all from one batch
+            of finite differences. Much cheaper, and exact to second order;
+            see `hessian_elastic_tensor`.
+        displacement: atomic finite-difference step for method="hessian", A
+        force_constants: for method="hessian", `ForceConstants` already
+            measured for this structure (any supercell); only the strained
+            cells are then computed
 
     Returns:
         ElasticResult
     """
+    if method == "hessian":
+        return hessian_elastic_tensor(
+            structure,
+            calculator,
+            strain=HESSIAN_STRAIN if strain == "auto" else strain,
+            displacement=displacement,
+            symmetry=symmetry,
+            rotations=rotations,
+            info=info,
+            force_constants=force_constants,
+            progress=progress,
+        )
+    if method != "strain":
+        raise ValueError(f"unknown method {method!r}, expected 'strain' or 'hessian'")
     system = _as_system(structure, info)
     if not system.periodic:
         raise ValueError("elastic constants need a periodic structure")
@@ -314,6 +365,268 @@ def elastic_tensor(
         relaxations=relaxations,
         strains=tuple(strains),
     )
+
+
+def hessian_elastic_tensor(
+    structure,
+    calculator,
+    *,
+    strain: float = HESSIAN_STRAIN,
+    displacement: float = DEFAULT_DISPLACEMENT,
+    symmetry: bool = True,
+    rotations=None,
+    info=None,
+    force_constants=None,
+    progress=None,
+) -> ElasticResult:
+    """Relaxed-ion elastic constants from second derivatives, without relaxing.
+
+    Expanding the energy to second order in the strain `e` and the internal
+    displacements `u` and minimising over `u` gives
+
+        C = C0 - (1/V) L^T Phi^+ L
+
+    with `C0` the clamped-ion constants (stress response at fixed fractional
+    coordinates), `Phi` the Gamma-point Hessian of the cell, and
+    `L = d2E/du de` the internal-strain tensor. Every piece is a central
+    difference, so the whole calculation is one batch of independent
+    evaluations: the symmetry-unique displacements of the unit cell for
+    `Phi`, and twelve strained cells for `C0` and `L`.
+
+    `L` is measured twice -- as `-dF/de` on every atom from the strained
+    cells, and as `d(virial)/du` from the displaced ones, completed by
+    symmetry -- and the two have to agree. Their average is used, and half
+    the difference between the tensors each gives is `internal_strain_noise`
+    on the result. The three uniform translations are projected out of `Phi`
+    before it is inverted, which is where the acoustic sum rule comes in.
+
+    Args:
+        structure: a relaxed `Crystal` or `System`
+        calculator: a `chmpy.calc.Calculator`; every evaluation goes through
+            one `calculator.batch` call, which falls back to evaluating one
+            at a time for calculators without a native batch path
+        strain: engineering strain for `C0` and `L`
+        displacement: atomic step for `Phi`, Angstroms
+        symmetry: displace only symmetry-unique atoms, fold `L` onto the
+            space group, and project `C` onto the point group
+        rotations: (M, 3, 3) Cartesian point operations, as for
+            `elastic_tensor`
+        info: model inputs that are not geometry
+        force_constants: `ForceConstants` already measured for this
+            structure; their Gamma-point Hessian is used and only the strained
+            cells are computed
+        progress: as for `elastic_tensor`
+
+    Returns:
+        ElasticResult with method="hessian"
+    """
+    from chmpy.ext.elastic_tensor import ElasticTensor
+    from chmpy.vib.force_constants import DisplacementPlan
+
+    system = _as_system(structure, info)
+    if not system.periodic:
+        raise ValueError("elastic constants need a periodic structure")
+    n = len(system)
+    volume = system.volume
+    rotations = _rotations_for(structure, rotations, symmetry)
+    basis = invariant_elastic_basis(rotations)
+    has_group = symmetry and hasattr(structure, "space_group")
+    started = calculator.stats.calls
+
+    reference = calculator(system, ("energy", "stress"))
+    residual = reference.smax
+    if residual > RESIDUAL_STRESS_WARNING:
+        LOG.warning(
+            "the reference structure carries %.3f GPa of stress; elastic "
+            "constants are defined at equilibrium, so relax it first",
+            residual,
+        )
+
+    cell, scaled = np.array(system.cell), system.scaled_positions
+    strained = []
+    for index in range(6):
+        for sign in (1, -1):
+            deformation = np.eye(3) + voigt_strain(index, sign * strain)
+            strained.append(
+                System(
+                    system.numbers,
+                    scaled @ (cell @ deformation),
+                    cell @ deformation,
+                    True,
+                    dict(system.info),
+                )
+            )
+    plan = None
+    displaced = []
+    if force_constants is None:
+        plan = DisplacementPlan(structure, system, (1, 1, 1), symmetry, displacement)
+        displaced = plan.systems()
+
+    report = reporter(progress)
+    report(
+        "elastic",
+        "setup",
+        f"elastic tensor from the Hessian: {len(displaced)} displaced and "
+        f"{len(strained)} strained cells in one batch, "
+        f"{len(basis)} independent constants",
+    )
+    results = calculator.batch(displaced + strained, ("energy", "forces", "stress"))
+    moved, deformed = results[: len(displaced)], results[len(displaced) :]
+
+    if plan is not None:
+        force_constants = plan.solve([result.forces for result in moved])
+    hessian = force_constants.gamma_hessian()
+    if hessian.shape != (3 * n, 3 * n):
+        raise ValueError(
+            f"the force constants are for {hessian.shape[0] // 3} atoms, the "
+            f"structure has {n}"
+        )
+
+    # clamped-ion constants and the internal-strain tensor, one strain column
+    # at a time
+    clamped = np.zeros((6, 6))
+    internal = np.zeros((3 * n, 6))
+    for index in range(6):
+        plus, minus = deformed[2 * index], deformed[2 * index + 1]
+        clamped[:, index] = (plus.stress_voigt - minus.stress_voigt) / (2 * strain)
+        internal[:, index] = -(plus.forces - minus.forces).ravel() / (2 * strain)
+    if has_group:
+        from .symmetry import crystal_atom_map
+
+        internal = _symmetrise_internal_strain(
+            internal, crystal_atom_map(structure, system), cell
+        )
+
+    # the same tensor from the other side: d(virial)/du along each
+    # displacement made, completed by symmetry. The two estimates of C differ
+    # only through L, so half their difference is what L's noise costs.
+    correction = _relaxation_correction(hessian, internal, n) / volume
+    internal_noise = None
+    if plan is not None:
+        from_displacements = _internal_strain_from_displacements(plan, moved, volume)
+        if has_group:
+            from_displacements = _symmetrise_internal_strain(
+                from_displacements, plan.atom_map, cell
+            )
+        other = _relaxation_correction(hessian, from_displacements, n) / volume
+        internal_noise = (
+            0.5 * float(np.abs(other - correction).max()) * EV_PER_ANGSTROM3_TO_GPA
+        )
+        correction = (
+            _relaxation_correction(hessian, 0.5 * (internal + from_displacements), n)
+            / volume
+        )
+
+    raw = (clamped - correction) * EV_PER_ANGSTROM3_TO_GPA
+    asymmetry = float(np.abs(raw - raw.T).max())
+    voigt = 0.5 * (raw + raw.T)
+    symmetry_residual = 0.0
+    if symmetry:
+        projected = elastic_to_voigt(project_elastic(elastic_from_voigt(voigt), basis))
+        symmetry_residual = float(np.abs(projected - voigt).max())
+        voigt = projected
+
+    result = ElasticResult(
+        tensor=ElasticTensor(voigt),
+        evaluations=calculator.stats.calls - started,
+        relaxed_atoms=True,
+        residual_stress=residual,
+        asymmetry=asymmetry,
+        symmetry_residual=symmetry_residual,
+        n_independent=len(basis),
+        strain=strain,
+        method="hessian",
+        internal_strain_noise=internal_noise,
+        clamped=0.5 * (clamped + clamped.T) * EV_PER_ANGSTROM3_TO_GPA,
+    )
+    largest = float(np.abs(voigt).max())
+    if largest > 0 and result.noise > NOISE_WARNING * largest:
+        _warn_about_noise(result.noise, largest, strain, float("nan"))
+    return result
+
+
+def _relaxation_correction(hessian, internal, n) -> np.ndarray:
+    """`L^T Phi^+ L` with the three uniform translations projected out.
+
+    A uniform translation costs nothing, so `Phi` is singular along it and `L`
+    has no component there; both are expressed in an orthonormal basis of the
+    complement before solving. A Hessian that is not positive definite there
+    means the reference is not a minimum, and the relaxation it implies is
+    not one either.
+    """
+    translations = np.kron(np.ones((n, 1)), np.eye(3)) / np.sqrt(n)
+    basis, _ = np.linalg.qr(translations, mode="complete")
+    complement = basis[:, 3:]
+    reduced = complement.T @ hessian @ complement
+    reduced = 0.5 * (reduced + reduced.T)
+    projected = complement.T @ internal
+    eigenvalues, vectors = np.linalg.eigh(reduced)
+    if eigenvalues.min() <= 0:
+        LOG.warning(
+            "the Gamma-point Hessian has %d non-positive eigenvalues (lowest "
+            "%.3g eV/A^2): the reference is not a minimum, and the relaxed-ion "
+            "constants from it are not meaningful",
+            int(np.sum(eigenvalues <= 0)),
+            eigenvalues.min(),
+        )
+    keep = np.abs(eigenvalues) > 1e-10 * np.abs(eigenvalues).max()
+    inverse = (vectors[:, keep] / eigenvalues[keep]) @ vectors[:, keep].T
+    return projected.T @ inverse @ projected
+
+
+def _internal_strain_from_displacements(plan, results, volume) -> np.ndarray:
+    """`L = d(virial)/du` for every atom, from the displaced cells alone.
+
+    Each displacement `d` of a representative atom measures `d . L_r`; each
+    operation `s` of its site group turns that into another equation,
+    `(R^T d) . L_r = R^T (d . L_r) R` on the strain indices, and the rest of
+    the orbit follows from `L_(g(r)) = R (x) R (x) R . L_r`.
+    """
+    n = len(plan.system)
+    pairs = ((0, 0), (1, 1), (2, 2), (1, 2), (0, 2), (0, 1))
+    cartesian = plan.cartesian
+    tensor = np.zeros((n, 3, 3, 3))
+    results = iter(results)
+    for representative, stabiliser, directions in plan.plan:
+        rows, responses = [], []
+        for direction in directions:
+            plus, minus = next(results), next(results)
+            voigt = volume * (plus.stress_voigt - minus.stress_voigt)
+            voigt /= 2 * plan.displacement
+            measured = np.zeros((3, 3))
+            for index, (a, b) in enumerate(pairs):
+                measured[a, b] = measured[b, a] = voigt[index]
+            for operation in stabiliser:
+                rotation = cartesian[operation]
+                rows.append(rotation.T @ direction)
+                responses.append((rotation.T @ measured @ rotation).ravel())
+        solved = (np.linalg.pinv(np.array(rows)) @ np.array(responses)).reshape(3, 3, 3)
+        images = plan.atom_map.permutation[:, representative]
+        _, first = np.unique(images, return_index=True)
+        for operation in first:
+            rotation = cartesian[operation]
+            tensor[images[operation]] = np.einsum(
+                "xa,yb,zc,abc->xyz", rotation, rotation, rotation, solved
+            )
+    return np.stack([tensor[:, :, a, b] for a, b in pairs], axis=-1).reshape(3 * n, 6)
+
+
+def _symmetrise_internal_strain(internal, atom_map, cell) -> np.ndarray:
+    """Fold `L` onto the space group: the group average of
+    `L_(g(i)) = R (x) R (x) R . L_i` over the operations."""
+    n = internal.shape[0] // 3
+    tensor = np.zeros((n, 3, 3, 3))
+    pairs = ((0, 0), (1, 1), (2, 2), (1, 2), (0, 2), (0, 1))
+    columns = internal.reshape(n, 3, 6)
+    for index, (a, b) in enumerate(pairs):
+        tensor[:, :, a, b] = tensor[:, :, b, a] = columns[:, :, index]
+    rotations = atom_map.cartesian(cell)
+    folded = np.zeros_like(tensor)
+    for rotation, permutation in zip(rotations, atom_map.permutation, strict=True):
+        rotated = np.einsum("xa,yb,zc,nabc->nxyz", rotation, rotation, rotation, tensor)
+        np.add.at(folded, permutation, rotated)
+    folded /= len(rotations)
+    return np.stack([folded[:, :, a, b] for a, b in pairs], axis=-1).reshape(3 * n, 6)
 
 
 def _warn_about_noise(noise, largest, strain, fmax) -> None:

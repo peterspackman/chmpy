@@ -334,3 +334,9 @@ def test_optical_frequencies_drop_exactly_the_translations(argon):
     np.testing.assert_allclose(
         optical, constants.frequencies([0, 0, 0], "cm-1")[3:], atol=1e-6
     )
+
+
+def test_batched_displacements_give_the_same_constants(argon):
+    relaxed, calc, constants, _ = argon
+    batched = force_constants(relaxed, calc, cutoff=8.0, batch=True)
+    np.testing.assert_allclose(batched.blocks, constants.blocks, atol=1e-12)

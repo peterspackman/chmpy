@@ -400,3 +400,54 @@ def test_the_misfit_of_rotated_responses_is_reported(layered):
     response = np.array([10.0, 3.0, 2.0, 1.0, 0.0, 1.0])
     _, misfit = fit_elastic([(0, response)], rotations)
     assert misfit > 0.1
+
+
+# -- method="hessian" ----------------------------------------------------------
+
+
+@pytest.mark.parametrize("fixture", ["binary", "layered"])
+def test_the_hessian_route_matches_finite_strain(fixture, request):
+    """C0 - L^T Phi^+ L / V is the relaxed-ion tensor, without relaxing."""
+    structure, calc = request.getfixturevalue(fixture)
+    strained = elastic_tensor(structure, calc, strain=0.002, fmax=1e-7, steps=800)
+    hessian = elastic_tensor(
+        structure, calc, method="hessian", strain=0.002, displacement=0.005
+    )
+    assert hessian.method == "hessian"
+    np.testing.assert_allclose(hessian.c_voigt, strained.c_voigt, atol=1e-3)
+    # the atoms do relax, so the correction is doing something
+    assert np.abs(hessian.clamped - hessian.c_voigt).max() > 0.1
+    assert hessian.evaluations < strained.evaluations
+    assert hessian.internal_strain_noise < 1e-3
+    assert hessian.noise_fraction < 1e-3
+
+
+def test_hessian_symmetry_reduction_gives_the_p1_tensor(layered):
+    structure, calc = layered
+    reduced = elastic_tensor(structure, calc, method="hessian", strain=0.002)
+    full = elastic_tensor(
+        structure, calc, method="hessian", strain=0.002, symmetry=False
+    )
+    assert reduced.evaluations < full.evaluations
+    np.testing.assert_allclose(reduced.c_voigt, full.c_voigt, atol=1e-3)
+
+
+def test_hessian_reuses_precomputed_force_constants(layered):
+    from chmpy.vib import force_constants
+
+    structure, calc = layered
+    constants = force_constants(structure, calc, supercell=(2, 2, 1))
+    direct = elastic_tensor(structure, calc, method="hessian", strain=0.002)
+    reused = elastic_tensor(
+        structure, calc, method="hessian", strain=0.002, force_constants=constants
+    )
+    # the reference cell and the twelve strained cells, nothing else
+    assert reused.evaluations == 13
+    assert reused.internal_strain_noise is None
+    np.testing.assert_allclose(reused.c_voigt, direct.c_voigt, atol=1e-3)
+
+
+def test_an_unknown_method_is_refused(relaxed_argon):
+    structure, calc = relaxed_argon
+    with pytest.raises(ValueError, match="unknown method"):
+        elastic_tensor(structure, calc, method="sideways")
