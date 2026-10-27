@@ -7,20 +7,31 @@ static internal stress approximation, ZSISA), and
 
     G(q) = E_static(q) + F_vib(q, T)
 
-is minimised by damped Newton steps:
+is minimised on a model, not by searching:
 
-* the gradient is the static stress, analytically, plus dF_vib/dq_k by
-  central differences, each needing force constants at a strained cell;
-* the Hessian is the static elastic tensor projected onto the strain basis,
-  `V0 B_k : C : B_l`, computed once at the start;
-* each step is bounded and accepted only if G actually decreases, so a large
-  thermal stress cannot carry the cell to a region where the crystal has
-  come apart, which a fixed applied stress does.
+* E_static is quadratic about the current cell, with the analytic static
+  stress as its gradient and, as its Hessian, the static elastic tensor
+  projected onto the strain basis as `V0 B_k : C : B_l`, computed once and
+  updated by BFGS from the static stresses, which are free of noise;
+* F_vib is a parabola along each strain direction through the current cell
+  and the cells strained by +/-h, which gives its slope and curvature;
+* the step is Newton on the sum, bounded, and the iteration stops once it is
+  small.
+
+F_vib is never differentiated over less than `h`, 1% by default. Its strain
+derivative is in effect a third derivative of the energy, which
+machine-learned potentials reproduce far less smoothly than the energy itself:
+over a few tenths of a percent of strain, their force constants can wiggle
+enough to change a central difference by tenths of a GPa. A parabola through
+points 1% apart averages that out, the elastic tensor carries the coupling
+between directions, and no cell is ever evaluated just to be rejected, so the
+cost is fixed at 2n + 1 force-constant sets per iteration for n strain
+directions.
 
 Imaginary modes mean the harmonic free energy is not defined. Dropping them
 would make the finite differences measure which modes were dropped, so a
-trial cell with imaginary modes is a rejected step, and imaginary modes at
-the current cell or the cells its gradient needs stop the calculation.
+step that reaches a cell with imaginary modes is halved, and imaginary modes
+at the starting cell stop the calculation.
 
     result = qha_structure(crystal, calculator, temperature=293.0)
     tensor = elastic_tensor(result.structure, calculator)  # quasi-static C
@@ -36,12 +47,16 @@ import numpy as np
 from chmpy.calc.result import EV_PER_ANGSTROM3_TO_GPA
 
 from .force_constants import force_constants
+from .gamma import MechanicallyUnstable
 from .thermo import thermal_properties
 
 LOG = logging.getLogger(__name__)
 
 #: finite-difference step in the strain amplitudes for dF_vib/dq
 DEFAULT_STRAIN = 0.005
+
+#: strain amplitude the F_vib parabola is fitted over in `qha_structure`
+FIT_STRAIN = 0.01
 
 #: largest change in any strain amplitude in one Newton step
 MAX_STEP = 0.02
@@ -79,8 +94,9 @@ class QHAResult:
         temperature: K
         free_energy: G = E_static + F_vib at the minimum, eV per cell
         strain: (3, 3) strain from the starting cell
-        converged: whether the gradient fell below tolerance
-        history: per iteration, the amplitudes, G and the largest gradient
+        converged: whether the step fell below tolerance
+        history: per iteration, the amplitudes, G, the largest gradient and
+            the step taken
     """
 
     structure: object
@@ -126,6 +142,7 @@ class _FreeEnergySurface:
         self.gamma_correction = gamma_correction
         self._crystals = {}
         self._vibrational = {}
+        self._elastic = None
 
     def deformation(self, q):
         return np.eye(3) + np.einsum("k,kab->ab", q, self.basis)
@@ -184,12 +201,21 @@ class _FreeEnergySurface:
                 cutoff=self.cutoff,
                 info=self.info,
             )
-            properties = thermal_properties(
-                constants,
-                [self.temperature],
-                mesh=self.mesh,
-                gamma_correction=self.gamma_correction,
-            )
+            correction = self.gamma_correction
+            if isinstance(correction, str) and correction == "elastic":
+                correction = self.elastic()
+            try:
+                properties = thermal_properties(
+                    constants,
+                    [self.temperature],
+                    mesh=self.mesh,
+                    gamma_correction=correction,
+                )
+            except MechanicallyUnstable as unstable:
+                raise ImaginaryModes(
+                    f"acoustic modes near Gamma are imaginary at strain amplitudes "
+                    f"{np.round(q, 5).tolist()}: {unstable}"
+                ) from unstable
             if properties.n_imaginary:
                 raise ImaginaryModes(
                     f"{properties.n_imaginary} imaginary modes at strain amplitudes "
@@ -212,15 +238,35 @@ class _FreeEnergySurface:
             )
         return gradient
 
+    def vibrational_parabolas(self, q):
+        """F_vib at q, and its slope and curvature along each strain direction,
+        from the parabola through q and q +/- strain."""
+        h = self.strain
+        centre = self.vibrational(q)
+        slope, curvature = np.zeros(len(q)), np.zeros(len(q))
+        for k in range(len(q)):
+            step = np.zeros(len(q))
+            step[k] = h
+            plus, minus = self.vibrational(q + step), self.vibrational(q - step)
+            slope[k] = (plus - minus) / (2 * h)
+            curvature[k] = (plus - 2 * centre + minus) / h**2
+        return centre, slope, curvature
+
+    def elastic(self):
+        "The static elastic tensor of the reference cell"
+        if self._elastic is None:
+            from chmpy.opt import elastic_tensor
+
+            self._elastic = elastic_tensor(
+                self.reference, self.calculator, info=self.info, fmax=self.fmax
+            )
+        return self._elastic
+
     def hessian(self):
         "V0 B_k : C : B_l from the static elastic tensor at the start"
-        from chmpy.opt import elastic_tensor
         from chmpy.opt.strain import elastic_from_voigt, to_vector
 
-        result = elastic_tensor(
-            self.reference, self.calculator, info=self.info, fmax=self.fmax
-        )
-        stiffness = elastic_from_voigt(result.c_voigt) / EV_PER_ANGSTROM3_TO_GPA
+        stiffness = elastic_from_voigt(self.elastic().c_voigt) / EV_PER_ANGSTROM3_TO_GPA
         vectors = to_vector(self.basis)
         return self.volume * vectors @ stiffness @ vectors.T
 
@@ -236,7 +282,7 @@ def thermal_stress(
     strain: float = DEFAULT_STRAIN,
     info=None,
     fmax: float = 1e-3,
-    gamma_correction: bool = False,
+    gamma_correction=False,
 ) -> ThermalStress:
     """`(1/V) dF_vib/d eps` over the strains a crystal's symmetry allows.
 
@@ -272,13 +318,13 @@ def qha_structure(
     mesh=(4, 4, 4),
     supercell=None,
     cutoff: float | None = None,
-    strain: float = DEFAULT_STRAIN,
+    strain: float = FIT_STRAIN,
     info=None,
     fmax: float = 1e-3,
-    gtol: float = 1e-3,
-    max_iterations: int = 20,
+    xtol: float = 2e-4,
+    max_iterations: int = 10,
     max_step: float = MAX_STEP,
-    gamma_correction: bool = False,
+    gamma_correction=False,
 ) -> QHAResult:
     """Minimise G = E_static + F_vib over the symmetry-allowed strains.
 
@@ -288,15 +334,18 @@ def qha_structure(
         calculator: a `chmpy.calc.Calculator`
         temperature: K
         mesh: q-mesh for F_vib
-        gamma_correction: add the Gamma correction to F_vib, with the
-            long-wave tensor read off each cell's own force constants, so a
-            coarse mesh can stand in for a dense one
+        gamma_correction: add the Gamma correction to F_vib, so a coarse mesh
+            can stand in for a dense one. True reads the long-wave tensor off
+            each cell's own force constants; "elastic" takes it from the
+            reference cell's elastic tensor, which is computed anyway and is
+            more robust when the force constants are noisy near Gamma
         supercell, cutoff: passed to `force_constants`; size the supercell
             from the model's receptive field, not its cutoff radius
-        strain: finite-difference step for dF_vib/dq
+        strain: half-width of the F_vib parabola along each strain direction
         info: model inputs that are not geometry
         fmax: force tolerance for the atomic relaxations, eV/A
-        gtol: convergence on the largest gradient component, as a stress in GPa
+        xtol: convergence on the largest strain amplitude of the next step;
+            2e-4 is a volume change of about 0.06%
         max_iterations: Newton steps before giving up
         max_step: largest change in any strain amplitude per step
 
@@ -318,59 +367,65 @@ def qha_structure(
         fmax=fmax,
         gamma_correction=gamma_correction,
     )
-    hessian = surface.hessian()
+    static_hessian = surface.hessian()
     q = np.zeros(len(surface.basis))
-    G = surface.value(q)
     history, converged = [], False
-    previous = None
+    previous, previous_static, step = None, None, None
     for _ in range(max_iterations):
-        _, static_gradient = surface.static(q)
-        gradient = static_gradient + surface.vibrational_gradient(q)
+        try:
+            F, slope, curvature = surface.vibrational_parabolas(q)
+        except ImaginaryModes as unstable:
+            if step is None:
+                raise
+            # the step reached a dynamically unstable cell: go half as far
+            LOG.info("halving a step that reached an unstable cell: %s", unstable)
+            step *= 0.5
+            q = previous + step
+            continue
+        E, static_gradient = surface.static(q)
+        if previous is not None:
+            # BFGS on the static part alone: its gradient is analytic and free
+            # of noise, and the lattice softens as it expands
+            s, y = q - previous, static_gradient - previous_static
+            if s @ y > 1e-12 * np.linalg.norm(s) * np.linalg.norm(y):
+                hs = static_hessian @ s
+                static_hessian = (
+                    static_hessian
+                    + np.outer(y, y) / (y @ s)
+                    - np.outer(hs, hs) / (s @ hs)
+                )
+        previous_static = static_gradient
+        gradient = static_gradient + slope
+        hessian = static_hessian + np.diag(curvature)
+        if np.linalg.eigvalsh(hessian).min() <= 0:
+            # F_vib curving down faster than the lattice stiffens: trust the
+            # static curvature alone for this step
+            hessian = static_hessian
+        step = -np.linalg.solve(hessian, gradient)
+        step *= min(1.0, max_step / max(float(np.abs(step).max()), 1e-300))
         largest = (
             float(np.abs(gradient).max()) / surface.volume * EV_PER_ANGSTROM3_TO_GPA
         )
-        history.append({"q": q.tolist(), "G": G, "gradient_gpa": largest})
-        if largest < gtol:
+        history.append(
+            {
+                "q": q.tolist(),
+                "G": E + F,
+                "gradient_gpa": largest,
+                "step": step.tolist(),
+            }
+        )
+        if float(np.abs(step).max()) < xtol:
             converged = True
             break
-        if previous is not None:
-            # BFGS: the static C misses the vibrational softening of G, which
-            # leaves plain Newton converging only linearly
-            s, y = q - previous[0], gradient - previous[1]
-            if s @ y > 1e-12 * np.linalg.norm(s) * np.linalg.norm(y):
-                hs = hessian @ s
-                hessian = (
-                    hessian + np.outer(y, y) / (y @ s) - np.outer(hs, hs) / (s @ hs)
-                )
-        previous = (q.copy(), gradient.copy())
-        step = -np.linalg.solve(hessian, gradient)
-        step *= min(1.0, max_step / max(float(np.abs(step).max()), 1e-300))
-        for _ in range(6):
-            trial = q + step
-            try:
-                trial_G = surface.value(trial)
-                if trial_G < G:
-                    # the next gradient needs the neighbouring cells too; they
-                    # are cached, so this costs nothing for an accepted step
-                    surface.vibrational_gradient(trial)
-            except ImaginaryModes as unstable:
-                # the step left the region where the crystal is dynamically
-                # stable; that is a step to shorten, not a failure
-                LOG.info("rejected a trial cell: %s", unstable)
-                trial_G = np.inf
-            if trial_G < G:
-                q, G = trial, trial_G
-                break
-            step *= 0.5
-        else:
-            LOG.warning("no step along the Newton direction lowered G; stopping")
-            break
+        previous = q.copy()
+        q = q + step
     if not converged:
         LOG.warning(
-            "the quasi-harmonic cell did not converge to %g GPa in %d steps",
-            gtol,
+            "the quasi-harmonic cell did not converge to a step of %g in %d steps",
+            xtol,
             max_iterations,
         )
+    G = surface.value(q)
     return QHAResult(
         structure=surface.crystal(q),
         temperature=float(temperature),

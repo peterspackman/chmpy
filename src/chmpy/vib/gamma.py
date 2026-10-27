@@ -70,6 +70,10 @@ _GPA_PER_A2 = 1e9 * 1e20
 _AMU_KG = 1.66053906660e-27
 
 
+class MechanicallyUnstable(ValueError):
+    "Some sound velocity is imaginary: the acoustic tensor is indefinite"
+
+
 @cache
 def _sphere(order: int = 131):
     "Lebedev directions (n, 3) and weights summing to 4 pi"
@@ -201,7 +205,7 @@ class _GammaLattice:
         directions, self.weights = _sphere()
         self.speeds = self._frequencies(directions)  # per mesh unit, (n, 3)
         if self.speeds.min() <= 0:
-            raise ValueError(
+            raise MechanicallyUnstable(
                 "the long-wave acoustic tensor is not positive definite, so the "
                 "crystal is mechanically unstable and the Gamma weight is undefined"
             )
