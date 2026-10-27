@@ -111,6 +111,7 @@ class _FreeEnergySurface:
         strain,
         info,
         fmax,
+        gamma_correction=False,
     ):
         from chmpy.opt.coordinates import strain_basis_for
 
@@ -122,6 +123,7 @@ class _FreeEnergySurface:
         self.temperature = float(temperature)
         self.mesh, self.supercell, self.cutoff = mesh, supercell, cutoff
         self.strain, self.info, self.fmax = strain, info, fmax
+        self.gamma_correction = gamma_correction
         self._crystals = {}
         self._vibrational = {}
 
@@ -183,7 +185,10 @@ class _FreeEnergySurface:
                 info=self.info,
             )
             properties = thermal_properties(
-                constants, [self.temperature], mesh=self.mesh
+                constants,
+                [self.temperature],
+                mesh=self.mesh,
+                gamma_correction=self.gamma_correction,
             )
             if properties.n_imaginary:
                 raise ImaginaryModes(
@@ -231,6 +236,7 @@ def thermal_stress(
     strain: float = DEFAULT_STRAIN,
     info=None,
     fmax: float = 1e-3,
+    gamma_correction: bool = False,
 ) -> ThermalStress:
     """`(1/V) dF_vib/d eps` over the strains a crystal's symmetry allows.
 
@@ -247,6 +253,7 @@ def thermal_stress(
         strain=strain,
         info=info,
         fmax=fmax,
+        gamma_correction=gamma_correction,
     )
     q = np.zeros(len(surface.basis))
     gradient = surface.vibrational_gradient(q)
@@ -271,6 +278,7 @@ def qha_structure(
     gtol: float = 1e-3,
     max_iterations: int = 20,
     max_step: float = MAX_STEP,
+    gamma_correction: bool = False,
 ) -> QHAResult:
     """Minimise G = E_static + F_vib over the symmetry-allowed strains.
 
@@ -280,6 +288,9 @@ def qha_structure(
         calculator: a `chmpy.calc.Calculator`
         temperature: K
         mesh: q-mesh for F_vib
+        gamma_correction: add the Gamma correction to F_vib, with the
+            long-wave tensor read off each cell's own force constants, so a
+            coarse mesh can stand in for a dense one
         supercell, cutoff: passed to `force_constants`; size the supercell
             from the model's receptive field, not its cutoff radius
         strain: finite-difference step for dF_vib/dq
@@ -305,6 +316,7 @@ def qha_structure(
         strain=strain,
         info=info,
         fmax=fmax,
+        gamma_correction=gamma_correction,
     )
     hessian = surface.hessian()
     q = np.zeros(len(surface.basis))

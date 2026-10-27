@@ -44,6 +44,7 @@ class ThermalProperties:
         mesh: q-mesh used
         n_modes: modes included over the whole mesh
         n_imaginary: modes excluded as imaginary
+        gamma: (T, 3) the Gamma correction included in F, S and Cv, or None
     """
 
     temperatures: np.ndarray
@@ -54,6 +55,7 @@ class ThermalProperties:
     mesh: tuple
     n_modes: int
     n_imaginary: int
+    gamma: np.ndarray | None = None
 
 
 def q_mesh(mesh) -> np.ndarray:
@@ -155,13 +157,20 @@ def _irreducible_by_inversion(points):
     return points[chosen], np.array(multiplicity)
 
 
-def thermal_properties(constants, temperatures, mesh=(8, 8, 8)) -> ThermalProperties:
+def thermal_properties(
+    constants, temperatures, mesh=(8, 8, 8), gamma_correction=None
+) -> ThermalProperties:
     """Harmonic thermodynamics of a crystal from its force constants.
 
     Args:
         constants: a `chmpy.vib.ForceConstants`
         temperatures: K
         mesh: q-mesh; converge it for the property you need
+        gamma_correction: put back the three acoustic modes at Gamma that the
+            mesh drops (see `chmpy.vib.gamma`). True takes the long-wave
+            acoustic tensor from `constants`; an elastic tensor (a (6, 6)
+            array in GPa, `ElasticTensor` or `ElasticResult`) takes it from
+            that instead. None or False leaves them out.
 
     Returns:
         ThermalProperties, per unit cell
@@ -170,13 +179,29 @@ def thermal_properties(constants, temperatures, mesh=(8, 8, 8)) -> ThermalProper
     frequencies, imaginary = mesh_frequencies(constants, mesh)
     n_q = int(np.prod(mesh))
     values = np.array([harmonic_properties(frequencies, T) for T in temperatures])
+    values = values.reshape(-1, 3) / n_q
+    zero_point = harmonic_properties(frequencies, 0.0)[0] / n_q
+
+    gamma = None
+    if gamma_correction is not None and gamma_correction is not False:
+        from .gamma import gamma_weight, long_wave_tensor
+
+        elastic = None if gamma_correction is True else gamma_correction
+        tensor = long_wave_tensor(constants, elastic)
+        weights = gamma_weight(tensor, mesh, np.append(temperatures, 0.0))
+        gamma = np.array(weights).T / n_q
+        zero_point += gamma[-1, 0]
+        gamma = gamma[:-1]
+        values = values + gamma
+
     return ThermalProperties(
         temperatures=temperatures,
-        free_energy=values[:, 0] / n_q,
-        entropy=values[:, 1] / n_q,
-        heat_capacity=values[:, 2] / n_q,
-        zero_point=harmonic_properties(frequencies, 0.0)[0] / n_q,
+        free_energy=values[:, 0],
+        entropy=values[:, 1],
+        heat_capacity=values[:, 2],
+        zero_point=zero_point,
         mesh=tuple(mesh),
         n_modes=len(frequencies),
         n_imaginary=imaginary,
+        gamma=gamma,
     )
