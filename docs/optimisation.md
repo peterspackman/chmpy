@@ -178,6 +178,39 @@ For a noisy model, `elastic_tensor(..., strain="auto")` keeps increasing the
 strain until the tensor's own noise estimate is acceptable. The result reports
 `noise_fraction`, and it logs a warning if the tensor should not be trusted.
 
+## Vibrational free energies
+
+`thermal_properties` sums the harmonic free energy over a q-mesh, using a set
+of force constants measured in a supercell:
+
+``` python
+from chmpy.vib import thermal_properties
+
+constants = force_constants(relaxed, calc)
+thermal_properties(constants, [100.0, 298.15], mesh=(8, 8, 8)).free_energy
+# eV per unit cell
+```
+
+For molecular crystals, the supercell needed to converge this can run to
+thousands of atoms. The Einstein-Debye model of Nickerson and Johnson
+(PCCP 2026, DOI 10.1039/D6CP00089D) needs only the unit cell. It treats the
+optical modes at Gamma as Einstein oscillators, and the acoustic modes as a
+Debye solid whose cutoff comes from the sound velocities of the elastic tensor:
+
+``` python
+from chmpy.vib import einstein_debye
+
+result = einstein_debye(relaxed, calc, [100.0, 298.15])
+result.per_molecule("free_energy")
+# kJ/mol per molecule, for ranking polymorphs
+result.debye.temperature, result.n_imaginary
+```
+
+If you already have the elastic tensor, pass it with `elastic=` to save
+computing it again. For paracetamol (HXACAN01) with PET-MOLS-S, the result is
+within 0.05 kJ/mol per molecule of a 2x2x3 supercell on an 8x8x8 mesh, at
+about a tenth of the cost.
+
 ## Lattice energies
 
 ``` python
