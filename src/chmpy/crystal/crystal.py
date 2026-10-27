@@ -363,7 +363,7 @@ class Crystal:
             csgraph=uc_graph, directed=False, return_labels=True
         )
         # Safe because of previous unit_cell_connectivity call
-        uc_dict = self._cached_unit_cell_atoms
+        uc_dict = self.unit_cell_atoms()
         uc_frac = uc_dict["frac_pos"]
         uc_elements = uc_dict["element"]
         uc_asym = uc_dict["asym_atom"]

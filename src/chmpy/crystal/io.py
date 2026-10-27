@@ -434,7 +434,7 @@ def from_molecule(molecule, **kwargs):
     )
     space_group = SpaceGroup(1)
     x = Crystal(unit_cell, space_group, asym)
-    _ = x.unit_cell_atoms(
+    x._cached_unit_cell_atoms = x.unit_cell_atoms(
         tolerance=1e-12
     )  # need to workaround default tolerance as we have a massive cell
     return x
