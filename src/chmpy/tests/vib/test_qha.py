@@ -201,3 +201,27 @@ def test_an_unstable_trial_cell_is_a_rejected_step(calc, monkeypatch, caplog):
     assert not result.converged
     assert np.abs(result.strain).max() <= limit + 0.005 + 1e-9
     assert result.history[-1]["gradient_gpa"] < result.history[0]["gradient_gpa"]
+
+
+def test_the_volume_scan_matches_the_strained_cell_for_a_cubic_crystal(calc, static):
+    """For a cubic crystal isotropic scaling loses nothing, so both routes must
+    find the same cell and free energy."""
+    from chmpy.vib.qha import qha_volume
+
+    scan = qha_volume(
+        static,
+        calc,
+        [20.0, 40.0],
+        scales=np.linspace(0.98, 1.12, 9),
+        mesh=MESH,
+        cutoff=CUTOFF,
+        fmax=1e-6,
+    )
+    assert scan.in_range.all()
+    for k, temperature in enumerate(scan.temperatures):
+        direct = qha_structure(
+            static, calc, temperature, mesh=MESH, cutoff=CUTOFF, fmax=1e-6
+        )
+        assert scan.volume_change[k] == pytest.approx(direct.volume_change, abs=2e-4)
+        assert scan.free_energy[k] == pytest.approx(direct.free_energy, abs=5e-5)
+    assert np.all(scan.thermal_expansion > 0)

@@ -434,3 +434,256 @@ def qha_structure(
         converged=converged,
         history=history,
     )
+
+
+# -- isotropic: a volume scan --------------------------------------------------
+
+
+@dataclass
+class VolumeQHA:
+    """Quasi-harmonic equilibrium from an isotropic volume scan.
+
+    Attributes:
+        temperatures: (T,) K
+        volumes: (V,) cell volumes sampled, A^3, those with imaginary modes
+            left out
+        static_energies: (V,) E_static at each, atoms relaxed, eV per cell
+        free_energies: (T, V) F_vib at each, eV per cell
+        volume: (T,) equilibrium volume, A^3
+        free_energy: (T,) G at the equilibrium volume, eV per cell
+        bulk_modulus: (T,) isothermal bulk modulus at that volume, GPa
+        in_range: (T,) whether the minimum lies inside the sampled volumes;
+            where it does not, volume, free_energy and bulk_modulus are NaN
+            rather than an extrapolation
+        reference_volume: volume of the starting (static) cell, A^3
+        n_imaginary: (V,) imaginary modes found at every volume sampled
+        sampled: (V,) every volume sampled, including any left out
+    """
+
+    temperatures: np.ndarray
+    volumes: np.ndarray
+    static_energies: np.ndarray
+    free_energies: np.ndarray
+    volume: np.ndarray
+    free_energy: np.ndarray
+    bulk_modulus: np.ndarray
+    in_range: np.ndarray
+    reference_volume: float
+    n_imaginary: np.ndarray
+    sampled: np.ndarray
+
+    @property
+    def volume_change(self) -> np.ndarray:
+        "(T,) V(T) / V_static - 1"
+        return self.volume / self.reference_volume - 1
+
+    @property
+    def thermal_expansion(self) -> np.ndarray:
+        "(T,) volumetric expansion coefficient (1/V) dV/dT, 1/K"
+        if len(self.temperatures) < 2:
+            return np.full(len(self.temperatures), np.nan)
+        return np.gradient(self.volume, self.temperatures) / self.volume
+
+
+def vinet(volume, energy, minimum, bulk, derivative):
+    """The Vinet equation of state, E(V) in the units of `energy` and `bulk`*V."""
+    eta = (np.asarray(volume) / minimum) ** (1.0 / 3.0)
+    x = 1.5 * (derivative - 1.0) * (1.0 - eta)
+    return energy + 2.0 * bulk * minimum / (derivative - 1.0) ** 2 * (
+        2.0 - (2.0 - 2.0 * x) * np.exp(x)
+    )
+
+
+def _fit_vinet(volumes, values):
+    """(E0, V0, B0 in eV/A^3, B0') of a Vinet curve through the points.
+
+    Fitted relative to the lowest point and in units of the mean volume: the
+    energies are thousands of eV with differences of meV, which leaves the
+    raw least-squares problem too badly scaled to converge.
+    """
+    from scipy.optimize import least_squares
+
+    volumes, values = np.asarray(volumes, float), np.asarray(values, float)
+    unit, offset = float(volumes.mean()), float(values.min())
+    v, e = volumes / unit, values - offset
+    a, b, _ = np.polyfit(v, e, 2)
+    v0 = -b / (2 * a) if a > 0 else float(v[np.argmin(e)])
+    v0 = float(np.clip(v0, 0.5, 1.5))
+    guess = [float(e.min()), v0, max(2 * a * v0, 1e-6), 5.0]
+    fit = least_squares(
+        lambda p: vinet(v, *p) - e,
+        guess,
+        bounds=([-np.inf, 0.3, 1e-9, 1.01], [np.inf, 3.0, np.inf, 30.0]),
+        x_scale="jac",
+    )
+    e0, v0, b0, b1 = fit.x
+    # B0 came out in eV per (unit volume); the energy scale is unchanged
+    return np.array([e0 + offset, v0 * unit, b0 / unit, b1])
+
+
+def _descend(values, start) -> int:
+    "The local minimum of a sequence reached by walking downhill from `start`"
+    index = int(start)
+    while True:
+        if index > 0 and values[index - 1] < values[index]:
+            index -= 1
+        elif index < len(values) - 1 and values[index + 1] < values[index]:
+            index += 1
+        else:
+            return index
+
+
+def qha_volume(
+    crystal,
+    calculator,
+    temperatures,
+    *,
+    scales=(0.99, 1.0, 1.01, 1.02, 1.03, 1.04, 1.05, 1.06, 1.08, 1.10),
+    mesh=(4, 4, 4),
+    supercell=None,
+    cutoff: float | None = None,
+    gamma_correction=False,
+    info=None,
+    fmax: float = 1e-3,
+    shift=0.0,
+    window: int = 2,
+) -> VolumeQHA:
+    """Quasi-harmonic V(T) and G(T) by scaling the cell isotropically.
+
+    Each volume costs one atomic relaxation and one set of force constants,
+    whatever the number of temperatures: F_vib at every temperature is a sum
+    over the same modes. G(V) = E_static(V) + F_vib(V, T) is then fitted with
+    the Vinet equation of state at each temperature, about its lowest sampled
+    point, which smooths over noise in F_vib that a derivative would amplify.
+
+    The cell shape is kept, so this is exact for cubic crystals and an
+    approximation otherwise; `qha_structure` lets the shape change too, at a
+    cost that grows with the number of strain directions and a sensitivity to
+    noise in the model's third derivatives.
+
+    Args:
+        crystal: a statically relaxed `Crystal`
+        calculator: a `chmpy.calc.Calculator`
+        temperatures: K
+        scales: volumes to sample, relative to the static cell. The fitted
+            minimum at every temperature should lie inside them; `in_range`
+            on the result says whether it does.
+        mesh, shift: q-mesh for F_vib
+        supercell, cutoff: passed to `force_constants`
+        gamma_correction: as for `thermal_properties`; True reads the
+            long-wave tensor off each volume's own force constants
+        info: model inputs that are not geometry
+        fmax: force tolerance for the atomic relaxations, eV/A
+        window: the equation of state is fitted to this many volumes either
+            side of the minimum, not to all of them. The minimum is followed
+            downhill from the static cell, upward in temperature: far from
+            it the relaxed atoms can switch to another branch of the energy
+            surface, which is not the same crystal expanding
+
+    Returns:
+        VolumeQHA, per unit cell
+    """
+    from chmpy.calc.system import System
+    from chmpy.crystal import Crystal, UnitCell
+    from chmpy.opt import relax
+    from chmpy.opt.relax import coordinates_for
+
+    temperatures = np.atleast_1d(np.asarray(temperatures, dtype=float))
+    reference = np.asarray(crystal.unit_cell.direct)
+    reference_volume = crystal.unit_cell.volume()
+    sampled, energies, free, imaginary = [], [], [], []
+    for scale in scales:
+        scaled = Crystal(
+            UnitCell(reference * float(scale) ** (1.0 / 3.0)),
+            crystal.space_group,
+            crystal.asymmetric_unit,
+        )
+        if coordinates_for(scaled, cell=False).n_dof:
+            outcome = relax(
+                scaled, calculator, cell=False, info=info, fmax=fmax, steps=500
+            )
+            if not outcome.converged:
+                LOG.warning("atomic relaxation at volume x%g did not converge", scale)
+            scaled = outcome.structure
+        energy = calculator.energy(System.from_crystal(scaled, **(info or {})))
+        constants = force_constants(
+            scaled, calculator, supercell=supercell, cutoff=cutoff, info=info
+        )
+        try:
+            properties = thermal_properties(
+                constants,
+                temperatures,
+                mesh=mesh,
+                gamma_correction=gamma_correction,
+                shift=shift,
+            )
+            n_imaginary, values = properties.n_imaginary, properties.free_energy
+        except MechanicallyUnstable:
+            n_imaginary, values = -1, np.full(len(temperatures), np.nan)
+        sampled.append(scaled.unit_cell.volume())
+        energies.append(energy)
+        free.append(values)
+        imaginary.append(n_imaginary)
+
+    sampled, energies = np.array(sampled), np.array(energies)
+    free, imaginary = np.array(free).T, np.array(imaginary)
+    keep = imaginary == 0
+    if not keep.all():
+        LOG.warning(
+            "left out %d of %d volumes with imaginary modes or an unstable "
+            "long-wave tensor: x%s",
+            int((~keep).sum()),
+            len(keep),
+            np.round(np.asarray(scales)[~keep], 4).tolist(),
+        )
+    if keep.sum() < 2 * window + 1:
+        raise ImaginaryModes(
+            f"only {int(keep.sum())} of {len(keep)} volumes are dynamically "
+            "stable, too few for an equation of state"
+        )
+    volumes = sampled[keep]
+
+    minima, values, bulk, in_range = [], [], [], []
+    lowest = int(np.argmin(np.abs(volumes - reference_volume)))
+    order = np.argsort(temperatures)
+    fitted = {}
+    for t in order:
+        G = energies[keep] + free[t, keep]
+        # follow the minimum continuously from the static cell, upward in
+        # temperature, rather than taking the lowest point anywhere: far from
+        # the minimum a relaxation can land on another branch of the energy
+        # surface, which may even be lower, but is not this crystal expanding
+        lowest = _descend(G, lowest)
+        start = int(np.clip(lowest - window, 0, max(len(G) - 2 * window - 1, 0)))
+        part = slice(start, start + 2 * window + 1)
+        _, v0, b0, _ = parameters = _fit_vinet(volumes[part], G[part])
+        inside = volumes[part]
+        if 0 < lowest < len(G) - 1 and inside.min() <= v0 <= inside.max():
+            fitted[t] = (v0, vinet(v0, *parameters), b0 * EV_PER_ANGSTROM3_TO_GPA, True)
+        else:
+            # never report an extrapolated minimum
+            fitted[t] = (np.nan, np.nan, np.nan, False)
+    for t in range(len(temperatures)):
+        minima.append(fitted[t][0])
+        values.append(fitted[t][1])
+        bulk.append(fitted[t][2])
+        in_range.append(fitted[t][3])
+    minima, in_range = np.array(minima), np.array(in_range)
+    if not in_range.all():
+        LOG.warning(
+            "the G minimum lies outside the sampled volumes at %s K; widen `scales`",
+            temperatures[~in_range].tolist(),
+        )
+    return VolumeQHA(
+        temperatures=temperatures,
+        volumes=volumes,
+        static_energies=energies[keep],
+        free_energies=free[:, keep],
+        volume=minima,
+        free_energy=np.array(values),
+        bulk_modulus=np.array(bulk),
+        in_range=in_range,
+        reference_volume=reference_volume,
+        n_imaginary=imaginary,
+        sampled=sampled,
+    )
