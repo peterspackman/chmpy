@@ -63,9 +63,9 @@ RAD_S_TO_PER_CM = 1.0 / (2 * np.pi * 2.99792458e10)
 BY_SHIFT_BYTES = 512 * 2**20
 
 #: the acoustic sum rule is imposed until each atom's residual is below this
-#: fraction of its largest block, or this many sweeps have been made
+#: fraction of the largest block, or this many iterations have been made
 SUM_RULE_TOLERANCE = 1e-12
-SUM_RULE_SWEEPS = 200
+SUM_RULE_ITERATIONS = 500
 
 
 @dataclass
@@ -564,11 +564,15 @@ def symmetrise(constants: ForceConstants) -> ForceConstants:
     the symmetric self block, and the part left over reappears as a
     sum-rule error in the dynamical matrix, which is Hermitian, of a size
     that shows up as acoustic modes at Gamma that are not quite zero.
-    Alternating the two orthogonal projections converges to the projection
-    onto both, so that is what is done until the residual is at round-off.
+    Alternating the two projections does converge, but can take hundreds of
+    sweeps.
 
-    The sum-rule projection is the least-squares one: each block of atom
-    `i`'s row takes a share of the residual in proportion to its weight.
+    So the projection onto both is solved for directly. After permutation
+    symmetry, the closest constants obeying the sum rule are
+    `Phi - P(w Lambda_i)`, with `P` the permutation average and one 3x3
+    multiplier `Lambda_i` per atom chosen so that every row sums to zero.
+    That condition is a symmetric positive semi-definite linear system in the
+    multipliers, solved by conjugate gradients to round-off.
     """
     blocks = np.array(constants.blocks)
     pairs, shifts, weights = constants.pairs, constants.shifts, constants.weights
@@ -576,28 +580,31 @@ def symmetrise(constants: ForceConstants) -> ForceConstants:
     partner = _permutation_partners(pairs, shifts)
     has_partner = partner >= 0
     row = pairs[:, 0]
-    norm = np.bincount(row, weights=weights * weights, minlength=n)
-    if np.any(norm == 0):
-        LOG.warning(
-            "atoms %s have no force constants, so the acoustic sum rule cannot "
-            "be imposed on them",
-            np.flatnonzero(norm == 0).tolist(),
-        )
-    norm[norm == 0] = np.inf
+    index = (9 * row[:, None] + np.arange(9)).ravel()
 
-    scale = max(float(np.abs(blocks).max(initial=0.0)), 1e-300)
-    for _ in range(SUM_RULE_SWEEPS):
-        mirrored = blocks[partner[has_partner]].transpose(0, 2, 1)
-        blocks[has_partner] = 0.5 * (blocks[has_partner] + mirrored)
-        residual = np.zeros((n, 3, 3))
-        np.add.at(residual, row, weights[:, None, None] * blocks)
-        if np.abs(residual).max(initial=0.0) <= SUM_RULE_TOLERANCE * scale:
-            break
-        blocks -= (weights / norm[row])[:, None, None] * residual[row]
-    else:
+    def permute(values):
+        result = np.array(values)
+        mirrored = values[partner[has_partner]].transpose(0, 2, 1)
+        result[has_partner] = 0.5 * (values[has_partner] + mirrored)
+        return result
+
+    def row_sums(values):
+        weighted = (weights[:, None, None] * values).ravel()
+        return np.bincount(index, weights=weighted, minlength=9 * n).reshape(n, 3, 3)
+
+    def correction(multipliers):
+        return permute(weights[:, None, None] * multipliers[row])
+
+    blocks = permute(blocks)
+    residual = row_sums(blocks)
+    tolerance = SUM_RULE_TOLERANCE * max(float(np.abs(blocks).max(initial=0.0)), 1e-300)
+    multipliers, left = _conjugate_gradient(
+        lambda x: row_sums(correction(x)), residual, tolerance, SUM_RULE_ITERATIONS
+    )
+    blocks -= correction(multipliers)
+    if left > tolerance:
         LOG.warning(
-            "the acoustic sum rule converged only to %.1e of the largest block",
-            np.abs(residual).max() / scale,
+            "the acoustic sum rule converged only to %.1e eV/A^2 per atom", left
         )
 
     return ForceConstants(
@@ -609,6 +616,32 @@ def symmetrise(constants: ForceConstants) -> ForceConstants:
         cell=constants.cell,
         positions=constants.positions,
     )
+
+
+def _conjugate_gradient(apply, target, tolerance, iterations):
+    """Solve `apply(x) = target` for a symmetric positive semi-definite
+    operator, starting from zero so the answer stays in its range.
+
+    Returns:
+        (x, largest element of the residual left)
+    """
+    x = np.zeros_like(target)
+    r = np.array(target)
+    p = np.array(r)
+    rr = float(np.vdot(r, r))
+    for _ in range(iterations):
+        if np.abs(r).max(initial=0.0) <= tolerance:
+            break
+        applied = apply(p)
+        curvature = float(np.vdot(p, applied))
+        if curvature <= 0:
+            break
+        step = rr / curvature
+        x += step * p
+        r -= step * applied
+        rr, previous = float(np.vdot(r, r)), rr
+        p = r + (rr / previous) * p
+    return x, float(np.abs(r).max(initial=0.0))
 
 
 def _permutation_partners(pairs, shifts) -> np.ndarray:
