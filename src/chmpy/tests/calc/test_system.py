@@ -71,7 +71,7 @@ def test_crystal_round_trip():
 
     crystal = Crystal.from_molecule(_molecule())
     system = System.from_crystal(crystal)
-    assert len(system) == len(_molecule())
+    assert len(system) == len(crystal.unit_cell_atoms()["element"])
     np.testing.assert_allclose(system.cell, crystal.unit_cell.direct)
 
     back = system.to_crystal()

@@ -166,9 +166,7 @@ class Crystal:
         any atom site in the unit cell has > 1.0 occupancy after
         this.
 
-        Sets the `_unit_cell_atom_dict` member as this is an expensive
-        operation and is worth caching the result. Subsequent calls
-        to this function will be a no-op.
+        The result is cached when called with the default tolerance.
 
         Arguments:
             tolerance (float, optional): Minimum separation of sites in the unit
@@ -265,11 +263,10 @@ class Crystal:
         self, tolerance=0.4, neighbouring_cells=1, **kwargs
     ) -> tuple:
         """
-        Periodic connectiviy for the unit cell, populates _uc_graph
-        with a networkx.Graph object, where nodes are indices into the
-        _unit_cell_atom_dict arrays and the edges contain the translation
-        (cell) for the image of the corresponding unit cell atom with the
-        higher index to be bonded to the lower
+        Periodic connectivity for the unit cell, as a sparse graph where
+        nodes are indices into the `unit_cell_atoms()` arrays and the edges
+        contain the translation (cell) for the image of the corresponding
+        unit cell atom with the higher index to be bonded to the lower
 
         Bonding is determined by interatomic distances being less than the
         sum of covalent radii for the sites plus the tolerance (provided
@@ -362,7 +359,6 @@ class Crystal:
         n_uc_mols, uc_mols = csgraph.connected_components(
             csgraph=uc_graph, directed=False, return_labels=True
         )
-        # Safe because of previous unit_cell_connectivity call
         uc_dict = self.unit_cell_atoms()
         uc_frac = uc_dict["frac_pos"]
         uc_elements = uc_dict["element"]
