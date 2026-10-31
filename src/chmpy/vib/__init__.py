@@ -14,6 +14,9 @@ cell alone -- Gamma-point optical modes plus a Debye model of the acoustic ones
 fitted to the elastic tensor -- which is what polymorph ranking usually needs
 when a converged supercell is out of reach.
 
+`chmpy.vib.modes` gives the symmetry of the Gamma-point modes, by irreducible
+representation, and which are infrared or Raman active.
+
 `chmpy.vib.christoffel` checks a set of force constants against an elastic
 tensor for the same structure: the two describe the same physics in the
 long-wavelength limit by completely different routes, so the acoustic slopes
@@ -35,12 +38,14 @@ from .einstein_debye import (
     gamma_einstein_debye,
 )
 from .force_constants import ForceConstants, force_constants, symmetrise
+from .modes import GammaModes, gamma_modes
 from .thermo import ThermalProperties, q_mesh, thermal_properties
 
 __all__ = [
     "DebyeModel",
     "EinsteinDebye",
     "ForceConstants",
+    "GammaModes",
     "ThermalProperties",
     "christoffel_velocities",
     "compare_with_elastic",
@@ -49,6 +54,7 @@ __all__ = [
     "einstein_debye",
     "einstein_debye_properties",
     "force_constants",
+    "gamma_modes",
     "gamma_einstein_debye",
     "phonon_velocities",
     "q_mesh",
