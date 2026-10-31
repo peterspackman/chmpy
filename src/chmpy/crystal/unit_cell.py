@@ -257,8 +257,13 @@ class UnitCell:
 
     @property
     def is_monoclinic(self) -> bool:
-        """Returns true if angles alpha and gamma are equal"""
-        return close(self.alpha, self.gamma) and self.abc_different
+        """Returns true if only beta differs from 90 degrees (unique axis b)"""
+        right = np.pi / 2
+        return (
+            close(self.alpha, right)
+            and close(self.gamma, right)
+            and not close(self.beta, right)
+        )
 
     @property
     def is_cubic(self) -> bool:
@@ -267,8 +272,8 @@ class UnitCell:
 
     @property
     def is_orthorhombic(self) -> bool:
-        """Returns true if all angles are 90 degrees"""
-        return self.orthogonal and self.abc_different
+        """Returns true if all angles are 90 degrees and a, b differ"""
+        return self.orthogonal and not close(self.a, self.b)
 
     @property
     def is_tetragonal(self) -> bool:

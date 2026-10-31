@@ -74,3 +74,24 @@ class UnitCellTestCase(unittest.TestCase):
         np.testing.assert_allclose(np.diag(G), [5.1**2, 6.3**2, 7.7**2])
         self.assertAlmostEqual(G[0, 1], a @ b)
         self.assertAlmostEqual(G[1, 2], b @ cc)
+
+
+def _cell(lengths, angles):
+    return UnitCell.from_lengths_and_angles(lengths, angles, unit="degrees")
+
+
+def test_oblique_cell_with_equal_alpha_gamma_is_triclinic():
+    assert _cell([5, 6, 7], [70, 100, 70]).cell_type == "triclinic"
+
+
+def test_orthogonal_cell_with_a_equal_c_is_orthorhombic():
+    assert _cell([5, 6, 5], [90, 90, 90]).cell_type == "orthorhombic"
+
+
+def test_monoclinic_cell_with_a_equal_c_is_monoclinic():
+    assert _cell([5, 6, 5], [90, 100, 90]).cell_type == "monoclinic"
+
+
+def test_unique_c_cell_keeps_gamma():
+    cell = _cell([5, 6, 7], [90, 90, 100])
+    assert np.isclose(cell.unique_parameters_deg, 100).any()

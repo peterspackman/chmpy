@@ -11,13 +11,23 @@ LOG = logging.getLogger(__name__)
 CRYSTAL17_TEMPLATE = load_template("crystal17")
 
 
+def _cell_parameters(crystal):
+    "The cell parameters CRYSTAL17 reads for this crystal's lattice type"
+    a, b, c, alpha, beta, gamma = crystal.uc.parameters
+    return {
+        "triclinic": (a, b, c, alpha, beta, gamma),
+        "monoclinic": (a, b, c, beta),
+        "orthorhombic": (a, b, c),
+        "tetragonal": (a, c),
+        "hexagonal": (a, c),
+        "rhombohedral": (a, alpha),
+        "cubic": (a,),
+    }[crystal.space_group.lattice_type]
+
+
 def to_crystal17_input(crystal, **kwargs):
     space_group = crystal.space_group.international_tables_number
-    params = (
-        crystal.uc.parameters
-        if crystal.space_group.lattice_type == "triclinic"
-        else crystal.uc.unique_parameters_deg
-    )
+    params = _cell_parameters(crystal)
     method = kwargs.get("method", "hf-3c")
     if method == "hf-3c":
         method = "HF3C\nRESCALES8\n0.70"
