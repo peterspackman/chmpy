@@ -54,6 +54,7 @@ def test_reconstructed_surface_is_consistently_wound():
 
 
 def test_promolecule_isosurface_lies_on_the_isovalue():
+    pytest.importorskip("trimesh")
     from chmpy.interpolate.density import PromoleculeDensity
     from chmpy.surface import promolecule_density_isosurface
 
