@@ -366,7 +366,8 @@ class SpaceGroup:
     def latt(self) -> int:
         """
         The SHELX LATT number associated with this space group. Returns
-        a negative if there is no inversion.
+        a negative if there is no inversion centre at the origin, as SHELX
+        generates the inverted operations as -x,-y,-z about the origin.
 
         Options are
         ```
@@ -403,7 +404,8 @@ class SpaceGroup:
             "bface": 6,  # B
             "cface": 7,  # C
         }
-        if not self.centrosymmetric:
+        inversion = SymmetryOperation(-np.eye(3), np.zeros(3))
+        if inversion not in self.symmetry_operations:
             return -centering_to_latt[self.centering]
         return centering_to_latt[self.centering]
 

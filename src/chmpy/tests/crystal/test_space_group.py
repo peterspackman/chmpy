@@ -4,7 +4,11 @@ import unittest
 import numpy as np
 
 from chmpy.crystal import SpaceGroup, SymmetryOperation
-from chmpy.crystal.space_group import expanded_symmetry_list, reduced_symmetry_list
+from chmpy.crystal.space_group import (
+    SG_CHOICES,
+    expanded_symmetry_list,
+    reduced_symmetry_list,
+)
 
 LOG = logging.getLogger(__name__)
 
@@ -133,6 +137,22 @@ class SpaceGroupTestCase(unittest.TestCase):
         sg_bad.international_tables_number = -1
         with self.assertRaises(ValueError):
             print(sg_bad.crystal_system)
+
+    def test_latt_round_trips_every_setting(self):
+        for number, choices in SG_CHOICES.items():
+            for choice in choices:
+                sg = SpaceGroup(number, choice=choice)
+                with self.subTest(number=number, choice=choice):
+                    found = SpaceGroup.from_symmetry_operations(
+                        sg.reduced_symmetry_operations(), expand_latt=sg.latt
+                    )
+                    self.assertEqual(
+                        sorted(found.symmetry_operations),
+                        sorted(sg.symmetry_operations),
+                    )
+
+    def test_latt_is_negative_without_inversion_at_origin(self):
+        self.assertEqual(SpaceGroup(48, "1").latt, -1)
 
     def test_crystal_system_boundaries(self):
         ranges = {
