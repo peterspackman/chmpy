@@ -246,3 +246,21 @@ def test_accidentally_degenerate_sets_are_split_by_symmetry(hcp_argon):
     np.testing.assert_allclose(
         [m.frequency for m in lumped], [m.frequency for m in separate], atol=1e-6
     )
+
+
+def test_constants_breaking_the_sum_rule_are_refused(hcp_argon):
+    from dataclasses import replace
+
+    from chmpy.vib import symmetrise
+
+    structure, constants = hcp_argon
+    # tethering every atom in place breaks the sum rule but no symmetry
+    on_site = (constants.pairs[:, 0] == constants.pairs[:, 1]) & ~constants.shifts.any(
+        1
+    )
+    blocks = constants.blocks.copy()
+    blocks[on_site] += 1e-3 * np.eye(3)
+    broken = replace(constants, blocks=blocks)
+    with pytest.raises(ValueError, match="sum rule"):
+        label_gamma_modes(structure, broken)
+    assert label_gamma_modes(structure, symmetrise(broken))

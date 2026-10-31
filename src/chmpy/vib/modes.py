@@ -222,6 +222,10 @@ class GammaMode:
         return f"{self.frequency:10.2f}  {self.label or '-':<10} {', '.join(active)}"
 
 
+#: largest acoustic sum rule residue, in cm-1, that labelling accepts
+SUM_RULE_TOLERANCE = 1.0
+
+
 def label_gamma_modes(
     crystal, constants, units: str = "cm-1", tolerance: float = 0.1
 ) -> list[GammaMode]:
@@ -247,8 +251,10 @@ def label_gamma_modes(
         representation among the optical modes, low to high
 
     Raises:
-        ValueError: if the force constants are for a different structure, or a
-            set does not carry a representation (try another `tolerance`)
+        ValueError: if the force constants are for a different structure,
+            break the acoustic sum rule by more than `SUM_RULE_TOLERANCE`
+            (projecting the translations out would hide that), or a set does
+            not carry a representation (try another `tolerance`)
     """
     from chmpy.calc.system import System
     from chmpy.opt.symmetry import crystal_atom_map
@@ -260,6 +266,12 @@ def label_gamma_modes(
         system.positions, constants.positions, atol=1e-6
     ):
         raise ValueError("the force constants are for a different structure")
+    residue = constants.acoustic_error()
+    if residue > SUM_RULE_TOLERANCE:
+        raise ValueError(
+            f"the force constants break the acoustic sum rule by {residue:.2f} cm-1; "
+            "impose it first with chmpy.vib.symmetrise"
+        )
 
     atom_map = crystal_atom_map(crystal, system)
     rotations = atom_map.cartesian(constants.cell)
@@ -329,15 +341,15 @@ def label_gamma_modes(
             modes.append(make(folded, ""))
         return modes
 
-    root_mass = np.sqrt(constants.masses)
-    translations = np.linalg.qr(np.kron(root_mass[:, None], np.eye(3)))[0]
+    basis = constants._translation_basis()
+    translations = basis[:, :3]
     acoustic = _integral(
         table,
         table.reduce(
             average @ np.einsum("gim,im->g", images(translations), translations)
         ),
     )
-    complement = constants._translation_complement()
+    complement = basis[:, 3:]
     projected = complement.T @ matrix @ complement
     values, vectors = np.linalg.eigh(0.5 * (projected + projected.T))
     optical = complement @ vectors

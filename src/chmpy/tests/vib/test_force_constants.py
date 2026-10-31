@@ -340,3 +340,20 @@ def test_batched_displacements_give_the_same_constants(argon):
     relaxed, calc, constants, _ = argon
     batched = force_constants(relaxed, calc, cutoff=8.0, batch=True)
     np.testing.assert_allclose(batched.blocks, constants.blocks, atol=1e-12)
+
+
+def test_the_acoustic_error_is_not_fooled_by_an_imaginary_mode():
+    """Stretched past the Lennard-Jones inflection, hcp argon's optical modes
+    at Gamma are imaginary while the sum rule still holds exactly."""
+    cell = UnitCell.from_lengths_and_angles(
+        (4.6, 4.6, 4.6 * np.sqrt(8 / 3)), np.radians((90, 90, 120))
+    )
+    crystal = Crystal(
+        cell,
+        SpaceGroup(194),
+        AsymmetricUnit([Element[18]], np.array([[1 / 3, 2 / 3, 1 / 4]])),
+    )
+    calc = LennardJones(epsilon=0.0103, sigma=3.4, cutoff=8.0)
+    constants = force_constants(crystal, calc, cutoff=8.0)
+    assert constants.optical_frequencies("cm-1").min() < -1
+    assert constants.acoustic_error() < 1e-3

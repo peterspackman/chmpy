@@ -223,8 +223,9 @@ class ForceConstants:
         eigenvalues = np.linalg.eigvalsh(0.5 * (projected + projected.T))
         return _omega(eigenvalues) * factor
 
-    def _translation_complement(self) -> np.ndarray:
-        """(3N, 3N - 3) orthonormal basis orthogonal to uniform translations.
+    def _translation_basis(self) -> np.ndarray:
+        """(3N, 3N) orthonormal basis whose first three columns are the uniform
+        translations.
 
         A translation by `t` displaces every atom by `t`; in mass-weighted
         coordinates that is `sqrt(m_i) t`, which is what the dynamical matrix
@@ -232,8 +233,11 @@ class ForceConstants:
         """
         root_mass = np.sqrt(self.masses)
         translations = np.kron(root_mass[:, None], np.eye(3))
-        basis, _ = np.linalg.qr(translations, mode="complete")
-        return basis[:, 3:]
+        return np.linalg.qr(translations, mode="complete")[0]
+
+    def _translation_complement(self) -> np.ndarray:
+        "(3N, 3N - 3) orthonormal basis orthogonal to uniform translations"
+        return self._translation_basis()[:, 3:]
 
     def gamma_hessian(self) -> np.ndarray:
         """(3N, 3N) d2E/du du for displacements repeated in every cell, eV/A^2.
@@ -256,11 +260,15 @@ class ForceConstants:
         """How far the three acoustic modes at Gamma are from zero.
 
         The cleanest single check on a set of force constants: translating the
-        crystal costs no energy, so three frequencies at `q = 0` must vanish.
-        Anything left is the residue of the acoustic sum rule and of noise in
-        the finite differences.
+        crystal costs no energy, so the dynamical matrix must send the uniform
+        translations to zero. The largest amount it moves one by, as a
+        frequency, is the residue of the acoustic sum rule. It is measured on
+        the translations themselves rather than as the lowest frequencies, which
+        would report an imaginary optical mode instead.
         """
-        return float(np.abs(self.frequencies(np.zeros(3), units=units)[:3]).max())
+        translations = self._translation_basis()[:, :3]
+        moved = self.dynamical_matrix(np.zeros(3)).real @ translations
+        return float(_omega(np.linalg.norm(moved, 2)) * _unit_factor(units))
 
 
 def _unit_factor(units: str) -> float:
