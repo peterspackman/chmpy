@@ -178,6 +178,42 @@ For a noisy model, `elastic_tensor(..., strain="auto")` keeps increasing the
 strain until the tensor's own noise estimate is acceptable. The result reports
 `noise_fraction`, and it logs a warning if the tensor should not be trusted.
 
+## Mode symmetry
+
+`gamma_modes` gives the irreducible representations of a crystal's modes at
+Gamma, and which are infrared or Raman active, from its symmetry alone.
+`label_gamma_modes` labels the modes computed from a set of force constants.
+For molecular crystals, `rigid_body_fractions` gives how much of each mode is
+whole-molecule translation or libration:
+
+``` python
+from chmpy.vib import gamma_modes, label_gamma_modes, rigid_body_fractions
+
+print(gamma_modes(naphthalene))
+# optical: 27Ag + 27Bg + 26Au + 25Bu
+# infrared: 26Au + 25Bu
+# raman: 27Ag + 27Bg
+# silent: none
+
+constants = force_constants(naphthalene, calc)
+modes = label_gamma_modes(naphthalene, constants)
+fractions = rigid_body_fractions(naphthalene, modes)
+for mode, (translation, libration) in zip(modes[:4], fractions[:4]):
+    print(mode, f"{translation:.2f} {libration:.2f}")
+#       0.00  Au + 2Bu             1.00 0.00
+#      34.01  Bg         Raman     0.00 1.00
+#      42.89  Au         IR        0.99 0.00
+#      57.18  Ag         Raman     0.00 1.00
+```
+
+The acoustic modes are the uniform translations, projected out before the
+dynamical matrix is diagonalised. A soft or imaginary optical mode is never
+taken for an acoustic one, and keeps its label: in cubic BaTiO3 the unstable
+mode is the polar T1u. `lattice_modes` gives the lattice modes expected by
+the correlation method, here 3Ag + 3Bg librations and 2Au + Bu translations.
+In a centred cell, modes that belong to the zone boundary of the primitive
+cell are folded onto Gamma, and they are left unlabelled.
+
 ## Vibrational free energies
 
 `thermal_properties` sums the harmonic free energy over a q-mesh, using a set
