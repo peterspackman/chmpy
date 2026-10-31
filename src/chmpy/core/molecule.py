@@ -204,6 +204,11 @@ class Molecule:
         return np.mean(self.positions, axis=0)
 
     @property
+    def mass(self) -> float:
+        "Total mass of the atoms in this molecule, in amu"
+        return float(sum(x.mass for x in self.elements))
+
+    @property
     def center_of_mass(self) -> np.ndarray:
         "Mean cartesian position of atoms in this molecule, weighted by atomic mass"
         if len(self) > 0:

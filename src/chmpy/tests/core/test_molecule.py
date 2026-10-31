@@ -66,6 +66,9 @@ class MoleculeTestCase(unittest.TestCase):
             com, (-0.6664043, -0.0000541773, 0.008478989), rtol=1e-3, atol=1e-5
         )
 
+    def test_mass(self):
+        self.assertAlmostEqual(self.load_water().mass, 18.015, places=2)
+
     def test_repr(self):
         mol = self.load_water()
         expected = "<Molecule (H2O)[-0.67 -0.00 0.01]>"
