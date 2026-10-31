@@ -214,7 +214,7 @@ class SpaceGroup:
             raise ValueError("International spacegroup number must be between 1-230")
         if sg <= 2:
             return "triclinic"
-        if sg <= 16:
+        if sg <= 15:
             return "monoclinic"
         if sg <= 74:
             return "orthorhombic"

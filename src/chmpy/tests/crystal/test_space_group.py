@@ -134,6 +134,20 @@ class SpaceGroupTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             print(sg_bad.crystal_system)
 
+    def test_crystal_system_boundaries(self):
+        ranges = {
+            "triclinic": (1, 2),
+            "monoclinic": (3, 15),
+            "orthorhombic": (16, 74),
+            "tetragonal": (75, 142),
+            "trigonal": (143, 167),
+            "hexagonal": (168, 194),
+            "cubic": (195, 230),
+        }
+        for system, (first, last) in ranges.items():
+            for number in (first, last):
+                self.assertEqual(SpaceGroup(number).crystal_system, system)
+
     def test_lattice_type(self):
         sgs = (
             SpaceGroup(15),
