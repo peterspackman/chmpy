@@ -9,6 +9,7 @@ from chmpy.crystal.space_group import (
     expanded_symmetry_list,
     reduced_symmetry_list,
 )
+from chmpy.crystal.symmetry_operation import LATTICE_TYPE_TRANSLATIONS
 
 LOG = logging.getLogger(__name__)
 
@@ -150,6 +151,22 @@ class SpaceGroupTestCase(unittest.TestCase):
                         sorted(found.symmetry_operations),
                         sorted(sg.symmetry_operations),
                     )
+
+    def test_centering_matches_lattice_translations(self):
+        for number, choices in SG_CHOICES.items():
+            for choice in choices:
+                sg = SpaceGroup(number, choice=choice)
+                translations = sorted(
+                    s
+                    for s in sg.symmetry_operations
+                    if np.array_equal(s.rotation, np.eye(3))
+                )
+                expected = sorted(
+                    SymmetryOperation(np.eye(3), np.array(t))
+                    for t in ((0, 0, 0), *LATTICE_TYPE_TRANSLATIONS[abs(sg.latt)])
+                )
+                with self.subTest(number=number, choice=choice):
+                    self.assertEqual(translations, expected)
 
     def test_latt_is_negative_without_inversion_at_origin(self):
         self.assertEqual(SpaceGroup(48, "1").latt, -1)
