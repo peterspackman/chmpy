@@ -11,6 +11,7 @@ from scipy.spatial import cKDTree as KDTree
 from chmpy.core.element import Element
 from chmpy.core.molecule import Molecule
 from chmpy.util.num import cartesian_product
+from chmpy.util.util import cache_defaults
 
 from .asymmetric_unit import AsymmetricUnit
 from .space_group import SpaceGroup, SymmetryOperation
@@ -152,6 +153,7 @@ class Crystal:
         """
         return self.unit_cell.to_reciprocal(coords)
 
+    @cache_defaults
     def unit_cell_atoms(self, tolerance=1e-2) -> dict:
         """
         Generate all atoms in the unit cell (i.e. with
@@ -164,9 +166,7 @@ class Crystal:
         any atom site in the unit cell has > 1.0 occupancy after
         this.
 
-        Sets the `_unit_cell_atom_dict` member as this is an expensive
-        operation and is worth caching the result. Subsequent calls
-        to this function will be a no-op.
+        The result is cached when called with the default tolerance.
 
         Arguments:
             tolerance (float, optional): Minimum separation of sites in the unit
@@ -187,9 +187,6 @@ class Crystal:
                 occupation: (N) array of occupation numbers for each site. Will
                     warn if any of these are greater than 1.0
         """
-
-        if hasattr(self, "_unit_cell_atom_dict"):
-            return self._unit_cell_atom_dict
         pos = self.site_positions
         atoms = self.site_atoms
         natom = self.nsites
@@ -234,7 +231,7 @@ class Crystal:
         )[mask]
         if np.any(occupation > 1.0 + 1e-6):
             LOG.debug("Some unit cell site occupations are > 1.0")
-        self._unit_cell_atom_dict = {
+        unit_cell_atom_dict = {
             "asym_atom": asym[mask],
             "frac_pos": translated[mask],
             "element": uc_nums[mask],
@@ -243,7 +240,7 @@ class Crystal:
             "occupation": occupation,
             "cart_pos": self.to_cartesian(translated[mask]),
         }
-        return self._unit_cell_atom_dict
+        return unit_cell_atom_dict
 
     def powder_pattern(self, **kwargs):
         """
@@ -261,15 +258,15 @@ class Crystal:
 
         return powder_pattern(self, **kwargs)
 
+    @cache_defaults
     def unit_cell_connectivity(
         self, tolerance=0.4, neighbouring_cells=1, **kwargs
     ) -> tuple:
         """
-        Periodic connectiviy for the unit cell, populates _uc_graph
-        with a networkx.Graph object, where nodes are indices into the
-        _unit_cell_atom_dict arrays and the edges contain the translation
-        (cell) for the image of the corresponding unit cell atom with the
-        higher index to be bonded to the lower
+        Periodic connectivity for the unit cell, as a sparse graph where
+        nodes are indices into the `unit_cell_atoms()` arrays and the edges
+        contain the translation (cell) for the image of the corresponding
+        unit cell atom with the higher index to be bonded to the lower
 
         Bonding is determined by interatomic distances being less than the
         sum of covalent radii for the sites plus the tolerance (provided
@@ -290,9 +287,6 @@ class Crystal:
             the (i, j) value in the dict is the cell translation on j which
             bonds these two sites
         """
-
-        if hasattr(self, "_uc_graph"):
-            return self._uc_graph
         slab = self.slab(bounds=((-1, -1, -1), (1, 1, 1)))
         n_uc = slab["n_uc"]
         uc_pos = slab["frac_pos"][:n_uc]
@@ -339,9 +333,9 @@ class Crystal:
             uc_graph[i, j] = d
             properties[(i, j)] = cell
 
-        self._uc_graph = uc_graph, properties
-        return self._uc_graph
+        return uc_graph, properties
 
+    @cache_defaults
     def unit_cell_molecules(self, bond_tolerance=0.4, **kwargs) -> list[Molecule]:
         """
         Calculate the molecules for all sites in the unit cell,
@@ -358,9 +352,6 @@ class Crystal:
             If the asymmetric is molecular, the list will be of length
             num_molecules_in_asymmetric_unit * num_symm_operations
         """
-
-        if hasattr(self, "_unit_cell_molecules"):
-            return self._unit_cell_molecules
         self._warn_if_disordered("molecules")
         uc_graph, edge_cells = self.unit_cell_connectivity(
             tolerance=bond_tolerance, **kwargs
@@ -368,7 +359,7 @@ class Crystal:
         n_uc_mols, uc_mols = csgraph.connected_components(
             csgraph=uc_graph, directed=False, return_labels=True
         )
-        uc_dict = self._unit_cell_atom_dict
+        uc_dict = self.unit_cell_atoms()
         uc_frac = uc_dict["frac_pos"]
         uc_elements = uc_dict["element"]
         uc_asym = uc_dict["asym_atom"]
@@ -411,7 +402,6 @@ class Crystal:
             translation = self.to_cartesian(new_centroid - frac_centroid)
             mol.translate(translation)
             molecules.append(mol)
-        self._unit_cell_molecules = molecules
         return molecules
 
     def molecular_shell(
@@ -470,6 +460,7 @@ class Crystal:
             result[f].append(m)
         return result
 
+    @cache_defaults
     def symmetry_unique_molecules(self, bond_tolerance=0.4, **kwargs) -> list[Molecule]:
         """
         Calculate a list of connected molecules which contain
@@ -491,9 +482,6 @@ class Crystal:
             num_molecules_in_asymmetric_unit and the total number of atoms
             will be equal to the number of atoms in the asymmetric_unit
         """
-
-        if hasattr(self, "_symmetry_unique_molecules"):
-            return self._symmetry_unique_molecules
         uc_molecules = self.unit_cell_molecules(bond_tolerance=bond_tolerance, **kwargs)
         asym_atoms = np.zeros(len(self.asymmetric_unit), dtype=bool)
         molecules = []
@@ -511,7 +499,6 @@ class Crystal:
             if np.all(asym_atoms):
                 break
         LOG.debug("%d symmetry unique molecules", len(molecules))
-        self._symmetry_unique_molecules = molecules
         for i, mol in enumerate(molecules):
             mol.properties["asym_mol_idx"] = i
 
@@ -846,6 +833,7 @@ class Crystal:
 
         return promolecule_density_isosurfaces(self, **kwargs)
 
+    @cache_defaults
     def unit_cell_coordination_numbers(self) -> np.ndarray:
         """
         Calculate the coordination numbers for the unit cell atoms of this
@@ -854,17 +842,14 @@ class Crystal:
         Returns:
             an `ndarray` of coordination numbers for the unit cell atoms.
         """
-        if hasattr(self, "_unit_cell_coordination_numbers"):
-            return self._unit_cell_coordination_numbers
 
         from chmpy.crystal.eeq_pbc import calculate_coordination_numbers_crystal
 
         # Calculate coordination numbers with PBC
         cn = calculate_coordination_numbers_crystal(self)
-        self._unit_cell_coordination_numbers = cn.astype(np.float32)
+        return cn.astype(np.float32)
 
-        return self._unit_cell_coordination_numbers
-
+    @cache_defaults
     def asymmetric_unit_coordination_numbers(self) -> np.ndarray:
         """
         Calculate the coordination numbers for the asymmetric unit of this
@@ -873,9 +858,6 @@ class Crystal:
         Returns:
             an `ndarray` of coordination numbers for the asymmetric unit atoms.
         """
-        if hasattr(self, "_asymmetric_unit_coordination_numbers"):
-            return self._asymmetric_unit_coordination_numbers
-
         # Get unit cell coordination numbers
         uc_cn = self.unit_cell_coordination_numbers()
         uc_atoms = self.unit_cell_atoms()
@@ -886,9 +868,9 @@ class Crystal:
             asym_idx = uc_atoms["asym_atom"][i]
             asym_cn[asym_idx] = cn
 
-        self._asymmetric_unit_coordination_numbers = asym_cn
         return asym_cn
 
+    @cache_defaults
     def unit_cell_partial_charges(self, method="eeq") -> np.ndarray:
         """
         Calculate the partial charges for the unit cell atoms of this
@@ -900,9 +882,6 @@ class Crystal:
         Returns:
             an `ndarray` of partial charges for the unit cell atoms.
         """
-        if hasattr(self, "_unit_cell_partial_charges"):
-            return self._unit_cell_partial_charges
-
         method = method.lower()
 
         if method == "eeq":
@@ -939,8 +918,7 @@ class Crystal:
                     if i < len(uc_indices):
                         charges[uc_indices[i]] = charge
 
-        self._unit_cell_partial_charges = charges.astype(np.float32)
-        return charges
+        return charges.astype(np.float32)
 
     def asymmetric_unit_partial_charges(self, method="eeq") -> np.ndarray:
         """
@@ -1957,17 +1935,14 @@ class Crystal:
         self._clear_cached_structure()
 
     def _clear_cached_structure(self):
-        "Forget everything derived from the atomic positions"
-        for name in (
-            "_unit_cell_atom_dict",
-            "_uc_graph",
-            "_unit_cell_molecules",
-            "_symmetry_unique_molecules",
-            "_unit_cell_coordination_numbers",
-            "_asymmetric_unit_coordination_numbers",
-            "_unit_cell_partial_charges",
-        ):
-            self.__dict__.pop(name, None)
+        """
+        Forget everything derived from the atomic positions.
+
+        The method erases all attributes that start with '_cached'.
+        """
+        for attr in list(self.__dict__.keys()):
+            if attr.startswith("_cached"):
+                self.__dict__.pop(attr)
 
     def _warn_if_disordered(self, what):
         """Say so, once, before deriving ``what`` from overlapping alternatives.
