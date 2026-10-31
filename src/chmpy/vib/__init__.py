@@ -38,13 +38,14 @@ from .einstein_debye import (
     gamma_einstein_debye,
 )
 from .force_constants import ForceConstants, force_constants, symmetrise
-from .modes import GammaModes, gamma_modes
+from .modes import GammaMode, GammaModes, gamma_modes, label_gamma_modes
 from .thermo import ThermalProperties, q_mesh, thermal_properties
 
 __all__ = [
     "DebyeModel",
     "EinsteinDebye",
     "ForceConstants",
+    "GammaMode",
     "GammaModes",
     "ThermalProperties",
     "christoffel_velocities",
@@ -55,6 +56,7 @@ __all__ = [
     "einstein_debye_properties",
     "force_constants",
     "gamma_modes",
+    "label_gamma_modes",
     "gamma_einstein_debye",
     "phonon_velocities",
     "q_mesh",

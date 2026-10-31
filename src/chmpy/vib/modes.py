@@ -20,6 +20,8 @@ import numpy as np
 
 from chmpy.crystal.character_table import CharacterTable
 
+from .force_constants import _omega, _unit_factor
+
 #: two fractional positions are the same site within this
 SITE_TOLERANCE = 1e-3
 
@@ -113,15 +115,138 @@ def gamma_modes(crystal) -> GammaModes:
     )
 
 
-def _counts(table: CharacterTable, multiplicities) -> dict[str, int]:
-    "The non-zero multiplicities, by label, in the table's order"
+@dataclass(frozen=True, eq=False)
+class GammaMode:
+    """One set of vibrations at Gamma, degenerate by symmetry.
+
+    Attributes:
+        frequency: in the units asked for; negative for an imaginary mode
+        label: its representation, e.g. "E2g"; a sum for the acoustic set
+            (e.g. "A2u + E1u"); "" for modes of a centred cell that belong to
+            the zone boundary of the primitive cell and are folded onto Gamma
+        degeneracy: how many modes the set holds
+        acoustic: whether the set is the three uniform translations
+        infrared: whether it is infrared active
+        raman: whether it is Raman active
+        vectors: (3N, degeneracy) orthonormal mass-weighted eigenvectors
+    """
+
+    frequency: float
+    label: str
+    degeneracy: int
+    acoustic: bool
+    infrared: bool
+    raman: bool
+    vectors: np.ndarray
+
+    def __str__(self) -> str:
+        active = [x for x, on in (("IR", self.infrared), ("Raman", self.raman)) if on]
+        return f"{self.frequency:10.2f}  {self.label or '-':<10} {', '.join(active)}"
+
+
+def label_gamma_modes(
+    crystal, constants, units: str = "cm-1", tolerance: float = 0.1
+) -> list[GammaMode]:
+    """Label computed vibrations at Gamma by their symmetry.
+
+    The uniform translations are projected out first, as in
+    `ForceConstants.optical_frequencies`, and reported as one acoustic set.
+    Optical frequencies within `tolerance` of each other form one set, whose
+    characters are the traces of each operation on its eigenvectors, averaged
+    over the operations of each class (centring translations included).
+
+    Args:
+        crystal: the `Crystal` the force constants were measured on
+        constants: its `ForceConstants`
+        units: "cm-1", "thz" or "rad/s", for the frequencies reported
+        tolerance: largest splitting within a degenerate set, in cm-1
+
+    Returns:
+        list of GammaMode: the acoustic set, then optical sets low to high
+
+    Raises:
+        ValueError: if the force constants are for a different structure, or a
+            set does not carry a representation (try another `tolerance`)
+    """
+    from chmpy.calc.system import System
+    from chmpy.opt.symmetry import crystal_atom_map
+
+    symmetry = gamma_modes(crystal)
+    table = symmetry.table
+    system = System.from_crystal(crystal)
+    if len(system) != constants.n_atoms or not np.allclose(
+        system.positions, constants.positions, atol=1e-6
+    ):
+        raise ValueError("the force constants are for a different structure")
+
+    atom_map = crystal_atom_map(crystal, system)
+    rotations = atom_map.cartesian(constants.cell)
+    fractional = np.rint(atom_map.rotations)
+    classes = table.classes_of(fractional)
+    centring = np.all(fractional == np.eye(3), axis=(1, 2)).sum()
+    # averages a character over each class's operations
+    average = np.zeros((len(table.classes), len(classes)))
+    average[classes, np.arange(len(classes))] = 1 / (
+        centring * table.class_sizes[classes]
+    )
+    n = constants.n_atoms
+
+    def mode(frequency, vectors, acoustic) -> GammaMode:
+        x = vectors.reshape(n, 3, -1)
+        traces = np.einsum("gnam,gab,nbm->g", x[atom_map.permutation], rotations, x)
+        multiplicities = table.reduce(average @ traces)
+        counts = _integral(table, multiplicities)
+        if counts is None:
+            raise ValueError(
+                f"the modes near {frequency:.3f} {units} do not carry a "
+                f"representation (multiplicities {np.round(multiplicities, 2)}); "
+                "try a different tolerance"
+            )
+        return GammaMode(
+            frequency=frequency,
+            label=_terms(counts) if counts else "",
+            degeneracy=vectors.shape[1],
+            acoustic=acoustic,
+            infrared=not acoustic and not symmetry.infrared.isdisjoint(counts),
+            raman=not acoustic and not symmetry.raman.isdisjoint(counts),
+            vectors=vectors,
+        )
+
+    root_mass = np.sqrt(constants.masses)
+    translations = np.linalg.qr(np.kron(root_mass[:, None], np.eye(3)))[0]
+    complement = constants._translation_complement()
+    matrix = constants.dynamical_matrix(np.zeros(3)).real
+    projected = complement.T @ matrix @ complement
+    values, vectors = np.linalg.eigh(0.5 * (projected + projected.T))
+    optical = complement @ vectors
+    per_cm = _omega(values) * _unit_factor("cm-1")
+    scale = _unit_factor(units) / _unit_factor("cm-1")
+
+    sets = np.split(
+        np.arange(len(values)), np.flatnonzero(np.diff(per_cm) > tolerance) + 1
+    )
+    return [mode(0.0, translations, True)] + [
+        mode(float(per_cm[s].mean() * scale), optical[:, s], False) for s in sets
+    ]
+
+
+def _integral(table: CharacterTable, multiplicities) -> dict[str, int] | None:
+    "The non-zero multiplicities by label, or None if they are not integers"
     rounded = np.rint(multiplicities)
     if not np.allclose(rounded, multiplicities, atol=1e-6):
+        return None
+    return _nonzero(dict(zip(table.labels, rounded.astype(int).tolist(), strict=True)))
+
+
+def _counts(table: CharacterTable, multiplicities) -> dict[str, int]:
+    "The non-zero multiplicities, by label, in the table's order"
+    counts = _integral(table, multiplicities)
+    if counts is None:
         raise ValueError(
             "the structure does not have its space group's symmetry: "
             f"non-integer multiplicities {np.round(multiplicities, 3).tolist()}"
         )
-    return _nonzero(dict(zip(table.labels, rounded.astype(int).tolist(), strict=True)))
+    return counts
 
 
 def _nonzero(counts: dict[str, int]) -> dict[str, int]:
