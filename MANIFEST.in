@@ -1,4 +1,4 @@
-include README.md LICENSE.txt CHANGELOG.rst CITATION.cff
+include README.md LICENSE.txt CITATION.cff
 recursive-include src/chmpy *.npz *.json *.jinja2
 recursive-include src/chmpy/tests/test_files *
 prune local
