@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from chmpy.crystal.character_table import CharacterTable, hall_character_table
 from chmpy.crystal.hall_symbol import parse_hall_symbol
 from chmpy.crystal.symmetry_operation import SymmetryOperation
 
@@ -21,6 +22,11 @@ class PointGroup:
     def symmetry_operations(self) -> list[SymmetryOperation]:
         "The operations of this point group, in its crystallographic setting"
         return parse_hall_symbol(self.hall)
+
+    @property
+    def character_table(self) -> CharacterTable:
+        "Characters of the physically irreducible representations"
+        return hall_character_table(self.hall)
 
     @classmethod
     def from_number(cls, number, choice=None):
