@@ -81,26 +81,9 @@ def gamma_modes(crystal) -> GammaModes:
     Returns:
         GammaModes
     """
-    space_group = crystal.space_group
-    table = space_group.point_group.character_table
-    positions = crystal.unit_cell_atoms()["frac_pos"]
-    operations = space_group.symmetry_operations
-    rotations = np.rint([s.rotation for s in operations]).astype(np.int64)
-    translations = np.array([s.translation for s in operations])
-    pure = np.all(rotations == np.eye(3, dtype=np.int64), axis=(1, 2))
-    centring = translations[pure]
-
-    classes = table.classes_of(rotations)
-    first = np.array(
-        [np.flatnonzero(classes == k)[0] for k in range(len(table.classes))]
-    )
-    r, t = rotations[first], translations[first]
-
-    # (class, atom, centring, 3): image of each atom less itself and a centring
-    images = np.einsum("kij,nj->kni", r, positions) + t[:, None, :]
-    offset = images[:, :, None, :] - positions[None, :, None, :] - centring
-    on_site = np.all(np.abs(offset - np.rint(offset)) < SITE_TOLERANCE, axis=-1)
-    fixed = on_site.any(axis=-1).sum(axis=1) / len(centring)
+    table = crystal.space_group.point_group.character_table
+    r, t, centring = _class_operations(crystal.space_group, table)
+    fixed = _fixed(crystal.unit_cell_atoms()["frac_pos"], r, t, centring)
 
     traces = np.trace(r, axis1=1, axis2=2)
     squares = np.einsum("kij,kji->k", r, r)
@@ -113,6 +96,101 @@ def gamma_modes(crystal) -> GammaModes:
         infrared=frozenset(vector),
         raman=frozenset(polarisability),
     )
+
+
+def lattice_modes(crystal) -> dict[str, dict[str, int]]:
+    """The symmetry of a molecular crystal's optical lattice modes at Gamma.
+
+    By the correlation method: whole-molecule translations carry the vector
+    representation and rotations the axial one, on the molecules each
+    operation maps onto themselves. The acoustic modes are taken from the
+    translations.
+
+    Returns:
+        {"translation": ..., "libration": ...}, each a multiplicity by label
+    """
+    table = crystal.space_group.point_group.character_table
+    r, t, centring = _class_operations(crystal.space_group, table)
+    centres = np.array(
+        [crystal.to_fractional(m.center_of_mass) for m in crystal.unit_cell_molecules()]
+    )
+    fixed = _fixed(centres, r, t, centring)
+    traces = np.trace(r, axis1=1, axis2=2)
+    axial = np.rint(np.linalg.det(r)) * traces
+    acoustic = gamma_modes(crystal).acoustic
+    translation = _counts(table, table.reduce(fixed * traces))
+    return {
+        "translation": _nonzero(
+            {k: n - acoustic.get(k, 0) for k, n in translation.items()}
+        ),
+        "libration": _counts(table, table.reduce(fixed * axial)),
+    }
+
+
+def rigid_body_fractions(crystal, modes) -> np.ndarray:
+    """How much of each set of modes moves whole molecules.
+
+    Each molecule's rigid translations, and rotations about its centre of
+    mass, are mass-weighted displacements orthogonal to each other and to every
+    other molecule's; the squared projection of a set's eigenvectors onto them
+    is the share of its kinetic energy in translation and in libration.
+
+    Args:
+        crystal: the `Crystal` the modes are of, with its molecules
+        modes: `GammaMode`s, e.g. from `label_gamma_modes`
+
+    Returns:
+        (len(modes), 2) fraction of each set in translation and in libration,
+        averaged over the set's modes
+    """
+    bases = _rigid_body_bases(crystal)
+    return np.array(
+        [
+            [np.sum((basis.T @ m.vectors) ** 2) / m.degeneracy for basis in bases]
+            for m in modes
+        ]
+    )
+
+
+def _rigid_body_bases(crystal):
+    "Orthonormal mass-weighted (3N, 3Z) translations and (3N, <= 3Z) rotations"
+    n = len(crystal.unit_cell_atoms()["element"])
+    translations, rotations = [], []
+    for molecule in crystal.unit_cell_molecules():
+        atoms = np.asarray(molecule.properties["unit_cell_atoms"])
+        root_mass = np.sqrt([e.mass for e in molecule.elements])[:, None]
+        arm = molecule.positions - molecule.center_of_mass
+        columns = np.zeros((2, 3, n, 3))
+        for a, axis in enumerate(np.eye(3)):
+            columns[0, a, atoms] = root_mass * axis
+            columns[1, a, atoms] = root_mass * np.cross(axis, arm)
+        translations.append(columns[0].reshape(3, -1).T / np.sqrt(molecule.mass))
+        # a rotation about an axis a linear molecule lies on moves nothing
+        u, sizes, _ = np.linalg.svd(columns[1].reshape(3, -1).T, full_matrices=False)
+        rotations.append(u[:, sizes > 1e-8 * sizes.max()])
+    return np.hstack(translations), np.hstack(rotations)
+
+
+def _class_operations(space_group, table: CharacterTable):
+    """One operation of each class, as rotations and translations, and the
+    centring translations"""
+    operations = space_group.symmetry_operations
+    rotations = np.rint([s.rotation for s in operations]).astype(np.int64)
+    translations = np.array([s.translation for s in operations])
+    pure = np.all(rotations == np.eye(3, dtype=np.int64), axis=(1, 2))
+    classes = table.classes_of(rotations)
+    first = [np.flatnonzero(classes == k)[0] for k in range(len(table.classes))]
+    return rotations[first], translations[first], translations[pure]
+
+
+def _fixed(points, rotations, translations, centring) -> np.ndarray:
+    """How many of the primitive cell's points each operation leaves in place,
+    up to a lattice or centring translation"""
+    # (operation, point, centring, 3): image of each point less itself
+    images = np.einsum("kij,nj->kni", rotations, points) + translations[:, None, :]
+    offset = images[:, :, None, :] - points[None, :, None, :] - centring
+    on_site = np.all(np.abs(offset - np.rint(offset)) < SITE_TOLERANCE, axis=-1)
+    return on_site.any(axis=-1).sum(axis=1) / len(centring)
 
 
 @dataclass(frozen=True, eq=False)
@@ -153,16 +231,20 @@ def label_gamma_modes(
     `ForceConstants.optical_frequencies`, and reported as one acoustic set.
     Optical frequencies within `tolerance` of each other form one set, whose
     characters are the traces of each operation on its eigenvectors, averaged
-    over the operations of each class (centring translations included).
+    over the operations of each class (centring translations included). A set
+    holding more than one representation, from an accidental degeneracy, is
+    split with the projector onto each, so each mode gets a single label.
 
     Args:
         crystal: the `Crystal` the force constants were measured on
         constants: its `ForceConstants`
         units: "cm-1", "thz" or "rad/s", for the frequencies reported
-        tolerance: largest splitting within a degenerate set, in cm-1
+        tolerance: largest splitting within a degenerate set, in cm-1; too
+            large only costs time, too small can break a degenerate set
 
     Returns:
-        list of GammaMode: the acoustic set, then optical sets low to high
+        list of GammaMode: the acoustic set, then one per copy of each
+        representation among the optical modes, low to high
 
     Raises:
         ValueError: if the force constants are for a different structure, or a
@@ -189,45 +271,90 @@ def label_gamma_modes(
     average[classes, np.arange(len(classes))] = 1 / (
         centring * table.class_sizes[classes]
     )
-    n = constants.n_atoms
+    n, g = constants.n_atoms, len(classes)
+    # the projector onto representation i is scale_i * sum_g chi_i(g) D(g)
+    per_operation = table.characters[:, classes] / centring
+    scale = table.characters[:, 0] / (table.norms * table.order)
+    to_units = _unit_factor(units)
+    matrix = constants.dynamical_matrix(np.zeros(3)).real
 
-    def mode(frequency, vectors, acoustic) -> GammaMode:
+    def images(vectors) -> np.ndarray:
+        "(G, 3N, M): each operation applied to each column of `vectors`"
         x = vectors.reshape(n, 3, -1)
-        traces = np.einsum("gnam,gab,nbm->g", x[atom_map.permutation], rotations, x)
+        out = np.empty((g, *x.shape))
+        out[np.arange(g)[:, None], atom_map.permutation] = np.einsum(
+            "gab,nbm->gnam", rotations, x
+        )
+        return out.reshape(g, 3 * n, -1)
+
+    def make(vectors, label, acoustic=False) -> GammaMode:
+        curvature = np.linalg.eigvalsh(vectors.T @ matrix @ vectors).mean()
+        return GammaMode(
+            frequency=0.0 if acoustic else float(_omega(curvature) * to_units),
+            label=label,
+            degeneracy=vectors.shape[1],
+            acoustic=acoustic,
+            infrared=not acoustic and label in symmetry.infrared,
+            raman=not acoustic and label in symmetry.raman,
+            vectors=vectors,
+        )
+
+    def split(vectors) -> list[GammaMode]:
+        "One GammaMode per copy of each representation in a set of modes"
+        moved = images(vectors)
+        traces = np.einsum("gim,im->g", moved, vectors)
         multiplicities = table.reduce(average @ traces)
         counts = _integral(table, multiplicities)
         if counts is None:
             raise ValueError(
-                f"the modes near {frequency:.3f} {units} do not carry a "
-                f"representation (multiplicities {np.round(multiplicities, 2)}); "
+                f"modes near {make(vectors, '').frequency:.3f} {units} do not carry "
+                f"a representation (multiplicities {np.round(multiplicities, 2)}); "
                 "try a different tolerance"
             )
-        return GammaMode(
-            frequency=frequency,
-            label=_terms(counts) if counts else "",
-            degeneracy=vectors.shape[1],
-            acoustic=acoustic,
-            infrared=not acoustic and not symmetry.infrared.isdisjoint(counts),
-            raman=not acoustic and not symmetry.raman.isdisjoint(counts),
-            vectors=vectors,
-        )
+        modes, gamma = [], np.zeros_like(vectors)
+        for label, count in counts.items():
+            i = table.labels.index(label)
+            projected = scale[i] * np.einsum("g,gim->im", per_operation[i], moved)
+            gamma += projected
+            basis = _range(projected)
+            # within one representation the eigenvalues come in exact multiplets
+            _, rotation = np.linalg.eigh(basis.T @ matrix @ basis)
+            basis = basis @ rotation
+            dim = int(table.characters[i, 0])
+            modes += [
+                make(basis[:, k : k + dim], label) for k in range(0, count * dim, dim)
+            ]
+        folded = _range(vectors - gamma)
+        if folded.shape[1]:
+            modes.append(make(folded, ""))
+        return modes
 
     root_mass = np.sqrt(constants.masses)
     translations = np.linalg.qr(np.kron(root_mass[:, None], np.eye(3)))[0]
+    acoustic = _integral(
+        table,
+        table.reduce(
+            average @ np.einsum("gim,im->g", images(translations), translations)
+        ),
+    )
     complement = constants._translation_complement()
-    matrix = constants.dynamical_matrix(np.zeros(3)).real
     projected = complement.T @ matrix @ complement
     values, vectors = np.linalg.eigh(0.5 * (projected + projected.T))
     optical = complement @ vectors
     per_cm = _omega(values) * _unit_factor("cm-1")
-    scale = _unit_factor(units) / _unit_factor("cm-1")
-
     sets = np.split(
         np.arange(len(values)), np.flatnonzero(np.diff(per_cm) > tolerance) + 1
     )
-    return [mode(0.0, translations, True)] + [
-        mode(float(per_cm[s].mean() * scale), optical[:, s], False) for s in sets
-    ]
+    modes = [m for s in sets for m in split(optical[:, s])]
+    return [make(translations, _terms(acoustic), acoustic=True)] + sorted(
+        modes, key=lambda m: m.frequency
+    )
+
+
+def _range(projected) -> np.ndarray:
+    "Orthonormal basis for the range of a projector applied to orthonormal columns"
+    u, sizes, _ = np.linalg.svd(projected, full_matrices=False)
+    return u[:, sizes > 0.5]
 
 
 def _integral(table: CharacterTable, multiplicities) -> dict[str, int] | None:

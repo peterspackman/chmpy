@@ -5,7 +5,12 @@ import pytest
 
 from chmpy import Crystal
 from chmpy.crystal import AsymmetricUnit, SpaceGroup, UnitCell
-from chmpy.vib import gamma_modes, label_gamma_modes
+from chmpy.vib import (
+    gamma_modes,
+    label_gamma_modes,
+    lattice_modes,
+    rigid_body_fractions,
+)
 
 
 def crystal(number, lengths, angles, sites):
@@ -153,7 +158,7 @@ def test_modes_folded_into_a_centred_cell_are_not_labelled():
     fcc = crystal(225, [5.3] * 3, [90] * 3, [("Ar", (0, 0, 0))])
     calc = LennardJones(epsilon=0.0103, sigma=3.4, cutoff=8.0)
     modes = label_gamma_modes(fcc, force_constants(fcc, calc, cutoff=8.0))
-    assert [m.label for m in modes if m.acoustic] == ["T1u"]
+    assert [(m.label, m.infrared) for m in modes if m.acoustic] == [("T1u", False)]
     assert {m.label for m in modes if not m.acoustic} == {""}
     assert sum(m.degeneracy for m in modes if not m.acoustic) == 9
 
@@ -161,3 +166,83 @@ def test_modes_folded_into_a_centred_cell_are_not_labelled():
 def test_force_constants_of_another_structure_are_refused(hcp_argon, rock_salt):
     with pytest.raises(ValueError, match="different structure"):
         label_gamma_modes(rock_salt, hcp_argon[1])
+
+
+@pytest.fixture(scope="module")
+def acetic_acid():
+    from pathlib import Path
+
+    return Crystal.load(Path(__file__).parents[1] / "test_files" / "acetic_acid.res")
+
+
+@pytest.fixture(scope="module")
+def centrosymmetric():
+    "Two planar four-atom molecules on inversion centres in P2_1/c"
+    cell = UnitCell.from_lengths_and_angles([8, 6, 8], [90, 100, 90], unit="degrees")
+    cartesian = np.array([[0.6, 0.0, 0.0], [1.0, 1.1, 0.3]])
+    asym = AsymmetricUnit.from_records(
+        [
+            {"label": label, "element": e, "position": p}
+            for label, e, p in zip(
+                ("C1", "O1"), ("C", "O"), cell.to_fractional(cartesian), strict=True
+            )
+        ]
+    )
+    return Crystal(cell, SpaceGroup(14), asym)
+
+
+def test_lattice_modes_on_general_positions(acetic_acid):
+    modes = lattice_modes(acetic_acid)
+    assert modes["translation"] == {"A1": 2, "A2": 3, "B1": 2, "B2": 2}
+    assert modes["libration"] == {"A1": 3, "A2": 3, "B1": 3, "B2": 3}
+
+
+def test_lattice_modes_of_molecules_on_inversion_centres(centrosymmetric):
+    modes = lattice_modes(centrosymmetric)
+    assert modes["libration"] == {"Ag": 3, "Bg": 3}
+    assert modes["translation"] == {"Au": 2, "Bu": 1}
+
+
+def _modes(vectors, sizes):
+    "GammaModes holding consecutive columns of `vectors`"
+    from chmpy.vib import GammaMode
+
+    edges = np.cumsum([0, *sizes])
+    return [
+        GammaMode(0.0, "", int(b - a), False, False, False, vectors[:, a:b])
+        for a, b in zip(edges[:-1], edges[1:], strict=True)
+    ]
+
+
+def test_rigid_body_fractions_of_any_complete_set_count_the_molecules(acetic_acid):
+    n = 3 * len(acetic_acid.unit_cell_atoms()["element"])
+    basis = np.linalg.qr(np.random.default_rng(1).normal(size=(n, n)))[0]
+    sizes = [1, 2, 3] * (n // 6) + [1] * (n % 6)
+    modes = _modes(basis, sizes)
+    fractions = rigid_body_fractions(acetic_acid, modes)
+    totals = (fractions * [[m.degeneracy] for m in modes]).sum(axis=0)
+    np.testing.assert_allclose(totals, [12, 12], atol=1e-9)
+
+
+def test_a_rigid_translation_is_all_translation(centrosymmetric):
+    from chmpy.core import Element
+
+    elements = centrosymmetric.unit_cell_atoms()["element"]
+    root_mass = np.sqrt([Element[z].mass for z in elements])
+    vector = np.kron(root_mass, [0.0, 1.0, 0.0])
+    modes = _modes((vector / np.linalg.norm(vector))[:, None], [1])
+    np.testing.assert_allclose(
+        rigid_body_fractions(centrosymmetric, modes), [[1, 0]], atol=1e-12
+    )
+
+
+def test_accidentally_degenerate_sets_are_split_by_symmetry(hcp_argon):
+    structure, constants = hcp_argon
+    lumped = label_gamma_modes(structure, constants, tolerance=1e4)
+    separate = label_gamma_modes(structure, constants)
+    assert [(m.label, m.degeneracy) for m in lumped] == [
+        (m.label, m.degeneracy) for m in separate
+    ]
+    np.testing.assert_allclose(
+        [m.frequency for m in lumped], [m.frequency for m in separate], atol=1e-6
+    )
