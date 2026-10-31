@@ -14,6 +14,7 @@ from chmpy.vib import (
     compare_with_elastic,
     density,
     force_constants,
+    phonon_velocities,
 )
 from chmpy.vib.christoffel import full_tensor
 
@@ -357,3 +358,19 @@ def test_the_acoustic_error_is_not_fooled_by_an_imaginary_mode():
     constants = force_constants(crystal, calc, cutoff=8.0)
     assert constants.optical_frequencies("cm-1").min() < -1
     assert constants.acoustic_error() < 1e-3
+
+
+def test_sound_velocities_skip_an_imaginary_optical_mode():
+    cell = UnitCell.from_lengths_and_angles(
+        (4.6, 4.6, 4.6 * np.sqrt(8 / 3)), np.radians((90, 90, 120))
+    )
+    crystal = Crystal(
+        cell,
+        SpaceGroup(194),
+        AsymmetricUnit([Element[18]], np.array([[1 / 3, 2 / 3, 1 / 4]])),
+    )
+    calc = LennardJones(epsilon=0.0103, sigma=3.4, cutoff=8.0)
+    constants = force_constants(crystal, calc, cutoff=8.0)
+    for direction in np.eye(3):
+        velocities = phonon_velocities(constants, direction)
+        assert np.all(velocities < 3000), velocities

@@ -23,6 +23,8 @@ from __future__ import annotations
 
 import numpy as np
 
+from .force_constants import _omega
+
 #: amu -> kg, Angstrom^3 -> m^3
 AMU_TO_KG = 1.66053906660e-27
 ANGSTROM3_TO_M3 = 1e-30
@@ -67,7 +69,9 @@ def phonon_velocities(constants, direction, magnitude: float = 1e-4) -> np.ndarr
     """The three acoustic velocities along a direction, from force constants.
 
     Evaluated at a wavevector short enough to be in the linear regime, which
-    is what makes it comparable with `christoffel_velocities`.
+    is what makes it comparable with `christoffel_velocities`. The acoustic
+    branches are the three modes with most weight on the uniform translations,
+    not the three lowest, which would be any imaginary optical modes.
 
     Args:
         constants: a `ForceConstants`
@@ -86,9 +90,12 @@ def phonon_velocities(constants, direction, magnitude: float = 1e-4) -> np.ndarr
     wavevector = magnitude * n
     q = wavevector @ np.asarray(constants.cell).T / (2 * np.pi)
 
-    omega = constants.frequencies(q, units="rad/s")[:3]
+    values, vectors = np.linalg.eigh(constants.dynamical_matrix(q))
+    translations = constants._translation_basis()[:, :3]
+    weight = np.sum(np.abs(translations.T @ vectors) ** 2, axis=0)
+    omega = _omega(values[np.argsort(weight)[-3:]])
     # |k| in inverse metres
-    return np.abs(omega) / (magnitude * 1e10)
+    return np.sort(np.abs(omega)) / (magnitude * 1e10)
 
 
 def compare_with_elastic(constants, c_voigt, directions=None) -> dict:
