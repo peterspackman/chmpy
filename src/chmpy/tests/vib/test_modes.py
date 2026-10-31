@@ -264,3 +264,24 @@ def test_constants_breaking_the_sum_rule_are_refused(hcp_argon):
     with pytest.raises(ValueError, match="sum rule"):
         label_gamma_modes(structure, broken)
     assert label_gamma_modes(structure, symmetrise(broken))
+
+
+def test_single_atoms_have_no_librations(hcp_argon):
+    assert lattice_modes(hcp_argon[0]) == {
+        "translation": {"B1g": 1, "E2g": 1},
+        "libration": {},
+    }
+
+
+def test_lattice_modes_need_molecules(rock_salt):
+    with pytest.raises(ValueError, match="molecular"):
+        lattice_modes(rock_salt)
+
+
+def test_linear_molecules_have_two_librations():
+    co2 = crystal(
+        205, [5.62] * 3, [90] * 3, [("C", (0, 0, 0)), ("O", (0.118, 0.118, 0.118))]
+    )
+    modes = lattice_modes(co2)
+    assert modes["libration"] == {"Eg": 1, "Tg": 2}
+    assert modes["translation"] == {"Au": 1, "Eu": 1, "Tu": 2}

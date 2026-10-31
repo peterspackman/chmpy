@@ -10,6 +10,12 @@ The three acoustic modes span the vector representation (x, y, z). An optical
 mode is infrared active if its representation occurs in the vector
 representation, as the dipole does, and Raman active if it occurs in the
 symmetric square of it, as the polarisability does.
+
+- `gamma_modes`: what the structure's symmetry allows, without force constants
+- `label_gamma_modes`: computed modes, each with its representation
+- `lattice_modes`, `rigid_body_fractions`: for molecular crystals, the lattice
+  modes expected by the correlation method, and how much of each computed
+  mode is whole-molecule translation or libration
 """
 
 from __future__ import annotations
@@ -24,6 +30,8 @@ from .force_constants import _omega, _unit_factor
 
 #: two fractional positions are the same site within this
 SITE_TOLERANCE = 1e-3
+#: largest acoustic sum rule residue, in cm-1, that labelling accepts
+SUM_RULE_TOLERANCE = 1.0
 
 
 @dataclass(frozen=True, eq=False)
@@ -72,127 +80,6 @@ class GammaModes:
         return "\n".join(f"{name}: {_terms(counts)}" for name, counts in lines)
 
 
-def gamma_modes(crystal) -> GammaModes:
-    """The symmetry of a crystal's vibrations at Gamma.
-
-    Args:
-        crystal: a `Crystal`; its space group decides the symmetry
-
-    Returns:
-        GammaModes
-    """
-    table = crystal.space_group.point_group.character_table
-    r, t, centring = _class_operations(crystal.space_group, table)
-    fixed = _fixed(crystal.unit_cell_atoms()["frac_pos"], r, t, centring)
-
-    traces = np.trace(r, axis1=1, axis2=2)
-    squares = np.einsum("kij,kji->k", r, r)
-    vector = _counts(table, table.reduce(traces))
-    polarisability = _counts(table, table.reduce((traces**2 + squares) / 2))
-    return GammaModes(
-        table=table,
-        total=_counts(table, table.reduce(fixed * traces)),
-        acoustic=vector,
-        infrared=frozenset(vector),
-        raman=frozenset(polarisability),
-    )
-
-
-def lattice_modes(crystal) -> dict[str, dict[str, int]]:
-    """The symmetry of a molecular crystal's optical lattice modes at Gamma.
-
-    By the correlation method: whole-molecule translations carry the vector
-    representation and rotations the axial one, on the molecules each
-    operation maps onto themselves. The acoustic modes are taken from the
-    translations.
-
-    Returns:
-        {"translation": ..., "libration": ...}, each a multiplicity by label
-    """
-    table = crystal.space_group.point_group.character_table
-    r, t, centring = _class_operations(crystal.space_group, table)
-    centres = np.array(
-        [crystal.to_fractional(m.center_of_mass) for m in crystal.unit_cell_molecules()]
-    )
-    fixed = _fixed(centres, r, t, centring)
-    traces = np.trace(r, axis1=1, axis2=2)
-    axial = np.rint(np.linalg.det(r)) * traces
-    acoustic = gamma_modes(crystal).acoustic
-    translation = _counts(table, table.reduce(fixed * traces))
-    return {
-        "translation": _nonzero(
-            {k: n - acoustic.get(k, 0) for k, n in translation.items()}
-        ),
-        "libration": _counts(table, table.reduce(fixed * axial)),
-    }
-
-
-def rigid_body_fractions(crystal, modes) -> np.ndarray:
-    """How much of each set of modes moves whole molecules.
-
-    Each molecule's rigid translations, and rotations about its centre of
-    mass, are mass-weighted displacements orthogonal to each other and to every
-    other molecule's; the squared projection of a set's eigenvectors onto them
-    is the share of its kinetic energy in translation and in libration.
-
-    Args:
-        crystal: the `Crystal` the modes are of, with its molecules
-        modes: `GammaMode`s, e.g. from `label_gamma_modes`
-
-    Returns:
-        (len(modes), 2) fraction of each set in translation and in libration,
-        averaged over the set's modes
-    """
-    bases = _rigid_body_bases(crystal)
-    return np.array(
-        [
-            [np.sum((basis.T @ m.vectors) ** 2) / m.degeneracy for basis in bases]
-            for m in modes
-        ]
-    )
-
-
-def _rigid_body_bases(crystal):
-    "Orthonormal mass-weighted (3N, 3Z) translations and (3N, <= 3Z) rotations"
-    n = len(crystal.unit_cell_atoms()["element"])
-    translations, rotations = [], []
-    for molecule in crystal.unit_cell_molecules():
-        atoms = np.asarray(molecule.properties["unit_cell_atoms"])
-        root_mass = np.sqrt([e.mass for e in molecule.elements])[:, None]
-        arm = molecule.positions - molecule.center_of_mass
-        columns = np.zeros((2, 3, n, 3))
-        for a, axis in enumerate(np.eye(3)):
-            columns[0, a, atoms] = root_mass * axis
-            columns[1, a, atoms] = root_mass * np.cross(axis, arm)
-        translations.append(columns[0].reshape(3, -1).T / np.sqrt(molecule.mass))
-        # a rotation about an axis a linear molecule lies on moves nothing
-        u, sizes, _ = np.linalg.svd(columns[1].reshape(3, -1).T, full_matrices=False)
-        rotations.append(u[:, sizes > 1e-8 * sizes.max()])
-    return np.hstack(translations), np.hstack(rotations)
-
-
-def _class_operations(space_group, table: CharacterTable):
-    """One operation of each class, as rotations and translations, and the
-    centring translations"""
-    operations = space_group.symmetry_operations
-    rotations = np.rint([s.rotation for s in operations]).astype(np.int64)
-    translations = np.array([s.translation for s in operations])
-    pure = np.all(rotations == np.eye(3, dtype=np.int64), axis=(1, 2))
-    classes = table.classes_of(rotations)
-    first = [np.flatnonzero(classes == k)[0] for k in range(len(table.classes))]
-    return rotations[first], translations[first], translations[pure]
-
-
-def _fixed(points, rotations, translations, centring) -> np.ndarray:
-    """How many of the primitive cell's points each operation leaves in place,
-    up to a lattice or centring translation"""
-    # (operation, point, centring, 3): image of each point less itself
-    images = np.einsum("kij,nj->kni", rotations, points) + translations[:, None, :]
-    offset = images[:, :, None, :] - points[None, :, None, :] - centring
-    on_site = np.all(np.abs(offset - np.rint(offset)) < SITE_TOLERANCE, axis=-1)
-    return on_site.any(axis=-1).sum(axis=1) / len(centring)
-
-
 @dataclass(frozen=True, eq=False)
 class GammaMode:
     """One set of vibrations at Gamma, degenerate by symmetry.
@@ -219,11 +106,34 @@ class GammaMode:
 
     def __str__(self) -> str:
         active = [x for x, on in (("IR", self.infrared), ("Raman", self.raman)) if on]
-        return f"{self.frequency:10.2f}  {self.label or '-':<10} {', '.join(active)}"
+        return f"{self.frequency:10.2f}  {self.label or '-':<10} {', '.join(active):<9}"
 
 
-#: largest acoustic sum rule residue, in cm-1, that labelling accepts
-SUM_RULE_TOLERANCE = 1.0
+def gamma_modes(crystal) -> GammaModes:
+    """The symmetry of a crystal's vibrations at Gamma.
+
+    Args:
+        crystal: a `Crystal`; its space group decides the symmetry
+
+    Returns:
+        GammaModes
+    """
+    table = crystal.space_group.point_group.character_table
+    r, t, centring = _class_operations(crystal.space_group, table)
+    positions = crystal.unit_cell_atoms()["frac_pos"]
+    fixed = _fixed(positions, r, t, centring).sum(axis=1) / len(centring)
+
+    traces = np.trace(r, axis1=1, axis2=2)
+    squares = np.einsum("kij,kji->k", r, r)
+    vector = _counts(table, table.reduce(traces))
+    polarisability = _counts(table, table.reduce((traces**2 + squares) / 2))
+    return GammaModes(
+        table=table,
+        total=_counts(table, table.reduce(fixed * traces)),
+        acoustic=vector,
+        infrared=frozenset(vector),
+        raman=frozenset(polarisability),
+    )
 
 
 def label_gamma_modes(
@@ -361,6 +271,132 @@ def label_gamma_modes(
     return [make(translations, _terms(acoustic), acoustic=True)] + sorted(
         modes, key=lambda m: m.frequency
     )
+
+
+def lattice_modes(crystal) -> dict[str, dict[str, int]]:
+    """The symmetry of a molecular crystal's optical lattice modes at Gamma.
+
+    By the correlation method: whole-molecule translations carry the vector
+    representation, and rotations the axial one, on the molecules each
+    operation maps onto themselves. A single atom has no rotations and a
+    linear molecule none about its own axis. The acoustic modes are taken from
+    the translations.
+
+    Returns:
+        {"translation": ..., "libration": ...}, each a multiplicity by label
+
+    Raises:
+        ValueError: if the crystal is not molecular
+    """
+    from chmpy.opt.symmetry import cartesian_operations
+
+    molecules = _molecules(crystal)
+    table = crystal.space_group.point_group.character_table
+    r, t, centring = _class_operations(crystal.space_group, table)
+    centres = np.array([crystal.to_fractional(m.center_of_mass) for m in molecules])
+    fixed = _fixed(centres, r, t, centring)
+    cartesian = cartesian_operations(r, crystal.unit_cell.direct)
+    traces = np.trace(r, axis1=1, axis2=2)
+    det = np.rint(np.linalg.det(r))
+
+    rotation = np.zeros(len(r))
+    for m, molecule in enumerate(molecules):
+        _, sizes, axes = np.linalg.svd(molecule.positions - molecule.center_of_mass)
+        rank = int(np.sum(sizes > 1e-3))
+        if rank == 0:
+            continue
+        # a linear molecule's own axis u goes to s u under any operation fixing it
+        own = np.einsum("i,kij,j->k", axes[0], cartesian, axes[0]) if rank == 1 else 0
+        rotation += fixed[:, m] * det * (traces - own)
+    rotation /= len(centring)
+
+    acoustic = gamma_modes(crystal).acoustic
+    count = fixed.sum(axis=1) / len(centring)
+    translation = _counts(table, table.reduce(count * traces))
+    return {
+        "translation": _nonzero(
+            {k: n - acoustic.get(k, 0) for k, n in translation.items()}
+        ),
+        "libration": _counts(table, table.reduce(rotation)),
+    }
+
+
+def rigid_body_fractions(crystal, modes) -> np.ndarray:
+    """How much of each set of modes moves whole molecules.
+
+    Each molecule's rigid translations, and rotations about its centre of
+    mass, are mass-weighted displacements orthogonal to each other and to every
+    other molecule's; the squared projection of a set's eigenvectors onto them
+    is the share of its kinetic energy in translation and in libration.
+
+    Args:
+        crystal: the `Crystal` the modes are of, with its molecules
+        modes: `GammaMode`s, e.g. from `label_gamma_modes`
+
+    Returns:
+        (len(modes), 2) fraction of each set in translation and in libration,
+        averaged over the set's modes
+    """
+    bases = _rigid_body_bases(crystal, _molecules(crystal))
+    return np.array(
+        [
+            [np.sum((basis.T @ m.vectors) ** 2) / m.degeneracy for basis in bases]
+            for m in modes
+        ]
+    )
+
+
+def _molecules(crystal):
+    "The unit cell molecules, or ValueError if any is an infinite network"
+    from chmpy.crystal.slab import is_molecular
+
+    if not is_molecular(crystal):
+        raise ValueError(
+            "lattice modes need a molecular crystal; this one has bonded units "
+            "that extend through the lattice"
+        )
+    return crystal.unit_cell_molecules()
+
+
+def _rigid_body_bases(crystal, molecules):
+    "Orthonormal mass-weighted (3N, 3Z) translations and (3N, <= 3Z) rotations"
+    n = len(crystal.unit_cell_atoms()["element"])
+    translations, rotations = [], []
+    for molecule in molecules:
+        atoms = np.asarray(molecule.properties["unit_cell_atoms"])
+        root_mass = np.sqrt([e.mass for e in molecule.elements])[:, None]
+        arm = molecule.positions - molecule.center_of_mass
+        columns = np.zeros((2, 3, n, 3))
+        for a, axis in enumerate(np.eye(3)):
+            columns[0, a, atoms] = root_mass * axis
+            columns[1, a, atoms] = root_mass * np.cross(axis, arm)
+        translations.append(columns[0].reshape(3, -1).T / np.sqrt(molecule.mass))
+        # a rotation about an axis a linear molecule lies on moves nothing
+        u, sizes, _ = np.linalg.svd(columns[1].reshape(3, -1).T, full_matrices=False)
+        rotations.append(u[:, sizes > 1e-8 * max(sizes.max(), 1e-300)])
+    return np.hstack(translations), np.hstack(rotations)
+
+
+def _class_operations(space_group, table: CharacterTable):
+    """One operation of each class, as rotations and translations, and the
+    centring translations"""
+    operations = space_group.symmetry_operations
+    rotations = np.rint([s.rotation for s in operations]).astype(np.int64)
+    translations = np.array([s.translation for s in operations])
+    pure = np.all(rotations == np.eye(3, dtype=np.int64), axis=(1, 2))
+    classes = table.classes_of(rotations)
+    first = [np.flatnonzero(classes == k)[0] for k in range(len(table.classes))]
+    return rotations[first], translations[first], translations[pure]
+
+
+def _fixed(points, rotations, translations, centring) -> np.ndarray:
+    """(operations, points): whether each operation leaves each point in
+    place, up to a lattice or centring translation"""
+    # (operation, point, centring, 3): image of each point less itself
+    images = np.einsum("kij,nj->kni", rotations, points) + translations[:, None, :]
+    offset = images[:, :, None, :] - points[None, :, None, :] - centring
+    on_site = np.all(np.abs(offset - np.rint(offset)) < SITE_TOLERANCE, axis=-1)
+    return on_site.any(axis=-1)
 
 
 def _range(projected) -> np.ndarray:
