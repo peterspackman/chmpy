@@ -171,6 +171,31 @@ class SpaceGroupTestCase(unittest.TestCase):
     def test_latt_is_negative_without_inversion_at_origin(self):
         self.assertEqual(SpaceGroup(48, "1").latt, -1)
 
+    def test_point_group_matches_setting(self):
+        for number, choice, symbol in (
+            (5, "c1", "112"),
+            (115, "", "-4m2"),
+            (189, "", "-62m"),
+            (26, "cab", "2mm"),
+            (14, "a1", "2/m11"),
+        ):
+            with self.subTest(number=number, choice=choice):
+                sg = SpaceGroup(number, choice=choice)
+                self.assertEqual(sg.point_group.symbol, symbol)
+
+    def test_point_group_has_the_space_group_rotations(self):
+        def rotations(ops):
+            return {SymmetryOperation(s.rotation, np.zeros(3)) for s in ops}
+
+        for number, choices in SG_CHOICES.items():
+            for choice in choices:
+                sg = SpaceGroup(number, choice=choice)
+                expected = rotations(sg.symmetry_operations)
+                with self.subTest(number=number, choice=choice):
+                    self.assertEqual(
+                        rotations(sg.point_group.symmetry_operations), expected
+                    )
+
     def test_crystal_system_boundaries(self):
         ranges = {
             "triclinic": (1, 2),

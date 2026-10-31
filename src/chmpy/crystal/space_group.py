@@ -3,13 +3,15 @@ import logging
 import os
 from collections import namedtuple
 from copy import deepcopy
+from functools import cache
 from itertools import product
 
 import numpy as np
 
 from chmpy.util.text import overline, subscript
 
-from .point_group import PointGroup
+from .hall_symbol import parse_hall_symbol
+from .point_group import POINT_GROUP_FROM_NUMBER, PointGroup
 from .symmetry_operation import (
     SymmetryOperation,
     expanded_symmetry_list,
@@ -93,6 +95,24 @@ SG_DEFAULT_SETTING_CHOICE = {
 }
 
 
+@cache
+def _hall_codes(hall):
+    return frozenset(s.integer_code for s in parse_hall_symbol(hall))
+
+
+@cache
+def _point_group_setting(number, symop_codes):
+    "The tabulated setting of point group `number` matching these rotations"
+    rotations = frozenset(
+        SymmetryOperation(s.rotation, np.zeros(3)).integer_code
+        for s in map(SymmetryOperation.from_integer_code, symop_codes)
+    )
+    for pg in POINT_GROUP_FROM_NUMBER[number]:
+        if _hall_codes(pg.hall) == rotations:
+            return pg
+    return PointGroup.from_number(number)
+
+
 def _is_symmorphic(symmetry_operations, denom=12) -> bool:
     """Return True if a common origin makes every operation translation-free.
 
@@ -165,15 +185,13 @@ class SpaceGroup:
         self.full_symbol = sgdata.full
         self.choice = sgdata.choice
         self.centering = sgdata.centering
-        if choice not in ("b", "c", "R"):
-            choice = None
-        self._point_group = PointGroup.from_number(sgdata.pointgroup, choice=choice)
         self.schoenflies = sgdata.schoenflies
         self.centrosymmetric = sgdata.centrosymmetric
         symops = sgdata.symops
         self.symmetry_operations = [
             SymmetryOperation.from_integer_code(s) for s in symops
         ]
+        self._point_group = _point_group_setting(sgdata.pointgroup, tuple(symops))
         self._sgdata = sgdata
 
     @property
