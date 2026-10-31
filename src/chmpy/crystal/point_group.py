@@ -292,7 +292,7 @@ POINT_GROUP_DATA = (
     PointGroup(17, "-3r", "C3i", "trigonal", "-3", "R"),
     PointGroup(18, "32", "D3", "trigonal", "-3m", "32"),
     PointGroup(18, "321", "D3", "trigonal", "-3m", "321"),
-    PointGroup(18, "3m1", "D3", "trigonal", "-3m", "3m1"),
+    PointGroup(18, "312", "D3", "trigonal", "-3m", "312"),
     PointGroup(18, "32r", "D3", "trigonal", "-3m", "R"),
     PointGroup(19, "3m", "C3v", "trigonal", "-3m", "3m"),
     PointGroup(19, "3m1", "C3v", "trigonal", "-3m", "3m1"),
