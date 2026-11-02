@@ -1,15 +1,19 @@
 import numpy as np
 
 from .cna import StructureType, adaptive_cna, fixed_cna, interval_cna
+from .shape_measure import IDEAL_SHAPES, continuous_shape_measure, shape_measures
 from .symmetry_function_ani1 import SymmetryFunctionsANI1
 
 __all__ = [
+    "IDEAL_SHAPES",
     "selling_scalars",
     "StructureType",
     "SymmetryFunctionsANI1",
     "adaptive_cna",
+    "continuous_shape_measure",
     "fixed_cna",
     "interval_cna",
+    "shape_measures",
 ]
 
 
