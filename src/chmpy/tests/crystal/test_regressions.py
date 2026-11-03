@@ -197,3 +197,50 @@ def test_translation_just_below_one_is_the_identity():
     assert SymmetryOperation.from_string_code(
         "x,y,z-0.0000001"
     ) == SymmetryOperation.from_string_code("x,y,z")
+
+
+def _carbon_chain(length, positions):
+    cell = UnitCell.from_lengths_and_angles(
+        [length, 10, 10], [90, 90, 90], unit="degrees"
+    )
+    asym = AsymmetricUnit.from_records(
+        [
+            {"label": f"C{k}", "element": "C", "position": p}
+            for k, p in enumerate(positions)
+        ]
+    )
+    return Crystal(cell, SpaceGroup(1), asym)
+
+
+def test_a_bond_to_an_atoms_own_image_is_kept():
+    i, j, cells, lengths = _carbon_chain(1.5, [(0, 0, 0)]).unit_cell_bonds()
+    assert (i.tolist(), j.tolist(), cells.tolist()) == ([0], [0], [[1, 0, 0]])
+    assert lengths == pytest.approx([1.5])
+
+
+def test_bonds_to_two_images_of_one_atom_are_both_kept():
+    i, j, cells, _ = _carbon_chain(2.6, [(0, 0, 0), (0.5, 0, 0)]).unit_cell_bonds()
+    assert sorted(
+        zip(i.tolist(), j.tolist(), map(tuple, cells.tolist()), strict=True)
+    ) == [
+        (0, 1, (-1, 0, 0)),
+        (0, 1, (0, 0, 0)),
+    ]
+
+
+def test_unit_cell_bonds_agree_with_the_connectivity():
+    crystal = Crystal.load(TEST_FILES["acetic_acid.cif"])
+    graph, cells = crystal.unit_cell_connectivity()
+    i, j, offsets, lengths = crystal.unit_cell_bonds()
+    assert {
+        (a, b): tuple(c) for a, b, c in zip(i, j, offsets.tolist(), strict=True)
+    } == cells
+    np.testing.assert_allclose(
+        [graph[a, b] for a, b in zip(i, j, strict=True)], lengths
+    )
+
+
+def test_the_connectivity_warns_when_it_cannot_hold_every_bond(caplog):
+    with caplog.at_level("WARNING"):
+        _carbon_chain(2.6, [(0, 0, 0), (0.5, 0, 0)]).unit_cell_connectivity()
+    assert "unit_cell_bonds" in caplog.text

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from itertools import product
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -259,6 +260,60 @@ class Crystal:
         return powder_pattern(self, **kwargs)
 
     @cache_defaults
+    def unit_cell_bonds(self, tolerance=0.4, **kwargs) -> tuple:
+        """
+        Every bond of the unit cell atoms, each listed once, including bonds
+        between an atom and its own periodic image and bonds from one atom to
+        several images of another.
+
+        Bonded when the distance is less than the sum of the covalent radii
+        plus `tolerance`.
+
+        Arguments:
+            tolerance (float, optional):
+                Bonding tolerance (bonded if d < cov_a + cov_b + tolerance)
+            covalent_radii (dict, optional):
+                Covalent radii to use instead of the defaults, by atomic number
+
+        Returns:
+            A tuple of arrays `(i, j, cells, lengths)`: atom `j` in the cell
+            translated by `cells[k]` from atom `i`'s is bonded to atom `i`,
+            with `i < j`, or `i == j` and `cells[k]` lexicographically positive.
+        """
+        atoms = self.unit_cell_atoms()
+        frac, numbers = atoms["frac_pos"], atoms["element"]
+        n = len(numbers)
+        radii_by_number = {
+            x: Element.from_atomic_number(x).cov for x in np.unique(numbers)
+        }
+        radii_by_number.update(kwargs.get("covalent_radii", {}))
+        radii = np.array([radii_by_number[x] for x in numbers])
+
+        cells = np.array(list(product((-1, 0, 1), repeat=3)))
+        images = (frac[None, :, :] + cells[:, None, :]).reshape(-1, 3)
+        home = KDTree(self.to_cartesian(frac))
+        around = KDTree(self.to_cartesian(images))
+        found = home.sparse_distance_matrix(
+            around, max_distance=2 * radii.max() + tolerance, output_type="ndarray"
+        )
+        i, k, d = found["i"], found["j"], found["v"]
+        j, cell = k % n, cells[k // n]
+        bonded = (d > 1e-3) & (d < radii[i] + radii[j] + tolerance)
+        # each bond is found from both ends; keep the end that comes first
+        positive = (cell[:, 0] > 0) | (
+            (cell[:, 0] == 0)
+            & ((cell[:, 1] > 0) | ((cell[:, 1] == 0) & (cell[:, 2] > 0)))
+        )
+        keep = bonded & ((i < j) | ((i == j) & positive))
+        order = np.lexsort((*cell[keep].T[::-1], j[keep], i[keep]))
+        return (
+            i[keep][order],
+            j[keep][order],
+            cell[keep][order],
+            d[keep][order],
+        )
+
+    @cache_defaults
     def unit_cell_connectivity(
         self, tolerance=0.4, neighbouring_cells=1, **kwargs
     ) -> tuple:
@@ -272,14 +327,17 @@ class Crystal:
         sum of covalent radii for the sites plus the tolerance (provided
         as a parameter)
 
+        A pair of atoms has one cell here, so a bond to an atom's own image,
+        or a second bond to another image of the same atom, cannot be held;
+        the shortest bond of a pair is kept and a warning is logged. See
+        `unit_cell_bonds` for all of them.
+
         Arguments:
             tolerance (float, optional):
                 Bonding tolerance (bonded if d < cov_a + cov_b + tolerance)
             neighbouring_cells (int, optional):
-                Number of neighbouring cells in which to look for bonded atoms.
-                We start at the (0, 0, 0) cell, so a value of 1 will look in the
-                (0, 0, 1), (0, 1, 1), (1, 1, 1) i.e. all 26 neighbouring cells.
-                1 is typically sufficient for organic systems.
+                Kept for compatibility; bonds are found in the 26 cells around
+                the unit cell, which covers any bond shorter than a cell.
 
         Returns:
             A tuple of (sparse_matrix in dict of keys format, dict)
@@ -287,52 +345,33 @@ class Crystal:
             the (i, j) value in the dict is the cell translation on j which
             bonds these two sites
         """
-        slab = self.slab(bounds=((-1, -1, -1), (1, 1, 1)))
-        n_uc = slab["n_uc"]
-        uc_pos = slab["frac_pos"][:n_uc]
-        uc_nums = slab["element"][:n_uc]
-        neighbour_pos = slab["frac_pos"][n_uc:]
-        cart_uc_pos = self.to_cartesian(uc_pos)
-        covalent_radii_dict = {
-            x: Element.from_atomic_number(x).cov for x in np.unique(uc_nums)
-        }
-        covalent_radii_dict.update(kwargs.get("covalent_radii", {}))
-        # first establish all connections in the unit cell
-        covalent_radii = np.array([covalent_radii_dict[x] for x in uc_nums])
-        max_cov = np.max(covalent_radii)
-        # TODO this needs to be sped up for large cells, tends to slow for > 1000 atoms
-        # and the space storage will become a problem
-        tree = KDTree(cart_uc_pos)
-        dist = tree.sparse_distance_matrix(tree, max_distance=2 * max_cov + tolerance)
-        uc_edges = []
-
-        for (i, j), d in dist.items():
-            if not (i < j):
-                continue
-            if d > 1e-3 and d < (covalent_radii[i] + covalent_radii[j] + tolerance):
-                uc_edges.append((i, j, d, (0, 0, 0)))
-
-        cart_neighbour_pos = self.unit_cell.to_cartesian(neighbour_pos)
-        tree2 = KDTree(cart_neighbour_pos)
-        dist = tree.sparse_distance_matrix(tree2, max_distance=2 * max_cov + tolerance)
-        # could be sped up if done outside python
-        cells = slab["cell"][n_uc:]
-        for (uc_atom, neighbour_atom), d in dist.items():
-            uc_idx = neighbour_atom % n_uc
-            if not (uc_atom < uc_idx):
-                continue
-            if d > 1e-3 and d < (
-                covalent_radii[uc_atom] + covalent_radii[uc_idx] + tolerance
-            ):
-                cell = cells[neighbour_atom]
-                uc_edges.append((uc_atom, uc_idx, d, tuple(cell)))
-
+        i, j, cells, lengths = self.unit_cell_bonds(tolerance=tolerance, **kwargs)
+        n_uc = len(self.unit_cell_atoms()["element"])
         properties = {}
         uc_graph = dok_matrix((n_uc, n_uc))
-        for i, j, d, cell in uc_edges:
-            uc_graph[i, j] = d
-            properties[(i, j)] = cell
-
+        dropped = 0
+        for a, b, cell, d in sorted(
+            zip(
+                i.tolist(),
+                j.tolist(),
+                map(tuple, cells.tolist()),
+                lengths.tolist(),
+                strict=True,
+            ),
+            key=lambda bond: bond[3],
+        ):
+            if a == b or (a, b) in properties:
+                dropped += 1
+                continue
+            uc_graph[a, b] = d
+            properties[(a, b)] = cell
+        if dropped:
+            LOG.warning(
+                "%d bonds join an atom to its own image or to a second image of "
+                "an atom it is already bonded to; unit_cell_connectivity keeps "
+                "one per pair, unit_cell_bonds has them all",
+                dropped,
+            )
         return uc_graph, properties
 
     @cache_defaults
