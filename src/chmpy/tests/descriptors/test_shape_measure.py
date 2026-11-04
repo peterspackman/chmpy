@@ -2,9 +2,14 @@ import numpy as np
 import pytest
 from scipy.spatial.transform import Rotation
 
+from chmpy import Crystal, Molecule
+from chmpy.core.element import Element
+from chmpy.crystal import AsymmetricUnit, SpaceGroup, UnitCell
 from chmpy.descriptors.shape_measure import (
     IDEAL_SHAPES,
     continuous_shape_measure,
+    coordination_shapes,
+    shape_match,
     shape_measures,
 )
 
@@ -96,3 +101,48 @@ def test_a_mismatched_count_is_refused():
         continuous_shape_measure(IDEAL_SHAPES["OC-6"], "CU-8")
     with pytest.raises(ValueError, match="no ideal shape"):
         shape_measures(np.zeros((11, 3)))
+
+
+def test_the_ideal_shapes_are_read_only():
+    with pytest.raises(TypeError):
+        IDEAL_SHAPES["OC-6"] = np.zeros((6, 3))
+    with pytest.raises(ValueError):
+        IDEAL_SHAPES["OC-6"][0, 0] = 2.0
+
+
+@pytest.mark.parametrize("exact_max", [8, 0])
+def test_the_fitted_ideal_shape_gives_the_measure(exact_max):
+    ligands = 1.9 * distorted("SAPR-8", 0.1, seed=2) + [0.3, -1.0, 2.0]
+    match = shape_match(ligands, "SAPR-8", exact_max=exact_max)
+    centred = ligands - ligands.mean(axis=0)
+    residual = np.sum((ligands - match.ideal) ** 2) / np.sum(centred**2)
+    assert 100 * residual == pytest.approx(match.measure)
+    assert np.linalg.det(match.rotation) == pytest.approx(1)
+    assert sorted(match.assignment) == list(range(8))
+
+
+def cubic(elements, positions):
+    cell = UnitCell.from_lengths_and_angles((5.64,) * 3, np.radians((90, 90, 90)))
+    asym = AsymmetricUnit([Element[z] for z in elements], np.array(positions))
+    return Crystal(cell, SpaceGroup(225), asym)
+
+
+def test_rock_salt_sites_are_octahedral():
+    shapes = coordination_shapes(cubic([11, 17], [[0, 0, 0], [0.5, 0.5, 0.5]]))
+    assert list(shapes) == [0, 1]
+    for site in shapes.values():
+        assert next(iter(site)) == "OC-6"
+        assert site["OC-6"] == pytest.approx(0, abs=1e-9)
+
+
+def test_the_nearest_neighbours_of_fcc_are_a_cuboctahedron():
+    shapes = coordination_shapes(cubic([29], [[0, 0, 0]]), n=12)
+    assert shapes[0]["COC-12"] == pytest.approx(0, abs=1e-9)
+
+
+def test_a_molecule_is_measured_from_its_bonds():
+    ligands = 1.09 * IDEAL_SHAPES["T-4"] / np.linalg.norm(IDEAL_SHAPES["T-4"][0])
+    methane = Molecule.from_arrays([6, 1, 1, 1, 1], np.vstack([[0, 0, 0], ligands]))
+    shapes = coordination_shapes(methane)
+    assert list(shapes) == [0]
+    assert shapes[0]["T-4"] == pytest.approx(0, abs=1e-9)

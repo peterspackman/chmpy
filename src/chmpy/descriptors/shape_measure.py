@@ -21,13 +21,21 @@ two are alternated to a local optimum from many random rotations.
 The ideal shapes in `IDEAL_SHAPES` are centred and scaled to a mean vertex
 distance of 1, and named as in SHAPE where they are the same shape. Johnson
 solids (names starting with J) have all their edges equal.
+
+`shape_match` also returns the fit itself (which vertex each ligand goes to,
+the rotation and scale), and `coordination_shapes` measures every site of a
+crystal or molecule from its bonded (or nearest) neighbours.
 """
 
 from __future__ import annotations
 
 from itertools import islice, permutations
+from types import MappingProxyType
+from typing import NamedTuple
 
 import numpy as np
+
+from chmpy.util.num import kabsch_rotation_matrix
 
 #: largest vertex count measured exactly, by trying every assignment
 EXACT_MAX = 8
@@ -98,36 +106,88 @@ def _ideal_shapes() -> dict[str, np.ndarray]:
         "COC-12": cuboctahedron,
         "ACOC-12": np.vstack([turned, coc[~top]]),
     }
-    return {name: _normalise(v) for name, v in shapes.items()}
+    shapes = {name: _normalise(v) for name, v in shapes.items()}
+    for vertices in shapes.values():
+        vertices.flags.writeable = False
+    return MappingProxyType(shapes)
 
 
-#: ideal polyhedra: (n, 3) vertices, centred, mean vertex distance 1
+#: ideal polyhedra, read-only: (n, 3) vertices, centred, mean vertex distance 1
 IDEAL_SHAPES = _ideal_shapes()
 
 
-def continuous_shape_measure(
+class ShapeMatch(NamedTuple):
+    """The best fit of an ideal polyhedron to a set of ligands.
+
+    Attributes:
+        measure: S, from 0 (the ideal shape) to 100
+        vertices: (n, 3) the ideal shape's vertices, centred
+        assignment: (n,) the vertex each ligand is matched to
+        rotation: (3, 3) proper rotation taking the vertices onto the ligands
+        scale: the factor scaling the rotated vertices to the ligands
+        centre: (3,) the ligands' centroid
+    """
+
+    measure: float
+    vertices: np.ndarray
+    assignment: np.ndarray
+    rotation: np.ndarray
+    scale: float
+    centre: np.ndarray
+
+    @property
+    def ideal(self) -> np.ndarray:
+        "(n, 3) the closest ideal polyhedron, one vertex for each ligand"
+        moved = self.vertices[self.assignment] @ self.rotation.T
+        return self.scale * moved + self.centre
+
+
+def shape_match(
     ligands, shape, *, exact_max: int = EXACT_MAX, starts: int = STARTS, seed=0
-) -> float:
-    """The continuous shape measure of ligands against an ideal polyhedron.
+) -> ShapeMatch:
+    """The best fit of an ideal polyhedron to a set of ligands.
 
     Args:
         ligands: (n, 3) ligand positions, e.g. relative to the central atom;
-            any origin, orientation and scale give the same answer
+            any origin, orientation and scale give the same measure
         shape: a name from `IDEAL_SHAPES`, or (n, 3) vertices
         exact_max: try every assignment up to this many vertices
         starts: random starting rotations for the heuristic beyond that
         seed: for the starting rotations
 
     Returns:
+        ShapeMatch
+    """
+    q, p, centre = _centred(ligands, shape)
+    if len(q) <= exact_max:
+        assignment = _best_exact(q, p)
+    else:
+        assignment = _best_heuristic(q, p, starts, seed)
+    rotation = _rotation(p[assignment], q)
+    overlap = float(np.sum(q * (p[assignment] @ rotation.T)))
+    c = overlap / (np.linalg.norm(q) * np.linalg.norm(p))
+    return ShapeMatch(
+        measure=float(100 * (1 - min(c, 1.0) ** 2)),
+        vertices=p,
+        assignment=assignment,
+        rotation=rotation,
+        scale=overlap / float(np.sum(p * p)),
+        centre=centre,
+    )
+
+
+def continuous_shape_measure(ligands, shape, **kwargs) -> float:
+    """The continuous shape measure of ligands against an ideal polyhedron.
+
+    Args:
+        ligands: (n, 3) ligand positions
+        shape: a name from `IDEAL_SHAPES`, or (n, 3) vertices
+        **kwargs: passed to `shape_match`
+
+    Returns:
         S, from 0 (the ideal shape) to 100
     """
-    q, p = _centred(ligands, shape)
-    if len(q) <= exact_max:
-        best = _best_exact(q, p)
-    else:
-        best = _best_heuristic(q, p, starts, seed)
-    c = best / (np.linalg.norm(q) * np.linalg.norm(p))
-    return float(100 * (1 - min(c, 1.0) ** 2))
+    return shape_match(ligands, shape, **kwargs).measure
 
 
 def shape_measures(ligands, **kwargs) -> dict[str, float]:
@@ -135,7 +195,7 @@ def shape_measures(ligands, **kwargs) -> dict[str, float]:
 
     Args:
         ligands: (n, 3) ligand positions
-        **kwargs: passed to `continuous_shape_measure`
+        **kwargs: passed to `shape_match`
     """
     n = len(ligands)
     measures = {
@@ -148,6 +208,70 @@ def shape_measures(ligands, **kwargs) -> dict[str, float]:
     return dict(sorted(measures.items(), key=lambda item: item[1]))
 
 
+def coordination_shapes(
+    structure, *, sites=None, n=None, tolerance: float = 0.4, **kwargs
+) -> dict[int, dict[str, float]]:
+    """The shape measures of each site's coordination polyhedron.
+
+    The ligands are a site's bonded neighbours (covalent radii plus
+    `tolerance`), or its `n` nearest neighbours when `n` is given.
+
+    Args:
+        structure: a `Crystal` (one site per asymmetric unit atom) or a
+            `Molecule` (one per atom)
+        sites: which sites to measure, by index; by default every site with
+            an ideal shape for its coordination number
+        n: use the n nearest neighbours instead of the bonded ones
+        tolerance: bonding tolerance, Angstroms
+        **kwargs: passed to `shape_match`
+
+    Returns:
+        {site: {shape: S}}, each site's shapes best first. Requested sites
+        with no ideal shape for their coordination number are refused.
+    """
+    ligands = _ligand_vectors(structure, n, tolerance)
+    counts = {len(v) for v in IDEAL_SHAPES.values()}
+    if sites is None:
+        sites = [k for k, v in enumerate(ligands) if len(v) in counts]
+    return {int(k): shape_measures(ligands[k], **kwargs) for k in sites}
+
+
+def _ligand_vectors(structure, n, tolerance) -> list[np.ndarray]:
+    "(cn, 3) neighbour vectors from each site"
+    from chmpy.calc.nearest import nearest_neighbors
+
+    periodic = hasattr(structure, "unit_cell_atoms")
+    if periodic:
+        atoms = structure.unit_cell_atoms()
+        positions = atoms["cart_pos"]
+        # the first unit cell atom of each asymmetric unit atom
+        _, centres = np.unique(atoms["asym_atom"], return_index=True)
+        cell = structure.unit_cell.direct
+    else:
+        positions = np.asarray(structure.positions, dtype=float)
+        centres, cell = np.arange(len(positions)), None
+    if n is not None:
+        found = nearest_neighbors(positions, n, cell=cell)
+        return [found.vectors[c] for c in centres]
+
+    if periodic:
+        i, j, cells, _ = structure.unit_cell_bonds(tolerance=tolerance)
+        shift = cells @ cell
+    else:
+        if structure.bonds is None:
+            structure.guess_bonds(tolerance=tolerance)
+        pairs = np.array(list(structure.bonds.keys()), dtype=int).reshape(-1, 2)
+        i, j = pairs.T
+        once = i < j
+        i, j = i[once], j[once]
+        shift = np.zeros((len(i), 3))
+    vector = positions[j] + shift - positions[i]
+    # each bond is listed once: it is a ligand of both ends
+    ends = np.concatenate([i, j])
+    vectors = np.concatenate([vector, -vector])
+    return [vectors[ends == c] for c in centres]
+
+
 def _centred(ligands, shape):
     q = np.asarray(ligands, dtype=float)
     if isinstance(shape, str):
@@ -157,7 +281,13 @@ def _centred(ligands, shape):
     p = np.asarray(shape, dtype=float)
     if q.shape != p.shape or q.ndim != 2 or q.shape[1] != 3:
         raise ValueError(f"{q.shape} ligands against a {p.shape} shape")
-    return q - q.mean(axis=0), p - p.mean(axis=0)
+    centre = q.mean(axis=0)
+    return q - centre, p - p.mean(axis=0), centre
+
+
+def _rotation(source, target) -> np.ndarray:
+    "The proper rotation R best taking each source point x to target R x"
+    return kabsch_rotation_matrix(source, target).T
 
 
 def _best_trace(h) -> np.ndarray:
@@ -167,26 +297,29 @@ def _best_trace(h) -> np.ndarray:
     return s[..., 0] + s[..., 1] + d * s[..., 2]
 
 
-def _best_exact(q, p, chunk: int = 50_000) -> float:
-    "The best correlation sum over every assignment of vertices to ligands"
+def _best_exact(q, p, chunk: int = 50_000) -> np.ndarray:
+    "The assignment of vertices to ligands correlating best, trying every one"
     n = len(q)
     every = permutations(range(n))
-    best = -np.inf
+    best, best_assignment = -np.inf, None
     while block := list(islice(every, chunk)):
         assignments = np.array(block)
         h = np.einsum("mni,nj->mij", p[assignments], q)
-        best = max(best, float(_best_trace(h).max()))
-    return best
+        traces = _best_trace(h)
+        k = int(np.argmax(traces))
+        if traces[k] > best:
+            best, best_assignment = float(traces[k]), assignments[k]
+    return best_assignment
 
 
-def _best_heuristic(q, p, starts, seed) -> float:
+def _best_heuristic(q, p, starts, seed) -> np.ndarray:
     "Assignment and rotation alternated to a local optimum, from many rotations"
     from scipy.optimize import linear_sum_assignment
     from scipy.spatial.transform import Rotation
 
     rotations = Rotation.random(starts, random_state=seed).as_matrix()
     rotations[0] = np.eye(3)
-    best = -np.inf
+    best, best_assignment = -np.inf, None
     for rotation in rotations:
         assignment = None
         for _ in range(100):
@@ -194,8 +327,8 @@ def _best_heuristic(q, p, starts, seed) -> float:
             if assignment is not None and np.array_equal(new, assignment):
                 break
             assignment = new
-            u, _, vt = np.linalg.svd(p[assignment].T @ q)
-            d = np.sign(np.linalg.det(vt.T @ u.T))
-            rotation = vt.T @ np.diag([1, 1, d]) @ u.T
-        best = max(best, float(_best_trace(p[assignment].T @ q)))
-    return best
+            rotation = _rotation(p[assignment], q)
+        trace = float(_best_trace(p[assignment].T @ q))
+        if trace > best:
+            best, best_assignment = trace, assignment
+    return best_assignment
