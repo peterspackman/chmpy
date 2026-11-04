@@ -289,12 +289,18 @@ class Crystal:
         radii_by_number.update(kwargs.get("covalent_radii", {}))
         radii = np.array([radii_by_number[x] for x in numbers])
 
-        cells = np.array(list(product((-1, 0, 1), repeat=3)))
+        cutoff = 2 * radii.max() + tolerance
+        # a bond spans at most cutoff / spacing cells along each axis, plus one
+        # because both ends are anywhere in their cells: one cell either way for
+        # most cells, more for a thin or badly skewed one
+        spacing = 1 / np.linalg.norm(np.linalg.inv(self.unit_cell.direct), axis=0)
+        reach = (cutoff // spacing).astype(int) + 1
+        cells = np.array(list(product(*(range(-r, r + 1) for r in reach))))
         images = (frac[None, :, :] + cells[:, None, :]).reshape(-1, 3)
         home = KDTree(self.to_cartesian(frac))
         around = KDTree(self.to_cartesian(images))
         found = home.sparse_distance_matrix(
-            around, max_distance=2 * radii.max() + tolerance, output_type="ndarray"
+            around, max_distance=cutoff, output_type="ndarray"
         )
         i, k, d = found["i"], found["j"], found["v"]
         j, cell = k % n, cells[k // n]
@@ -336,8 +342,8 @@ class Crystal:
             tolerance (float, optional):
                 Bonding tolerance (bonded if d < cov_a + cov_b + tolerance)
             neighbouring_cells (int, optional):
-                Kept for compatibility; bonds are found in the 26 cells around
-                the unit cell, which covers any bond shorter than a cell.
+                Kept for compatibility; `unit_cell_bonds` searches every cell a
+                bond can reach.
 
         Returns:
             A tuple of (sparse_matrix in dict of keys format, dict)

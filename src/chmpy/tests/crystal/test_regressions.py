@@ -244,3 +244,21 @@ def test_the_connectivity_warns_when_it_cannot_hold_every_bond(caplog):
     with caplog.at_level("WARNING"):
         _carbon_chain(2.6, [(0, 0, 0), (0.5, 0, 0)]).unit_cell_connectivity()
     assert "unit_cell_bonds" in caplog.text
+
+
+def test_bonds_are_found_in_a_badly_skewed_cell():
+    # a 6 A square lattice described by b = 5a + (0, 6, 0): no short lattice
+    # vector, but the cell is thin, and the bonded image is two cells away
+    cell = UnitCell(np.array([[6.0, 0, 0], [30.0, 6.0, 0], [0, 0, 8.0]]))
+    first = cell.to_cartesian(np.array([0.05, 0.1, 0.5]))
+    cartesian = np.array([first, first + [0, 1.4, 0]])
+    asym = AsymmetricUnit.from_records(
+        [
+            {"label": f"C{k}", "element": "C", "position": p}
+            for k, p in enumerate(cell.to_fractional(cartesian))
+        ]
+    )
+    crystal = Crystal(cell, SpaceGroup(1), asym)
+    i, j, cells, lengths = crystal.unit_cell_bonds()
+    assert lengths == pytest.approx([1.4])
+    assert np.abs(cells).max() > 1
