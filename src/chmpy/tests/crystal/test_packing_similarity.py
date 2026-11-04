@@ -73,6 +73,23 @@ def test_benzene_has_its_full_symmetry():
     assert len(body.operations) == 24
 
 
+def test_a_nearly_planar_body_has_only_orthogonal_operations():
+    # ethyl carbamate's heavy atoms, 0.02 A from their best plane
+    atoms = np.array(
+        [
+            [0.0, 0.0, 0.02],
+            [1.21, 0.0, -0.02],
+            [-0.68, 1.15, 0.0],
+            [-0.68, -1.17, 0.01],
+            [-2.10, -1.20, -0.01],
+            [-2.62, -2.62, 0.0],
+        ]
+    )
+    body = RigidBody.from_molecule(atoms, [6, 8, 7, 8, 6, 6])
+    for q in body.operations:
+        np.testing.assert_allclose(q @ q.T, np.eye(3), atol=1e-9)
+
+
 def test_a_moved_mirrored_relabelled_copy_fits_exactly():
     rng = np.random.default_rng(3)
     atoms = rng.normal(size=(7, 3))

@@ -163,7 +163,7 @@ def _rotation(h, allow_improper: bool) -> np.ndarray:
     the signs the SVD happens to choose.
     """
     u, s, vt = np.linalg.svd(h)
-    rank = int(np.sum(s > 1e-9 * max(s[0], 1e-300)))
+    rank = int(np.sum(s > 1e-6 * max(s[0], 1e-300)))
     r = vt.T @ u.T
     if np.linalg.det(r) < 0 and (not allow_improper or rank < 3):
         vt[2] = -vt[2]
@@ -356,6 +356,8 @@ def _self_symmetry(p, numbers, tolerance) -> np.ndarray:
 
     def consider(q):
         if len(operations) >= 96:
+            return
+        if not np.allclose(q @ q.T, np.eye(3), atol=1e-6):
             return
         if any(np.linalg.norm(q - o) < limit for o in operations):
             return
