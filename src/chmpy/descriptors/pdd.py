@@ -9,7 +9,9 @@ a weight: the fraction of the unit cell's atoms the row stands for. The AMD is
 the weighted mean of the rows.
 
 Two PDDs whose rows correspond, atom by atom, compare entry by entry
-(`pdd_rms`). Otherwise -- different Z, a supercell, a different atom order --
+(`pdd_rms`); with `match_rows`, rows are first paired within each element by
+least difference, which a copy relabelled by its molecule's own symmetry
+needs. Otherwise -- different Z, a supercell, a different atom order --
 the earth mover's distance (`pdd_emd`) matches rows by transporting weight
 between them, at a cost of the largest difference between two rows.
 """
@@ -31,10 +33,12 @@ class PDD:
         rows: (m, k) nearest-neighbour distances, Angstroms, ascending along
             each row
         weights: (m,) fraction of the unit cell's atoms each row stands for
+        numbers: (m,) atomic number of each row's atoms
     """
 
     rows: np.ndarray
     weights: np.ndarray
+    numbers: np.ndarray
 
     @property
     def k(self) -> int:
@@ -72,10 +76,15 @@ def pdd(crystal, k: int = 100, groups=None) -> PDD:
     distances = nearest_neighbors(
         atoms["cart_pos"], k, cell=crystal.unit_cell.direct
     ).distances
-    _, groups, counts = np.unique(groups, return_inverse=True, return_counts=True)
+    _, first, groups, counts = np.unique(
+        groups, return_index=True, return_inverse=True, return_counts=True
+    )
+    numbers = np.asarray(atoms["element"])
+    if np.any(numbers != numbers[first][groups]):
+        raise ValueError("a row's atoms must all be of one element")
     rows = np.zeros((len(counts), k))
     np.add.at(rows, groups, distances)
-    return PDD(rows / counts[:, None], counts / counts.sum())
+    return PDD(rows / counts[:, None], counts / counts.sum(), numbers[first])
 
 
 def amd(crystal, k: int = 100) -> np.ndarray:
@@ -83,16 +92,31 @@ def amd(crystal, k: int = 100) -> np.ndarray:
     return pdd(crystal, k).amd
 
 
-def pdd_rms(a: PDD, b: PDD) -> float:
+def pdd_rms(a: PDD, b: PDD, match_rows: bool = False) -> float:
     """The root mean square difference of two PDDs, entry by entry.
 
-    Their rows must correspond: the same atoms, in the same order.
+    Their rows must correspond: the same atoms, in the same order. With
+    `match_rows`, the rows of each element are first paired by least total
+    squared difference, so a structure whose atoms were relabelled -- by its
+    molecule's own symmetry, say -- still compares row for row.
     """
     if a.rows.shape != b.rows.shape:
         raise ValueError(
             f"{a.rows.shape} and {b.rows.shape} rows do not correspond; use pdd_emd"
         )
-    return float(np.sqrt(np.mean((a.rows - b.rows) ** 2)))
+    if not match_rows:
+        return float(np.sqrt(np.mean((a.rows - b.rows) ** 2)))
+    from scipy.optimize import linear_sum_assignment
+
+    if sorted(a.numbers) != sorted(b.numbers):
+        raise ValueError("the rows are of different elements; use pdd_emd")
+    total = 0.0
+    for z in np.unique(a.numbers):
+        ra, rb = a.rows[a.numbers == z], b.rows[b.numbers == z]
+        cost = np.sum((ra[:, None] - rb[None]) ** 2, axis=-1)
+        i, j = linear_sum_assignment(cost)
+        total += cost[i, j].sum()
+    return float(np.sqrt(total / a.rows.size))
 
 
 def pdd_emd(a: PDD, b: PDD) -> float:

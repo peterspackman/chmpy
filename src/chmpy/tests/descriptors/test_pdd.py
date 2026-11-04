@@ -75,3 +75,28 @@ def test_rows_that_do_not_correspond_are_refused(acetic):
         pdd_rms(pdd(acetic, k=20), pdd(acetic.as_P1(), k=20))
     with pytest.raises(ValueError, match="k differs"):
         pdd_emd(pdd(acetic, k=20), pdd(acetic, k=30))
+
+
+def test_rows_can_be_matched_within_each_element(acetic):
+    # relabel the atoms: swap two of each element, as a molecule's own
+    # symmetry can when a structure is written out a second time
+    atoms = acetic.unit_cell_atoms()
+    p1 = acetic.as_P1()
+    groups = atoms["asym_atom"].copy()
+    numbers = np.asarray(atoms["element"])
+    for z in np.unique(numbers):
+        rows = np.unique(groups[numbers == z])
+        if len(rows) > 1:
+            a, b = rows[:2]
+            groups = np.where(groups == a, -1, np.where(groups == b, a, groups))
+            groups = np.where(groups == -1, b, groups)
+    original, relabelled = pdd(acetic, k=30), pdd(p1, k=30, groups=groups)
+    assert pdd_rms(original, relabelled) > 0.01
+    assert pdd_rms(original, relabelled, match_rows=True) < 1e-9
+
+
+def test_rows_know_their_element(acetic):
+    p = pdd(acetic, k=10)
+    np.testing.assert_array_equal(
+        p.numbers, [e.atomic_number for e in acetic.asymmetric_unit.elements]
+    )
