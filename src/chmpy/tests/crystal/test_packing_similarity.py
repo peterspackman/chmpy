@@ -134,3 +134,37 @@ def test_a_framework_is_refused():
     salt = Crystal(cell, SpaceGroup(225), asym)
     with pytest.raises(ValueError, match="not molecular"):
         compare_packing(salt, salt)
+
+
+@pytest.fixture(scope="module")
+def chiral():
+    "A chiral CHFClBr-like molecule in P2_1, whose mirror image is another crystal"
+    cell = UnitCell.from_lengths_and_angles(
+        [6.5, 7.0, 8.0], [90, 100, 90], unit="degrees"
+    )
+    bonds = (
+        1.5 * np.array([[1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 1]]) / np.sqrt(3)
+    )
+    centre = cell.to_cartesian(np.array([0.21, 0.13, 0.32]))
+    cartesian = np.vstack([centre, centre + bonds[:3] * [1.0, 1.1, 1.2]])
+    asym = AsymmetricUnit.from_records(
+        [
+            {"label": f"X{k}", "element": e, "position": x}
+            for k, (e, x) in enumerate(
+                zip(("C", "N", "O", "F"), cell.to_fractional(cartesian), strict=True)
+            )
+        ]
+    )
+    return Crystal(cell, SpaceGroup(4), asym)
+
+
+def test_an_enantiomorph_needs_an_improper_overlay(chiral):
+    atoms = chiral.unit_cell_atoms()
+    mirror = np.diag([-1.0, 1.0, 1.0])
+    image = p1(
+        chiral.unit_cell.direct @ mirror, atoms["cart_pos"] @ mirror, atoms["element"]
+    )
+    result = compare_packing(chiral, image)
+    assert result.same_packing
+    assert result.inverted
+    assert not compare_packing(chiral, image, allow_inversion=False).same_packing

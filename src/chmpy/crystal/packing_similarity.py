@@ -401,66 +401,76 @@ def _compare_clusters(body, a, b, options: PackingOptions) -> PackingComparison:
     """Overlay cluster a (central first, then its reference neighbours) on b."""
     ca, ma = a
     cb, mb = b
+    # Seeds lay central A on central B through each body operation Q. That
+    # overlay is improper when the two were fitted with opposite handedness
+    # or Q is a mirror, so with inversion allowed it is refitted both ways; its
+    # negation (A inverted in place) is a further starting point.
+    exact = [mb[0] @ q @ ma[0].T for q in body.operations]
+    seeds = [(r, False) for r in exact]
+    if options.allow_inversion:
+        seeds += [(r, True) for r in exact if np.linalg.det(r) < 0]
+        seeds += [(-r, True) for r in exact]
+    best = None
+    for r, improper in seeds:
+        result = _overlay(body, a, b, r, cb[0] - r @ ca[0], improper, options)
+        if best is None or result.n_matched > best.n_matched:
+            best = result
+        if best.same_packing:
+            break
+    return best
+
+
+def _overlay(body, a, b, r, t, improper, options) -> PackingComparison:
+    """From the transform (r, t), match neighbours and refit until the matched
+    set stops changing."""
+    ca, ma = a
+    cb, mb = b
     n_ref = min(options.n_neighbours, len(ca) - 1)
     ref_c, ref_m = ca[1 : n_ref + 1], ma[1 : n_ref + 1]
     pool_c, pool_m = cb[1:], mb[1:]
     g = body.gyration
-    best = None
-    for improper in (False, True) if options.allow_inversion else (False,):
-        for seed in body.operations:
-            r = mb[0] @ seed @ ma[0].T
-            if improper:
-                r = -r
-            t = cb[0] - r @ ca[0]
-            previous, matched = None, []
-            for _ in range(options.max_iterations):
-                cost, ops = _molecule_cost(
-                    body, ref_c @ r.T + t, r @ ref_m, pool_c, pool_m
-                )
-                rows, cols = linear_sum_assignment(cost)
-                matched = [
-                    (int(i), int(j), float(cost[i, j]), int(ops[i, j]))
-                    for i, j in zip(rows, cols, strict=True)
-                    if cost[i, j] <= options.tolerance
-                ]
-                # refit over the centrals and the matched neighbours, from
-                # centroids and orientations alone
-                pa = [(ca[0], ma[0])] + [(ref_c[i], ref_m[i]) for i, *_ in matched]
-                pb = [(cb[0], mb[0] @ np.eye(3))] + [
-                    (pool_c[j], pool_m[j] @ body.operations[q])
-                    for _, j, _, q in matched
-                ]
-                abar = np.mean([x for x, _ in pa], axis=0)
-                bbar = np.mean([x for x, _ in pb], axis=0)
-                h = sum(
-                    body.m * np.outer(xa - abar, xb - bbar) + m_a @ g @ m_b.T
-                    for (xa, m_a), (xb, m_b) in zip(pa, pb, strict=True)
-                )
-                r = _rotation(h, allow_improper=improper)
-                t = bbar - r @ abar
-                residual = sum(
-                    np.sum((r @ xa + t - xb) ** 2)
-                    + max(2 * (np.trace(g) - np.sum((r @ m_a) * (m_b @ g))) / body.m, 0)
-                    for (xa, m_a), (xb, m_b) in zip(pa, pb, strict=True)
-                )
-                rmsd = float(np.sqrt(residual / len(pa)))
-                signature = [(i, j) for i, j, *_ in matched]
-                if signature == previous:
-                    break
-                previous = signature
-            if best is None or len(matched) > best.n_matched:
-                best = PackingComparison(
-                    len(matched),
-                    n_ref,
-                    rmsd,
-                    improper,
-                    r,
-                    t,
-                    [(i, j, c) for i, j, c, _ in matched],
-                )
-            if best.n_matched == n_ref:
-                return best
-    return best
+    previous, matched, rmsd = None, [], 0.0
+    for _ in range(options.max_iterations):
+        cost, ops = _molecule_cost(body, ref_c @ r.T + t, r @ ref_m, pool_c, pool_m)
+        rows, cols = linear_sum_assignment(cost)
+        matched = [
+            (int(i), int(j), float(cost[i, j]), int(ops[i, j]))
+            for i, j in zip(rows, cols, strict=True)
+            if cost[i, j] <= options.tolerance
+        ]
+        # refit over the centrals and the matched neighbours, from centroids
+        # and orientations alone
+        pa = [(ca[0], ma[0])] + [(ref_c[i], ref_m[i]) for i, *_ in matched]
+        pb = [(cb[0], mb[0])] + [
+            (pool_c[j], pool_m[j] @ body.operations[q]) for _, j, _, q in matched
+        ]
+        abar = np.mean([x for x, _ in pa], axis=0)
+        bbar = np.mean([x for x, _ in pb], axis=0)
+        h = sum(
+            body.m * np.outer(xa - abar, xb - bbar) + m_a @ g @ m_b.T
+            for (xa, m_a), (xb, m_b) in zip(pa, pb, strict=True)
+        )
+        r = _rotation(h, allow_improper=improper)
+        t = bbar - r @ abar
+        residual = sum(
+            np.sum((r @ xa + t - xb) ** 2)
+            + max(2 * (np.trace(g) - np.sum((r @ m_a) * (m_b @ g))) / body.m, 0)
+            for (xa, m_a), (xb, m_b) in zip(pa, pb, strict=True)
+        )
+        rmsd = float(np.sqrt(residual / len(pa)))
+        signature = [(i, j) for i, j, *_ in matched]
+        if signature == previous:
+            break
+        previous = signature
+    return PackingComparison(
+        len(matched),
+        n_ref,
+        rmsd,
+        bool(np.linalg.det(r) < 0),
+        r,
+        t,
+        [(i, j, c) for i, j, c, _ in matched],
+    )
 
 
 class PackingComparer:
