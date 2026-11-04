@@ -5,8 +5,12 @@ from scipy.spatial.transform import Rotation
 from chmpy import Crystal
 from chmpy.crystal import AsymmetricUnit, SpaceGroup, UnitCell
 from chmpy.crystal.packing_similarity import (
+    Cluster,
+    Packing,
     PackingComparer,
+    PackingOptions,
     RigidBody,
+    _compare_clusters,
     _molecule_cost,
     compare_packing,
     heavy_atoms_suffice,
@@ -168,3 +172,53 @@ def test_an_enantiomorph_needs_an_improper_overlay(chiral):
     assert result.same_packing
     assert result.inverted
     assert not compare_packing(chiral, image, allow_inversion=False).same_packing
+
+
+@pytest.fixture(scope="module")
+def lattice():
+    "One asymmetric molecule per 6 A cubic cell, and the body it is placed as"
+    rng = np.random.default_rng(7)
+    body = RigidBody.from_molecule(rng.normal(size=(5, 3)), [6, 7, 8, 9, 16])
+    packing = Packing(6.0 * np.eye(3), np.zeros((1, 3)), np.eye(3)[None])
+    return body, packing
+
+
+def test_a_cluster_keeps_the_whole_shell_tied_with_its_last_place(lattice):
+    _, packing = lattice
+    cluster = packing.cluster(0, 15, 14.0)
+    # 6 at 6 A, then 12 at 6 sqrt(2) A: the 15th is tied with three more
+    assert len(cluster.centroids) == 1 + 18
+    assert cluster.untied == 6
+    assert packing.cluster(0, 6, 14.0).untied == -1
+
+
+def _reference(pool, stray, nearer_moved=False):
+    "The pool's first 15 neighbours, then a 16th tied with the 15th"
+    centroids = pool.centroids[:17].copy()
+    orientations = pool.orientations[:17].copy()
+    centroids[16] = centroids[15] + [3.0, 0, 0] if stray else pool.centroids[16]
+    if nearer_moved:
+        centroids[1] += [3.0, 0, 0]
+    return Cluster(centroids, orientations, untied=14)
+
+
+def test_either_tied_molecule_may_take_the_last_place(lattice):
+    body, packing = lattice
+    pool = packing.cluster(0, 40, 14.0)
+    reference = _reference(pool, stray=True)
+    assert _compare_clusters(body, reference, pool, PackingOptions()).n_matched == 15
+    swapped = Cluster(
+        reference.centroids[[*range(15), 16, 15]],
+        reference.orientations[[*range(15), 16, 15]],
+        untied=14,
+    )
+    assert _compare_clusters(body, swapped, pool, PackingOptions()).n_matched == 15
+
+
+def test_a_tied_molecule_does_not_stand_in_for_a_nearer_one(lattice):
+    body, packing = lattice
+    pool = packing.cluster(0, 40, 14.0)
+    reference = _reference(pool, stray=False, nearer_moved=True)
+    result = _compare_clusters(body, reference, pool, PackingOptions())
+    assert result.n_matched == 14
+    assert result.n_neighbours == 15

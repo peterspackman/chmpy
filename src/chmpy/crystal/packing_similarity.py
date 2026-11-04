@@ -27,6 +27,10 @@ This follows klasp's implementation, so that the two agree:
   could orient (ethylene, methanol) or there are fewer than two (water).
 * The reference cluster has `n_neighbours`; the other offers a larger pool, so
   a counterpart just beyond its own Nth-nearest can still match.
+* When molecules are exactly as far away as the Nth, which of them would make
+  the N is not a property of the structure, so the whole tied shell is kept:
+  the nearer neighbours must each match, and the shell fills the places left.
+  The result is still out of N.
 
 For crystals with more than one symmetry-independent environment (Z' > 1),
 each distinct one is tried as the centre of the reference cluster.
@@ -36,6 +40,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from itertools import product
+from typing import NamedTuple
 
 import numpy as np
 from scipy.optimize import linear_sum_assignment
@@ -43,6 +48,26 @@ from scipy.optimize import linear_sum_assignment
 #: cost of an assignment that must not be made: finite, as the assignment
 #: does arithmetic with it
 FORBIDDEN = 1e6
+#: molecules this far apart in centroid distance are tied, Angstroms
+SHELL_TIE = 1e-4
+#: most reference neighbours and candidates a comparison takes, as klasp's
+#: kernel does
+MAX_REFERENCES, MAX_POOL = 24, 40
+
+
+class Cluster(NamedTuple):
+    """A central molecule (first) and its neighbours, nearest first.
+
+    Attributes:
+        centroids: (1 + n, 3)
+        orientations: (1 + n, 3, 3)
+        untied: the first neighbour tied with the last place, when the cluster
+            was extended to keep a tied shell whole; -1 otherwise
+    """
+
+    centroids: np.ndarray
+    orientations: np.ndarray
+    untied: int = -1
 
 
 @dataclass(frozen=True)
@@ -397,10 +422,18 @@ def _molecule_cost(body, ca, ma, cb, mb):
     return np.sqrt(np.maximum(dc2 + np.maximum(orient, 0), 0)), best
 
 
-def _compare_clusters(body, a, b, options: PackingOptions) -> PackingComparison:
-    """Overlay cluster a (central first, then its reference neighbours) on b."""
-    ca, ma = a
-    cb, mb = b
+def _compare_clusters(body, a: Cluster, b: Cluster, options) -> PackingComparison:
+    """Overlay cluster a's references on cluster b's candidates."""
+    kept = len(a.centroids) - 1
+    if a.untied >= 0:
+        n_ref = min(kept, MAX_REFERENCES)
+        places = min(options.n_neighbours, n_ref)
+        required = a.untied
+    else:
+        n_ref = places = required = min(options.n_neighbours, kept, MAX_REFERENCES)
+    b = Cluster(b.centroids[: MAX_POOL + 1], b.orientations[: MAX_POOL + 1], b.untied)
+    ca, ma = a.centroids, a.orientations
+    cb, mb = b.centroids, b.orientations
     # Seeds lay central A on central B through each body operation Q. That
     # overlay is improper when the two were fitted with opposite handedness
     # or Q is a mirror, so with inversion allowed it is refitted both ways; its
@@ -412,20 +445,36 @@ def _compare_clusters(body, a, b, options: PackingOptions) -> PackingComparison:
         seeds += [(-r, True) for r in exact]
     best = None
     for r, improper in seeds:
-        result = _overlay(body, a, b, r, cb[0] - r @ ca[0], improper, options)
-        if best is None or result.n_matched > best.n_matched:
-            best = result
+        matched, rmsd, r, t = _overlay(
+            body, a, b, n_ref, r, cb[0] - r @ ca[0], improper, options
+        )
+        # the nearer neighbours each count; the tied shell fills what is left
+        nearer = sum(i < required for i, *_ in matched)
+        score = nearer + min(len(matched) - nearer, places - required)
+        if best is None or score > best.n_matched:
+            best = PackingComparison(
+                score,
+                places,
+                rmsd,
+                bool(np.linalg.det(r) < 0),
+                r,
+                t,
+                [(i, j, c) for i, j, c, _ in matched],
+            )
         if best.same_packing:
             break
     return best
 
 
-def _overlay(body, a, b, r, t, improper, options) -> PackingComparison:
-    """From the transform (r, t), match neighbours and refit until the matched
-    set stops changing."""
-    ca, ma = a
-    cb, mb = b
-    n_ref = min(options.n_neighbours, len(ca) - 1)
+def _overlay(body, a, b, n_ref, r, t, improper, options):
+    """From the transform (r, t), match a's first `n_ref` neighbours to b's and
+    refit until the matched set stops changing.
+
+    Returns:
+        (matched, rmsd, r, t), matched as (reference, candidate, rmsd, operation)
+    """
+    ca, ma = a.centroids, a.orientations
+    cb, mb = b.centroids, b.orientations
     ref_c, ref_m = ca[1 : n_ref + 1], ma[1 : n_ref + 1]
     pool_c, pool_m = cb[1:], mb[1:]
     g = body.gyration
@@ -438,7 +487,7 @@ def _overlay(body, a, b, r, t, improper, options) -> PackingComparison:
             for i, j in zip(rows, cols, strict=True)
             if cost[i, j] <= options.tolerance
         ]
-        # refit over the centrals and the matched neighbours, from centroids
+        # refit over the centrals and every matched neighbour, from centroids
         # and orientations alone
         pa = [(ca[0], ma[0])] + [(ref_c[i], ref_m[i]) for i, *_ in matched]
         pb = [(cb[0], mb[0])] + [
@@ -462,15 +511,7 @@ def _overlay(body, a, b, r, t, improper, options) -> PackingComparison:
         if signature == previous:
             break
         previous = signature
-    return PackingComparison(
-        len(matched),
-        n_ref,
-        rmsd,
-        bool(np.linalg.det(r) < 0),
-        r,
-        t,
-        [(i, j, c) for i, j, c, _ in matched],
-    )
+    return matched, rmsd, r, t
 
 
 class PackingComparer:
@@ -576,9 +617,9 @@ class Packing:
     orientations: np.ndarray
     representatives: list = field(default_factory=lambda: [0])
 
-    def cluster(self, central: int, n: int, radius: float):
-        """(centroids, orientations), central molecule first, then the `n`
-        nearest others within `radius`, nearest first."""
+    def cluster(self, central: int, n: int, radius: float) -> Cluster:
+        """The central molecule and its `n` nearest others within `radius`,
+        nearest first, with every further molecule tied with the nth."""
         spacing = 1 / np.linalg.norm(np.linalg.inv(self.cell), axis=0)
         reach = np.ceil(radius / spacing).astype(int)
         shifts = np.array(list(product(*(range(-r, r + 1) for r in reach))))
@@ -587,12 +628,27 @@ class Packing:
         home = np.all(shifts == 0, axis=1)[:, None] & (which == central)
         d2 = np.sum((images - self.centroids[central]) ** 2, axis=-1)
         keep = (d2 <= radius**2) & ~home
-        order = np.argsort(d2[keep], kind="stable")[:n]
-        centroids = images[keep][order]
-        orientations = self.orientations[which[keep][order]]
-        return (
-            np.vstack([self.centroids[central][None], centroids]),
-            np.concatenate([self.orientations[central][None], orientations]),
+        order = np.argsort(d2[keep], kind="stable")
+        distance = np.sqrt(d2[keep][order])
+        n = min(n, len(order))
+        kept, untied = n, n
+        if n > 0:
+            tied = np.abs(distance - distance[n - 1]) <= SHELL_TIE
+            while kept < len(order) and tied[kept]:
+                kept += 1
+            if kept > n:
+                while untied > 0 and tied[untied - 1]:
+                    untied -= 1
+        order = order[:kept]
+        return Cluster(
+            np.vstack([self.centroids[central][None], images[keep][order]]),
+            np.concatenate(
+                [
+                    self.orientations[central][None],
+                    self.orientations[which[keep][order]],
+                ]
+            ),
+            untied if kept > n else -1,
         )
 
 
