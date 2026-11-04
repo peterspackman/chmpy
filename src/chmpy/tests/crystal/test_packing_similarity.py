@@ -11,6 +11,7 @@ from chmpy.crystal.packing_similarity import (
     PackingOptions,
     RigidBody,
     _compare_clusters,
+    _kabsch,
     _molecule_cost,
     compare_packing,
     heavy_atoms_suffice,
@@ -88,6 +89,21 @@ def test_a_nearly_planar_body_has_only_orthogonal_operations():
     body = RigidBody.from_molecule(atoms, [6, 8, 7, 8, 6, 6])
     for q in body.operations:
         np.testing.assert_allclose(q @ q.T, np.eye(3), atol=1e-9)
+
+
+def test_a_slightly_bent_linear_body_gets_the_linear_operations():
+    co2 = np.array([[-1.16, 0.0, 0.0], [0.0, 0.01, 0.0], [1.16, 0.0, 0.0]])
+    body = RigidBody.from_molecule(co2, [8, 6, 8], heavy_only=True)
+    assert len(body.operations) == 8
+
+
+def test_collinear_points_fit_along_their_axis():
+    rng = np.random.default_rng(7)
+    line = np.array([[-1.2], [0.0], [1.2]]) * [1.0, 0.0, 0.0]
+    axis = Rotation.random(random_state=8).as_matrix()
+    target = line @ axis.T + rng.normal(size=3)
+    _, _, rmsd = _kabsch(line, target, allow_improper=False)
+    assert rmsd < 1e-10
 
 
 def test_a_moved_mirrored_relabelled_copy_fits_exactly():

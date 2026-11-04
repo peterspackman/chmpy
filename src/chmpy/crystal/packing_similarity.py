@@ -344,7 +344,6 @@ def _self_symmetry(p, numbers, tolerance) -> np.ndarray:
     if len(p) < 2:
         return np.array(operations)
     gyration = p.T @ p
-    scale = max(np.trace(gyration), 1e-300)
     radius = np.sqrt(np.trace(gyration) / len(p)) if np.trace(gyration) > 0 else 1.0
     limit = tolerance / max(radius, 1e-9)
 
@@ -367,10 +366,12 @@ def _self_symmetry(p, numbers, tolerance) -> np.ndarray:
     def mirror(normal):
         return np.eye(3) - 2 * np.outer(normal, normal)
 
+    # sums over the atoms of squared distances from the best plane and line
     values, vectors = np.linalg.eigh(gyration)
-    if values[0] / scale < 1e-6:  # planar: the mirror in its own plane
+    values = np.maximum(values, 0.0)
+    if np.sqrt(values[0]) < tolerance:  # planar: the mirror in its own plane
         consider(mirror(vectors[:, 0]))
-    if values[1] / scale < 1e-6:  # linear: a mirror containing it, across it
+    if np.sqrt(values[0] + values[1]) < tolerance:  # linear: mirrors with it, across it
         consider(mirror(vectors[:, 1]))
         consider(mirror(vectors[:, 2]))
         consider(-np.eye(3))
