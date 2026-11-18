@@ -12,7 +12,7 @@ Two steps, with the DFT run however you like in between:
 measures the residual stress. Only the strains the point group needs are
 written: 4 cells for cubic, 6 for hexagonal or trigonal, 12 for triclinic.
 Every directory shares one control.in, so the basis and k-grid are identical
-across strains. The k-grid gives at least `--k-length` Angstrom (default 6)
+across strains. The k-grid gives at least `--k-length` Angstrom (default 10)
 of cell per k-point along each direction of the reference cell; `--k-grid`
 sets it outright. The default strain is the one `elastic_tensor` uses with
 MLIPs on molecular crystals. `plan.json` keeps the strain and the point-group rotations for
@@ -219,8 +219,8 @@ def main():
     make.add_argument(
         "--k-length",
         type=float,
-        default=6.0,
-        help="Angstrom of cell per k-point along each axis (default 6)",
+        default=10.0,
+        help="Angstrom of cell per k-point along each axis (default 10)",
     )
     make.add_argument(
         "--k-grid", type=int, nargs=3, help="explicit k-grid, overriding --k-length"

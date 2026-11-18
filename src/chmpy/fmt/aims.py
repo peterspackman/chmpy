@@ -345,7 +345,7 @@ def geometry_file_to_crystal(filename):
     return geometry_string_to_crystal(Path(filename).read_text())
 
 
-def k_grid_for(cell, length=6.0):
+def k_grid_for(cell, length=10.0):
     """A Monkhorst-Pack grid with at least `length` Angstrom of cell per k-point.
 
     Along each reciprocal direction `n_i = ceil(length / d_i)`, where `d_i` is
