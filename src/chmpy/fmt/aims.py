@@ -65,6 +65,29 @@ def crystal_to_geometry_string(crystal, use_cartesian=False):
     return "\n".join(lines)
 
 
+def system_to_geometry_string(system):
+    """Convert a periodic `chmpy.calc.System` to an FHI-aims geometry.in string.
+
+    Lattice vectors and fractional positions are written as given, to ten
+    decimal places, so a strained cell keeps its exact orientation and strain.
+
+    Args:
+        system: a periodic System
+
+    Returns:
+        str: FHI-aims geometry.in format string
+    """
+    if not system.periodic:
+        raise ValueError("system_to_geometry_string needs a periodic system")
+    lines = [f"lattice_vector {v[0]:.10f} {v[1]:.10f} {v[2]:.10f}" for v in system.cell]
+    lines.append("")
+    for z, pos in zip(system.numbers, system.scaled_positions, strict=True):
+        symbol = Element.from_atomic_number(int(z)).symbol
+        lines.append(f"atom_frac {pos[0]:.10f} {pos[1]:.10f} {pos[2]:.10f} {symbol}")
+    lines.append("")
+    return "\n".join(lines)
+
+
 def molecule_to_geometry_string(molecule):
     """Convert a Molecule object to an FHI-aims geometry.in string.
 
@@ -320,6 +343,27 @@ def geometry_file_to_crystal(filename):
         Crystal: A new Crystal object
     """
     return geometry_string_to_crystal(Path(filename).read_text())
+
+
+def k_grid_for(cell, length=6.0):
+    """A Monkhorst-Pack grid with at least `length` Angstrom of cell per k-point.
+
+    Along each reciprocal direction `n_i = ceil(length / d_i)`, where `d_i` is
+    the spacing of the lattice planes normal to `b_i`; for an orthogonal cell
+    that is the lattice parameter, so `n_i * a_i >= length`. Long axes get one
+    point.
+
+    Args:
+        cell: (3, 3) lattice vectors as rows, Angstrom
+        length: real-space length in Angstrom; larger is denser
+
+    Returns:
+        tuple of three ints
+    """
+    reciprocal = np.linalg.inv(np.asarray(cell, dtype=float)).T
+    spacings = 1.0 / np.linalg.norm(reciprocal, axis=1)
+    # the tolerance keeps a cell exactly `length` long at one point
+    return tuple(max(1, int(np.ceil(length / d - 1e-6))) for d in spacings)
 
 
 def generate_control_in(

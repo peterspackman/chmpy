@@ -318,17 +318,9 @@ def elastic_tensor(
             report,
             atom_map,
         )
-        raw, misfit = fit_elastic(responses, rotations)
-        asymmetry = float(np.abs(raw - raw.T).max())
-        voigt = 0.5 * (raw + raw.T)
-
-        symmetry_residual = misfit
-        if symmetry:
-            projected = elastic_to_voigt(
-                project_elastic(elastic_from_voigt(voigt), basis)
-            )
-            symmetry_residual = max(misfit, float(np.abs(projected - voigt).max()))
-            voigt = projected
+        voigt, asymmetry, symmetry_residual = _fit_and_project(
+            responses, rotations, basis
+        )
 
         largest = float(np.abs(voigt).max())
         noise = max(asymmetry, symmetry_residual)
@@ -364,6 +356,149 @@ def elastic_tensor(
         strain=size,
         relaxations=relaxations,
         strains=tuple(strains),
+    )
+
+
+@dataclass(frozen=True)
+class StrainPoint:
+    """One strained cell of a finite-strain elastic tensor.
+
+    Attributes:
+        index: engineering Voigt component, 0-5 (xx yy zz yz xz xy)
+        sign: +1 or -1
+        strain: the engineering strain magnitude
+        system: the reference cell under this strain, atoms carried affinely
+            and not yet relaxed
+    """
+
+    index: int
+    sign: int
+    strain: float
+    system: System
+
+    @property
+    def name(self) -> str:
+        "A label fit for a directory name, e.g. 'voigt3_minus'"
+        return f"voigt{self.index}_{'plus' if self.sign > 0 else 'minus'}"
+
+
+def strain_points(
+    structure,
+    *,
+    strain: float = DEFAULT_STRAIN,
+    symmetry: bool = True,
+    rotations=None,
+    info=None,
+) -> list[StrainPoint]:
+    """The strained cells `elastic_tensor` would visit, for another code to run.
+
+    Relax the atoms of each at fixed cell (or not, for clamped-ion constants),
+    take the final stress, and pass the stresses to `elastic_from_stresses`
+    with the same `strain` and `rotations`. Only the point-group-independent
+    strains are listed, a `+` and `-` cell for each.
+
+    Args:
+        structure: a relaxed `Crystal` or periodic `System`
+        strain: engineering strain magnitude
+        symmetry: reduce the strains with the point group; False gives all six
+        rotations: (M, 3, 3) Cartesian point operations, taken from a
+            `Crystal`'s space group by default
+        info: model inputs carried on every `System`
+
+    Returns:
+        list of `StrainPoint`, `+` before `-` for each Voigt index
+    """
+    system = _as_system(structure, info)
+    if not system.periodic:
+        raise ValueError("elastic constants need a periodic structure")
+    rotations = _rotations_for(structure, rotations, symmetry)
+    cell = np.array(system.cell)
+    scaled = system.scaled_positions
+    return [
+        StrainPoint(
+            index,
+            sign,
+            float(strain),
+            _strained(system, cell, scaled, index, sign * strain),
+        )
+        for index in independent_strains(rotations)
+        for sign in (1, -1)
+    ]
+
+
+def elastic_from_stresses(
+    stresses,
+    *,
+    strain: float,
+    rotations=None,
+    reference_stress=None,
+    relaxed_atoms: bool = True,
+) -> ElasticResult:
+    """Fit an elastic tensor to stresses computed elsewhere.
+
+    The counterpart of `strain_points`: every Voigt index present must have
+    both its `+` and `-` stress, and together they must cover the strains
+    `independent_strains(rotations)` asks for. Extra indices are used in the
+    fit.
+
+    Args:
+        stresses: mapping of `(voigt index, sign)` to the (3, 3) stress in
+            eV/A^3, ASE sign convention (`(1/V) dE/deps`, negative under
+            compression)
+        strain: the engineering strain the cells were built with
+        rotations: (M, 3, 3) Cartesian point operations in the frame of the
+            strained cells; None or empty for no symmetry
+        reference_stress: (3, 3) stress of the unstrained cell in eV/A^3, if
+            computed; reported as `residual_stress`
+        relaxed_atoms: whether the atoms were relaxed at each strained cell,
+            recorded on the result
+
+    Returns:
+        ElasticResult, with `evaluations` the number of stresses used
+    """
+    rotations = _rotations_for(None, rotations, True)
+    indices = sorted({index for index, _ in stresses})
+    unpaired = [i for i in indices if (i, 1) not in stresses or (i, -1) not in stresses]
+    if unpaired:
+        raise ValueError(
+            f"Voigt strains {unpaired} have only one of their +/- stresses"
+        )
+    missing = sorted(set(independent_strains(rotations)) - set(indices))
+    if missing:
+        raise ValueError(
+            f"the stresses do not cover Voigt strains {missing}, which the point "
+            "group needs"
+        )
+    responses = []
+    for index in indices:
+        plus = np.asarray(stresses[(index, 1)], dtype=float)
+        minus = np.asarray(stresses[(index, -1)], dtype=float)
+        response = _stress_voigt(plus - minus) / (2.0 * strain)
+        responses.append((index, response * EV_PER_ANGSTROM3_TO_GPA))
+
+    basis = invariant_elastic_basis(rotations)
+    voigt, asymmetry, symmetry_residual = _fit_and_project(responses, rotations, basis)
+    largest = float(np.abs(voigt).max())
+    noise = max(asymmetry, symmetry_residual)
+    if largest > 0 and noise > NOISE_WARNING * largest:
+        _warn_about_noise(noise, largest, strain, float("nan"))
+
+    residual = float("nan")
+    if reference_stress is not None:
+        residual = float(np.abs(reference_stress).max() * EV_PER_ANGSTROM3_TO_GPA)
+
+    from chmpy.ext.elastic_tensor import ElasticTensor
+
+    return ElasticResult(
+        tensor=ElasticTensor(voigt),
+        evaluations=2 * len(indices),
+        relaxed_atoms=relaxed_atoms,
+        residual_stress=residual,
+        asymmetry=asymmetry,
+        symmetry_residual=symmetry_residual,
+        n_independent=len(basis),
+        strain=float(strain),
+        strains=tuple(indices),
     )
 
 
@@ -772,13 +907,8 @@ def _strain_sweep(
             stage = f"voigt {index} {'+' if sign > 0 else '-'}{strain:g}"
             symmetry = f", {len(kept)} operations kept" if kept is not None else ""
             report("elastic", stage, f"{stage}{symmetry}", index=point, total=total)
-            deformation = np.eye(3) + voigt_strain(index, sign * strain)
-            strained = System(
-                system.numbers,
-                reference_scaled @ (reference_cell @ deformation),
-                reference_cell @ deformation,
-                True,
-                dict(system.info),
+            strained = _strained(
+                system, reference_cell, reference_scaled, index, sign * strain
             )
             outcome = None
             if relax_atoms:
@@ -812,6 +942,32 @@ def _strain_sweep(
         response = (stresses[0] - stresses[1]) / (2.0 * strain)
         responses.append((index, response * EV_PER_ANGSTROM3_TO_GPA))
     return responses, relaxations
+
+
+def _strained(system, reference_cell, reference_scaled, index, strain) -> System:
+    "The reference cell under one engineering Voigt strain, atoms carried affinely"
+    deformation = np.eye(3) + voigt_strain(index, strain)
+    return System(
+        system.numbers,
+        reference_scaled @ (reference_cell @ deformation),
+        reference_cell @ deformation,
+        True,
+        dict(system.info),
+    )
+
+
+def _fit_and_project(responses, rotations, basis):
+    """Symmetrised Voigt tensor in GPa, with its asymmetry and symmetry residual.
+
+    The projection onto `basis` is the identity for a triclinic basis, so the
+    residual is then the fit misfit alone.
+    """
+    raw, misfit = fit_elastic(responses, rotations)
+    asymmetry = float(np.abs(raw - raw.T).max())
+    voigt = 0.5 * (raw + raw.T)
+    projected = elastic_to_voigt(project_elastic(elastic_from_voigt(voigt), basis))
+    symmetry_residual = max(misfit, float(np.abs(projected - voigt).max()))
+    return projected, asymmetry, symmetry_residual
 
 
 def _settle(system, calculator, fmax, steps, carried, atom_map=None, report=None):

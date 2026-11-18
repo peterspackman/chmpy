@@ -12,7 +12,13 @@ problem to an external program.
 
 from .coordinates import Atomic, AtomicStrain, Coordinates, Strain
 from .curvature import LimitedMemoryBFGS
-from .elastic import ElasticResult, elastic_tensor
+from .elastic import (
+    ElasticResult,
+    StrainPoint,
+    elastic_from_stresses,
+    elastic_tensor,
+    strain_points,
+)
 from .hessian import stretch_hessian
 from .lattice import LatticeEnergy, lattice_energy
 from .relax import Stage, coordinates_for, relax, two_stage
@@ -36,6 +42,7 @@ __all__ = [
     "LimitedMemoryBFGS",
     "Relaxation",
     "Stage",
+    "StrainPoint",
     "Step",
     "Strain",
     "SymmetryAdapted",
@@ -45,12 +52,14 @@ __all__ = [
     "XtbOptimizer",
     "cartesian_rotations",
     "coordinates_for",
+    "elastic_from_stresses",
     "elastic_tensor",
     "invariant_elastic_basis",
     "invariant_strain_basis",
     "lattice_energy",
     "map_atoms",
     "relax",
+    "strain_points",
     "stretch_hessian",
     "two_stage",
 ]

@@ -12,8 +12,10 @@ from chmpy.fmt.aims import (
     generate_control_in,
     geometry_string_to_crystal,
     geometry_string_to_molecule,
+    k_grid_for,
     molecule_to_geometry_string,
     parse_geometry_string,
+    system_to_geometry_string,
     to_geometry_string,
 )
 
@@ -73,7 +75,11 @@ class AimsFormatTestCase(unittest.TestCase):
         self.assertIn("lattice_vector", geom_str)
 
         # Check that it uses Cartesian coordinates
-        lines = [l for l in geom_str.splitlines() if l.strip() and not l.startswith("lattice_vector")]
+        lines = [
+            l
+            for l in geom_str.splitlines()
+            if l.strip() and not l.startswith("lattice_vector")
+        ]
         atom_lines = [l for l in lines if l.startswith("atom ")]
         self.assertGreater(len(atom_lines), 0)
 
@@ -646,6 +652,41 @@ class AimsOutputVariantsTestCase(unittest.TestCase):
         )
         stress = AimsOutput.from_string(raw + symmetrized).stress
         np.testing.assert_allclose(np.diag(stress), [-0.3] * 3)
+
+
+class SystemGeometryTestCase(unittest.TestCase):
+    def test_a_sheared_cell_survives_the_round_trip(self):
+        from chmpy.calc import System
+
+        cell = np.array([[5.0, 0.0, 0.0], [0.013, 6.0, 0.0], [0.0, 0.007, 7.0]])
+        fractional = np.array([[0.1, 0.2, 0.3], [0.6, 0.7, 0.8]])
+        system = System([6, 8], fractional @ cell, cell, True)
+
+        data = parse_geometry_string(system_to_geometry_string(system))
+
+        np.testing.assert_allclose(data["lattice"], cell, atol=1e-10)
+        np.testing.assert_allclose(data["positions"], fractional, atol=1e-10)
+        self.assertEqual([e.symbol for e in data["elements"]], ["C", "O"])
+
+    def test_a_molecule_is_refused(self):
+        from chmpy.calc import System
+
+        system = System([6], np.zeros((1, 3)))
+        with self.assertRaises(ValueError):
+            system_to_geometry_string(system)
+
+
+class KGridTestCase(unittest.TestCase):
+    def test_an_orthogonal_cell_gets_length_over_each_axis(self):
+        self.assertEqual(k_grid_for(np.diag([13.2, 4.0, 5.8]), 6.0), (1, 2, 2))
+
+    def test_an_axis_exactly_the_length_gets_one_point(self):
+        self.assertEqual(k_grid_for(np.diag([6.0, 3.0, 2.0]), 6.0), (1, 2, 3))
+
+    def test_an_oblique_cell_uses_the_plane_spacing(self):
+        # a = b = 4 at 120 degrees: the planes are 4 sin(60) = 3.46 A apart
+        cell = np.array([[4.0, 0, 0], [-2.0, 2 * np.sqrt(3), 0], [0, 0, 20.0]])
+        self.assertEqual(k_grid_for(cell, 7.0), (3, 3, 1))
 
 
 if __name__ == "__main__":

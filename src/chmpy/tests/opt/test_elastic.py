@@ -9,7 +9,7 @@ from chmpy.calc.result import EV_PER_ANGSTROM3_TO_GPA
 from chmpy.core import Element
 from chmpy.crystal import AsymmetricUnit, SpaceGroup, UnitCell
 from chmpy.ext.elastic_tensor import ElasticTensor
-from chmpy.opt import elastic_tensor, relax
+from chmpy.opt import elastic_from_stresses, elastic_tensor, relax, strain_points
 from chmpy.opt.elastic import voigt_strain
 from chmpy.opt.strain import cartesian_rotations
 
@@ -400,6 +400,97 @@ def test_the_misfit_of_rotated_responses_is_reported(layered):
     response = np.array([10.0, 3.0, 2.0, 1.0, 0.0, 1.0])
     _, misfit = fit_elastic([(0, response)], rotations)
     assert misfit > 0.1
+
+
+# -- strain_points / elastic_from_stresses (stresses computed elsewhere) -------
+
+
+def _stresses_of(points, calc, relax_atoms):
+    "Each strained cell relaxed in P1 at fixed cell, as an external code would"
+    stresses = {}
+    for point in points:
+        system = point.system
+        if relax_atoms:
+            outcome = relax(system, calc, cell=False, fmax=1e-7, steps=800)
+            assert outcome.converged
+            system = outcome.structure
+        stresses[(point.index, point.sign)] = calc(system, ("energy", "stress")).stress
+    return stresses
+
+
+def test_strain_points_are_the_independent_strains_both_ways(layered):
+    structure, _ = layered
+    points = strain_points(structure, strain=0.002)
+
+    assert [(p.index, p.sign) for p in points] == [
+        (0, 1),
+        (0, -1),
+        (2, 1),
+        (2, -1),
+        (3, 1),
+        (3, -1),
+    ]
+    assert points[5].name == "voigt3_minus"
+    reference = System.from_crystal(structure)
+    expected = reference.cell @ (np.eye(3) + voigt_strain(3, -0.002))
+    np.testing.assert_allclose(points[5].system.cell, expected)
+    np.testing.assert_allclose(
+        points[5].system.scaled_positions, reference.scaled_positions, atol=1e-12
+    )
+
+
+@pytest.mark.parametrize("relax_atoms", [True, False])
+def test_stresses_computed_elsewhere_give_the_same_tensor(layered, relax_atoms):
+    structure, calc = layered
+    points = strain_points(structure, strain=0.002)
+    stresses = _stresses_of(points, calc, relax_atoms)
+
+    external = elastic_from_stresses(
+        stresses,
+        strain=0.002,
+        rotations=cartesian_rotations(structure),
+        relaxed_atoms=relax_atoms,
+    )
+    direct = elastic_tensor(
+        structure, calc, strain=0.002, relax_atoms=relax_atoms, fmax=1e-7, steps=800
+    )
+
+    assert external.strains == direct.strains
+    assert external.n_independent == direct.n_independent
+    np.testing.assert_allclose(external.c_voigt, direct.c_voigt, atol=2e-3)
+
+
+def test_a_missing_stress_is_named(layered):
+    structure, calc = layered
+    stresses = _stresses_of(strain_points(structure, strain=0.002), calc, False)
+    del stresses[(3, -1)]
+    with pytest.raises(ValueError, match=r"\[3\]"):
+        elastic_from_stresses(
+            stresses, strain=0.002, rotations=cartesian_rotations(structure)
+        )
+
+
+def test_a_strain_the_point_group_needs_is_named(layered):
+    structure, calc = layered
+    stresses = _stresses_of(strain_points(structure, strain=0.002), calc, False)
+    stresses = {key: value for key, value in stresses.items() if key[0] != 2}
+    with pytest.raises(ValueError, match="cover Voigt strains \\[2\\]"):
+        elastic_from_stresses(
+            stresses, strain=0.002, rotations=cartesian_rotations(structure)
+        )
+
+
+def test_the_reference_stress_is_reported_in_gpa(relaxed_argon):
+    crystal, calc = relaxed_argon
+    stresses = _stresses_of(strain_points(crystal, strain=0.002), calc, False)
+    reference = np.diag([1e-3, 1e-3, 1e-3])
+    result = elastic_from_stresses(
+        stresses,
+        strain=0.002,
+        rotations=cartesian_rotations(crystal),
+        reference_stress=reference,
+    )
+    assert result.residual_stress == pytest.approx(1e-3 * EV_PER_ANGSTROM3_TO_GPA)
 
 
 # -- method="hessian" ----------------------------------------------------------
