@@ -69,6 +69,11 @@ NOISE_WARNING = 0.15
 #: Strains tried in turn by `strain="auto"`, smallest first.
 AUTO_STRAINS = (0.005, 0.01, 0.02, 0.04)
 
+#: rank tolerance when choosing strains. A genuinely new strain direction
+#: adds a singular value of order one; rotations from a cell that is only
+#: nearly symmetric (a DFT relaxation leaves ~1e-6 A) add noise far below this.
+STRAIN_RANK_TOLERANCE = 1e-4
+
 #: strain for the clamped-ion part of method="hessian"; nothing relaxes, so
 #: the response is linear and a small strain is safe
 HESSIAN_STRAIN = 0.005
@@ -812,7 +817,7 @@ def independent_strains(rotations) -> list[int]:
         strain = voigt_strain(index, 1.0)
         orbit = to_vector(np.einsum("rij,jk,rlk->ril", rotations, strain, rotations))
         extended = np.vstack([span, orbit])
-        extended_rank = np.linalg.matrix_rank(extended, tol=1e-8)
+        extended_rank = np.linalg.matrix_rank(extended, tol=STRAIN_RANK_TOLERANCE)
         if extended_rank == rank:
             continue
         chosen.append(index)

@@ -354,6 +354,17 @@ def test_each_strain_brings_its_orbit(number, angles, expected):
     assert independent_strains(cartesian_rotations(structure)) == expected
 
 
+def test_rotations_from_a_relaxed_cell_keep_every_strain():
+    """A DFT-relaxed cell is orthorhombic only to ~1e-6 A, and its rotations
+    carry that noise; it must not stand in for the missing shear orbits."""
+    from chmpy.opt.elastic import independent_strains
+
+    structure = _crystal((7.27, 9.29, 6.70), (90, 90, 90), 62, [6], [[0.1, 0.2, 0.3]])
+    rotations = cartesian_rotations(structure)
+    noise = np.random.default_rng(0).normal(scale=4e-7, size=rotations.shape)
+    assert independent_strains(rotations + noise) == [0, 1, 2, 3, 4, 5]
+
+
 def test_without_symmetry_the_fit_is_the_matrix_of_responses():
     from chmpy.opt.elastic import fit_elastic
 
