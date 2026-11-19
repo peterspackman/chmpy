@@ -1,0 +1,13 @@
+! {{keywords}}
+%maxcore {{maxcore}}
+%pal nprocs {{nprocs}} end
+{%- if blocks %}
+{{blocks}}
+{%- endif %}
+
+* xyz {{charge}} {{multiplicity}}
+{{geometry}}
+*
+{%- if trailing %}
+{{trailing}}
+{%- endif %}

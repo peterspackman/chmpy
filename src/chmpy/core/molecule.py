@@ -620,6 +620,26 @@ class Molecule:
             lines.append(f"{el} {x: 20.12f} {y: 20.12f} {z: 20.12f}")
         return "\n".join(lines)
 
+    def to_orca_input(self, keywords, **kwargs) -> str:
+        """
+        Represent this molecule as an ORCA input.
+
+        Args:
+            keywords (str): the simple input line, without the leading `!`
+            kwargs: passed to `chmpy.fmt.orca.to_orca_input` (blocks, nprocs,
+                maxcore, ghost); charge and multiplicity default to this
+                molecule's
+
+        Returns:
+            contents (str) the contents of the ORCA input
+        """
+        from chmpy.fmt.orca import to_orca_input
+
+        kwargs.setdefault("charge", self.charge)
+        kwargs.setdefault("multiplicity", self.multiplicity)
+        elements = [str(el) for el in self.elements]
+        return to_orca_input(elements, self.positions, keywords, **kwargs)
+
     def to_xyz_file(self, filename, **kwargs):
         """
         Represent this molecule as an

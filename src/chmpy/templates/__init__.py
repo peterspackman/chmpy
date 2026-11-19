@@ -17,6 +17,7 @@ _ALL_TEMPLATES = {
     "gaussian_scf": CHMPY_TEMPLATE_ENV.get_template("gaussian_scf.jinja2"),
     "nwchem_input": CHMPY_TEMPLATE_ENV.get_template("nwchem_input.jinja2"),
     "gulp": CHMPY_TEMPLATE_ENV.get_template("gulp.jinja2"),
+    "orca_input": CHMPY_TEMPLATE_ENV.get_template("orca_input.jinja2"),
 }
 
 
