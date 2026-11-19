@@ -10,6 +10,7 @@ watch the stress come back.
 problem to an external program.
 """
 
+from .constraints import Angle, Bond, Constrained, Dihedral, Fixed
 from .coordinates import Atomic, AtomicStrain, Coordinates, Strain
 from .curvature import LimitedMemoryBFGS
 from .elastic import (
@@ -32,19 +33,24 @@ from .trust_region import Relaxation, Step, TrustRegion, TrustRegionOptions
 from .xtb import XtbEnergyEvaluator, XtbOptimizer
 
 __all__ = [
+    "Angle",
+    "AtomMap",
     "Atomic",
     "AtomicStrain",
-    "AtomMap",
+    "Bond",
+    "Constrained",
     "Coordinates",
+    "Dihedral",
     "ElasticResult",
+    "Fixed",
     "InvariantAtomic",
     "LatticeEnergy",
     "LimitedMemoryBFGS",
     "Relaxation",
     "Stage",
-    "StrainPoint",
     "Step",
     "Strain",
+    "StrainPoint",
     "SymmetryAdapted",
     "TrustRegion",
     "TrustRegionOptions",

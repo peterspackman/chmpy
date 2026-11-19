@@ -38,6 +38,7 @@ import numpy as np
 
 from chmpy.calc.system import System
 
+from .constraints import Constrained
 from .coordinates import Atomic, AtomicStrain, strain_basis_for
 from .progress import reporter
 from .symmetry import SymmetryAdapted
@@ -104,7 +105,12 @@ def two_stage(fmax: float = 0.01, smax: float = 0.05, steps: int = 200) -> list[
 
 
 def coordinates_for(
-    structure, cell: bool = True, symmetry: bool = True, fixed=None, info=None
+    structure,
+    cell: bool = True,
+    symmetry: bool = True,
+    fixed=None,
+    info=None,
+    constraints=None,
 ):
     """The degrees of freedom to relax a structure with.
 
@@ -118,10 +124,24 @@ def coordinates_for(
             when symmetry is on, over the unit cell otherwise
         info: model inputs that are not geometry, e.g. a charge or a spin,
             carried on the `System` the calculator sees
+        constraints: `chmpy.opt.constraints` entries (`Bond`, `Angle`,
+            `Dihedral`, `Fixed`), indexed over the atoms of the System. They
+            apply at fixed cell and without symmetry.
 
     Returns:
         a `Coordinates`
     """
+    if constraints:
+        periodic = hasattr(structure, "space_group") or getattr(
+            structure, "periodic", False
+        )
+        if periodic and cell:
+            raise ValueError("constraints apply at fixed cell; pass cell=False")
+        if symmetry and hasattr(structure, "space_group"):
+            raise ValueError(
+                "constraints generally break the space group; pass symmetry=False"
+            )
+        return Constrained(_as_system(structure, info), constraints, fixed=fixed)
     if symmetry and hasattr(structure, "space_group"):
         return SymmetryAdapted(structure, cell=cell, fixed=fixed, info=info)
 
@@ -139,6 +159,7 @@ def relax(
     cell: bool = True,
     symmetry: bool = True,
     fixed=None,
+    constraints=None,
     info=None,
     fmax: float = 0.01,
     smax: float = 0.05,
@@ -158,6 +179,9 @@ def relax(
         symmetry: keep a crystal's space group, exactly, by making the
             asymmetric unit the degrees of freedom
         fixed: boolean mask of atoms to hold still
+        constraints: bonds, angles, dihedrals and Cartesian components to
+            hold, from `chmpy.opt.constraints`; at fixed cell and without
+            symmetry. Each holds its starting value unless given a `value`.
         info: model inputs that are not geometry -- a charge, a spin, an
             external field -- carried on the `System` the calculator sees.
             Models that need them fail without them.
@@ -189,7 +213,12 @@ def relax(
     finished = []
     for number, stage in enumerate(plan):
         coordinates = coordinates_for(
-            current, cell=stage.cell, symmetry=symmetry, fixed=fixed, info=info
+            current,
+            cell=stage.cell,
+            symmetry=symmetry,
+            fixed=fixed,
+            info=info,
+            constraints=constraints,
         )
         if coordinates.n_dof == 0:
             # nothing to vary -- a fixed-cell stage for a structure whose atoms
