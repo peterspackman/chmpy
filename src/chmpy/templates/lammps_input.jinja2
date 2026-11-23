@@ -1,0 +1,16 @@
+# {{ title }}
+{%- if preamble %}
+{{ preamble }}
+{%- endif %}
+
+units           {{ units }}
+atom_style      {{ atom_style }}
+boundary        {{ boundary }}
+read_data       {{ data_file }}
+
+{{ pair }}
+{%- for name, text in sections %}
+
+{% if name %}# {{ name }}
+{% endif %}{{ text }}
+{%- endfor %}
