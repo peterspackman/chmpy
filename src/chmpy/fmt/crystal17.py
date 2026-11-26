@@ -26,6 +26,9 @@ def _cell_parameters(crystal):
 
 
 def to_crystal17_input(crystal, **kwargs):
+    if not crystal.space_group.tabulated:
+        # CRYSTAL names the space group by number, which only a tabulated setting has
+        crystal = crystal.as_P1()
     space_group = crystal.space_group.international_tables_number
     params = _cell_parameters(crystal)
     method = kwargs.get("method", "hf-3c")

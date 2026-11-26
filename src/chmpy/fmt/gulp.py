@@ -64,6 +64,14 @@ def crystal_to_gulp_input(
         additional_keywords = {}
     if keywords is None:
         keywords = []
+    if not crystal.space_group.tabulated:
+        # GULP names the space group by symbol, which only a tabulated setting has
+        if charges is not None:
+            raise ValueError(
+                "The space group setting is not tabulated: write crystal.as_P1() "
+                "with charges for its sites"
+            )
+        crystal = crystal.as_P1()
     pos = crystal.asymmetric_unit.positions
     el = crystal.asymmetric_unit.elements
 

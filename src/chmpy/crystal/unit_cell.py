@@ -427,6 +427,27 @@ class UnitCell:
             deg[ang_diffs[i]] = deg[i]
         return np.hstack((l, deg))
 
+    def niggli_reduced(self) -> "UnitCell":
+        """The Niggli reduced cell of this lattice, in the same Cartesian frame.
+
+        `chmpy.crystal.lattice_reduction.niggli_reduce` also gives the
+        integer transform from this basis.
+        """
+        from .lattice_reduction import niggli_reduce
+
+        return UnitCell(niggli_reduce(self.direct).vectors)
+
+    def selling_reduced(self) -> "UnitCell":
+        """The Selling (Delaunay) reduced cell of this lattice, in the same
+        Cartesian frame.
+
+        `chmpy.crystal.lattice_reduction.selling_reduce` also gives the
+        integer transform from this basis.
+        """
+        from .lattice_reduction import selling_reduce
+
+        return UnitCell(selling_reduce(self.direct).vectors)
+
     @classmethod
     def from_lengths_and_angles(cls, lengths, angles, unit="radians"):
         """

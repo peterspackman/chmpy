@@ -147,6 +147,32 @@ def _is_symmorphic(symmetry_operations, denom=12) -> bool:
     return False
 
 
+#: lattice centrings by their pure translations, in twelfths
+_CENTRING_FROM_TRANSLATIONS = {
+    frozenset(): "primitive",
+    frozenset({(0, 6, 6)}): "aface",
+    frozenset({(6, 0, 6)}): "bface",
+    frozenset({(6, 6, 0)}): "cface",
+    frozenset({(6, 6, 6)}): "body",
+    frozenset({(0, 6, 6), (6, 0, 6), (6, 6, 0)}): "face",
+    frozenset({(8, 4, 4), (4, 8, 8)}): "rcenter",
+}
+
+
+def _centering(symmetry_operations) -> str:
+    "The centring named by the pure translations, or 'unconventional'."
+    translations = frozenset(
+        tuple(int(x) for x in np.round(12 * s.translation).astype(int) % 12)
+        for s in symmetry_operations
+        if np.allclose(s.rotation, np.eye(3)) and not s.is_identity()
+    )
+    return _CENTRING_FROM_TRANSLATIONS.get(translations, "unconventional")
+
+
+def _on_twelfths(x) -> bool:
+    return np.allclose(12 * x, np.round(12 * x), atol=1e-6)
+
+
 class SpaceGroup:
     """
     Represent a crystallographic space group, including
@@ -159,6 +185,8 @@ class SpaceGroup:
         full_symbol (str): The full international tables space group symbol
         choice (str): The space group choice (if applicable)
         centering (str): The space group centering (if applicable)
+        tabulated (bool): Whether the operations are those of a tabulated
+            setting; see `SpaceGroup.in_setting`
         schoenflies (str): The Schoenflies space group symbol
         centrosymmetric (bool): Whether or not the space group is centrosymmetric
         symmetry_operations (List[SymmetryOperation]): List of symmetry operations
@@ -193,10 +221,143 @@ class SpaceGroup:
         ]
         self._point_group = _point_group_setting(sgdata.pointgroup, tuple(symops))
         self._sgdata = sgdata
+        self.tabulated = True
+
+    @classmethod
+    def in_setting(cls, symmetry_operations, number=None, symbol=None):
+        """The space group with exactly these operations, in whatever setting
+        they describe.
+
+        A tabulated setting is returned when the operations match one.
+        Otherwise the group keeps the operations as given and `tabulated` is
+        False: its type (number, symbols) comes from `number`, or from
+        identifying the operations, and its centring and point group setting
+        from the operations themselves. It has no Hall symbol, and formats
+        that name a space group by symbol alone cannot represent it.
+
+        Args:
+            symmetry_operations (List[SymmetryOperation]): the full group,
+                translations modulo the lattice
+            number (int, optional): the space group type, if known
+            symbol (str, optional): the symbol to report, if not the short
+                symbol of the type
+
+        Returns:
+            SpaceGroup: the group in this setting
+
+        Raises:
+            ValueError: if `number` is not given and the operations cannot be
+                identified
+        """
+        operations = list(symmetry_operations)
+        try:
+            return cls.from_symmetry_operations(operations)
+        except ValueError:
+            pass
+        if number is None:
+            from .subgroup import identify_standard_setting
+
+            result = identify_standard_setting(operations)
+            if result is None:
+                raise ValueError(
+                    "Could not identify the space group of these operations"
+                )
+            number = result.sg_number
+        space_group = cls(number)
+        space_group.symmetry_operations = operations
+        space_group.tabulated = False
+        space_group.choice = ""
+        if symbol:
+            space_group.symbol = symbol
+        space_group.full_symbol = space_group.symbol
+        space_group.centering = _centering(operations)
+        codes = tuple(sorted(s.integer_code for s in operations))
+        space_group._point_group = _point_group_setting(
+            space_group._sgdata.pointgroup, codes
+        )
+        return space_group
+
+    def transformed(self, P, origin_shift=None):
+        """This group in the basis whose lattice vectors are the rows of
+        P @ direct, with fractional coordinates x @ inv(P) + origin_shift.
+
+        Each new basis vector must be a lattice vector, centring included.
+        A new cell smaller than the old one drops centring (to a primitive
+        cell, say); a larger one gains it, from the lattice points that are
+        fractional in the new basis (to a conventional centred cell, or a
+        supercell).
+
+        Args:
+            P (array_like): (3, 3) change of basis
+            origin_shift (array_like, optional): (3,) added to the new
+                fractional coordinates
+
+        Returns:
+            SpaceGroup: the group in the new basis, tabulated if that setting is
+
+        Raises:
+            ValueError: if a new basis vector is not a lattice vector, or an
+                operation cannot be represented in the new basis
+        """
+        P = np.asarray(P, dtype=float)
+        P_inv = np.linalg.inv(P)
+        shift = np.zeros(3) if origin_shift is None else np.asarray(origin_shift)
+        lattice = [np.zeros(3)] + [
+            s.translation
+            for s in self.symmetry_operations
+            if np.allclose(s.rotation, np.eye(3)) and not s.is_identity()
+        ]
+
+        def same_point(u, v):
+            return np.allclose((u - v + 0.5) % 1 - 0.5, 0, atol=1e-6)
+
+        for row in P:
+            if not any(same_point(row, t) for t in lattice):
+                raise ValueError(f"New basis vector {row} is not a lattice vector")
+
+        # the old lattice modulo the new: the new cell's centring translations
+        generators = [row % 1 for row in P_inv] + [(t @ P_inv) % 1 for t in lattice]
+        centring = [np.zeros(3)]
+        frontier = [np.zeros(3)]
+        while frontier:
+            point = frontier.pop()
+            for g in generators:
+                q = (point + g) % 1
+                if not any(same_point(q, c) for c in centring):
+                    centring.append(q)
+                    frontier.append(q)
+
+        operations = {}
+        for s in self.symmetry_operations:
+            rotation = P_inv.T @ s.rotation @ P.T
+            integral = np.round(rotation)
+            if not np.allclose(rotation, integral, atol=1e-6):
+                raise ValueError(f"Operation {s} is not a symmetry of the new basis")
+            if np.abs(integral).max() > 1:
+                raise ValueError(
+                    f"Operation {s} has rotation entries beyond +-1 in the new basis"
+                )
+            for c in centring:
+                translation = (
+                    P_inv.T @ s.translation + c + (np.eye(3) - integral) @ shift
+                )
+                if not _on_twelfths(translation):
+                    raise ValueError(
+                        f"Operation {s} has a translation off the 1/12 grid in "
+                        "the new basis"
+                    )
+                op = SymmetryOperation(integral, np.round(12 * translation) % 12 / 12)
+                operations.setdefault(op.integer_code, op)
+        symbol = None if self.tabulated else self.symbol
+        return SpaceGroup.in_setting(
+            operations.values(), number=self.international_tables_number, symbol=symbol
+        )
 
     @property
     def hall_symbol(self) -> str:
         "The Hall symbol of this setting, e.g. '-P 2yab' for P 1 21/a 1."
+        if not self.tabulated:
+            raise ValueError("A setting that is not tabulated has no Hall symbol")
         return HALL_SYMBOLS[f"{self.international_tables_number}:{self.choice}"]
 
     @property
@@ -208,6 +369,11 @@ class SpaceGroup:
         )
 
     def crystal17_spacegroup_symbol(self):
+        if not self.tabulated:
+            raise ValueError(
+                f"{self.symbol} is in a setting that is not tabulated, so no "
+                "symbol describes it; use Crystal.as_P1()"
+            )
         tokens = []
         s = self._sgdata.international.upper()
         if "=" in s:
@@ -373,6 +539,8 @@ class SpaceGroup:
         if inum < 143 or inum > 194:
             return self.crystal_system
         if inum in (146, 148, 155, 160, 161, 166, 167):
+            if not self.tabulated:
+                return "hexagonal" if self.centering == "rcenter" else "rhombohedral"
             if self.choice == "H":
                 return "hexagonal"
             elif self.choice == "R":
@@ -422,6 +590,8 @@ class SpaceGroup:
             "bface": 6,  # B
             "cface": 7,  # C
         }
+        if self.centering not in centering_to_latt:
+            raise ValueError(f"SHELX LATT cannot describe {self.centering} centring")
         inversion = SymmetryOperation(-np.eye(3), np.zeros(3))
         if inversion not in self.symmetry_operations:
             return -centering_to_latt[self.centering]
@@ -486,9 +656,14 @@ class SpaceGroup:
         return f"<{self.__class__.__name__} {self.international_tables_number}: {self.full_symbol}>"
 
     def __eq__(self, other):
+        if not isinstance(other, SpaceGroup):
+            return NotImplemented
         return (
             self.international_tables_number == other.international_tables_number
-        ) and (self.choice == other.choice)
+            and self.choice == other.choice
+            and {s.integer_code for s in self.symmetry_operations}
+            == {s.integer_code for s in other.symmetry_operations}
+        )
 
     def __hash__(self):
         return hash((self.international_tables_number, self.choice))

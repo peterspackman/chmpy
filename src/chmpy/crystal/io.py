@@ -16,7 +16,7 @@ from chmpy.core.element import Element
 from chmpy.fmt.cif import Cif, CifBlock, canonical_data_name, is_scalar
 
 from .asymmetric_unit import AsymmetricUnit
-from .space_group import SpaceGroup, SymmetryOperation
+from .space_group import SpaceGroup, SymmetryOperation, expanded_symmetry_list
 from .unit_cell import UnitCell
 
 if TYPE_CHECKING:
@@ -213,9 +213,10 @@ def from_cif_data(cif_data, titl=None):
         "space_group_symop_operation_xyz",
     )
     number = space_group.international_tables_number
+    listed_number = None
     for k in ("space_group_IT_number", "symmetry_Int_Tables_number"):
         if k in cif_data:
-            number = int(cif_data[k])
+            number = listed_number = int(cif_data[k])
             break
 
     # The setting comes from the Hall symbol, else the H-M symbol, unless the
@@ -261,19 +262,23 @@ def from_cif_data(cif_data, titl=None):
                     SymmetryOperation.from_string_code(x)
                     for x in cif_data[symop_data_block]
                 ]
+                symbol = hm_symbol or None
                 try:
-                    new_sg = SpaceGroup.from_symmetry_operations(symops)
-                    space_group = new_sg
+                    space_group = SpaceGroup.in_setting(
+                        symops, number=listed_number, symbol=symbol
+                    )
                 except ValueError:
-                    space_group.symmetry_operations = symops
-                    symbol = cif_data.get("symmetry_space_group_name_H-M", "Unknown")
-                    space_group.international_tables_number = number
-                    space_group.symbol = symbol
-                    space_group.full_symbol = symbol
-                    LOG.warn(
-                        "Initializing non-standard spacegroup setting %s, "
-                        "some SG data may be missing",
-                        symbol,
+                    LOG.warning(
+                        "Could not identify the space group of the listed "
+                        "operations; treating them as space group %s",
+                        number,
+                    )
+                    space_group = SpaceGroup.in_setting(
+                        symops, number=number, symbol=symbol
+                    )
+                if not space_group.tabulated:
+                    LOG.info(
+                        "%s is in a setting that is not tabulated", space_group.symbol
                     )
                 break
         else:
@@ -395,9 +400,16 @@ def from_shelx_string(file_content, **kwargs):
 
     shelx_dict = parse_shelx_file_content(file_content)
     asymmetric_unit = AsymmetricUnit.from_records(shelx_dict["ATOM"])
-    space_group = SpaceGroup.from_symmetry_operations(
-        shelx_dict["SYMM"], expand_latt=shelx_dict["LATT"]
-    )
+    operations = expanded_symmetry_list(shelx_dict["SYMM"], shelx_dict["LATT"])
+    try:
+        space_group = SpaceGroup.in_setting(operations)
+    except ValueError:
+        # a .res file has no space group number to fall back on
+        LOG.warning(
+            "Could not identify the space group of the SHELX operations; "
+            "keeping them with the type left as P1"
+        )
+        space_group = SpaceGroup.in_setting(operations, number=1)
     unit_cell = UnitCell.from_lengths_and_angles(
         shelx_dict["CELL"]["lengths"], shelx_dict["CELL"]["angles"], unit="degrees"
     )
@@ -539,10 +551,9 @@ def _cif_hermann_mauguin(space_group) -> str:
 
 def _cif_hall(space_group) -> str:
     "The Hall symbol of a tabulated setting, or '?' for any other."
-    try:
-        return space_group.hall_symbol
-    except KeyError:
+    if not space_group.tabulated:
         return "?"
+    return space_group.hall_symbol
 
 
 def to_cif_data(crystal, data_block_name=None, source_data=True) -> CifBlock:
@@ -650,6 +661,9 @@ def to_shelx_string(crystal, titl=None):
     """Represent a crystal structure as a shelx .res formatted string"""
     from chmpy.fmt.shelx import to_res_contents
 
+    if crystal.space_group.centering == "unconventional":
+        # LATT has no code for this centring
+        crystal = crystal.as_P1()
     sfac = list(np.unique(crystal.site_atoms))
     atom_sfac = [sfac.index(x) + 1 for x in crystal.site_atoms]
     shelx_data = {

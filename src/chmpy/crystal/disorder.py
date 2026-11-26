@@ -406,19 +406,11 @@ def _subgroup_space_group(operations, result):
     """
     from .space_group import SpaceGroup
 
-    try:
-        return SpaceGroup.from_symmetry_operations(list(operations))
-    except (ValueError, KeyError):
-        pass
-    space_group = SpaceGroup(1)
-    space_group.symmetry_operations = list(operations)
-    if result.space_group_number:
-        space_group.international_tables_number = result.space_group_number
-    symbol = result.space_group_symbol or space_group.symbol
-    space_group.symbol = symbol
-    space_group.full_symbol = symbol
-    LOG.debug("subgroup %s is a non-standard setting", symbol)
-    return space_group
+    return SpaceGroup.in_setting(
+        operations,
+        number=result.space_group_number or None,
+        symbol=result.space_group_symbol,
+    )
 
 
 def _overbonded_hydrogens(crystal, bond_tolerance=0.4):

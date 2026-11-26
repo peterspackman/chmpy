@@ -9,6 +9,7 @@ and more.
 from .asymmetric_unit import AsymmetricUnit
 from .crystal import Crystal
 from .disorder import Disorder, analyse_disorder, disorder_components
+from .lattice_reduction import ReducedBasis, niggli_reduce, selling_reduce
 from .point_group import PointGroup
 from .powder import PowderPattern, plot_powder_patterns, powder_pattern
 from .reflection_conditions import ReflectionCondition
@@ -23,6 +24,9 @@ __all__ = [
     "Disorder",
     "analyse_disorder",
     "disorder_components",
+    "ReducedBasis",
+    "niggli_reduce",
+    "selling_reduce",
     "SpaceGroup",
     "PointGroup",
     "UnitCell",

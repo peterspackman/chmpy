@@ -224,6 +224,9 @@ class Pdb:
     def from_crystal(cls, crystal, header=None):
         """Initialize a PDB from a Crystal object."""
         pdb = cls({})
+        if not crystal.space_group.tabulated:
+            # CRYST1 names the space group by symbol, which only a tabulated setting has
+            crystal = crystal.as_P1()
 
         # Set header
         pdb.header = header or "Crystal structure"

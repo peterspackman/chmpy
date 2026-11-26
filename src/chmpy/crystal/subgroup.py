@@ -186,9 +186,27 @@ def _compute_symmetry_adapted_transforms(
         if cross.any():
             all_vecs.append(cross.astype(int))
 
-    # If still fewer than 3 independent vectors, supplement with standard
-    # basis vectors. This handles pure rotation groups (e.g. C3) where
-    # only the rotation axis is extracted from eigenvectors.
+    # A pure rotation group (e.g. C3) gives only its axis v: the hexagonal
+    # axes are w and R w for a lattice vector w perpendicular to v.
+    if len(all_vecs) < 3:
+        for R in rotations:
+            R_int = np.round(R).astype(int)
+            if np.trace(R_int) not in (-1, 0, 1) or (R_int == I3).all():
+                continue
+            axes = _integer_null_space(R_int - I3)
+            if len(axes) != 1:
+                continue
+            for e in I3:
+                w = np.cross(axes[0], e)
+                if w.any():
+                    w = w // np.gcd.reduce(w[w != 0])
+                    for v in (w, R_int @ w):
+                        if not any(_is_parallel(v, x) for x in all_vecs):
+                            all_vecs.append(v)
+                    break
+            break
+
+    # Otherwise supplement with standard basis vectors.
     if len(all_vecs) < 3:
         for e in [np.array([1, 0, 0]), np.array([0, 1, 0]), np.array([0, 0, 1])]:
             if not any(_is_parallel(e, v) for v in all_vecs):
@@ -485,6 +503,8 @@ def _solve_origin_shift(
     For operations (R_i, t_i) and candidate (R_i, t_i'), solves for
     origin shift p such that:
         t_i - t_i' = (R_i - I) @ p  (mod 1) for all i
+    where, in a centred group, mod 1 is modulo the centring translations
+    too: each rotation's translations are only defined up to them.
 
     Strategy: generate candidate p vectors from individual constraints
     (trying integer shifts on b), then verify each candidate against
@@ -518,6 +538,8 @@ def _solve_origin_shift(
     if set(sub_rot_map.keys()) != set(cand_rot_map.keys()):
         return None
 
+    centring = [t for R, t in cand_ops if np.allclose(R, np.eye(3))]
+
     # Collect linear constraints: (R_i - I) @ p = delta_t_i (mod 1)
     I3 = np.eye(3)
     constraints_A = []
@@ -541,7 +563,7 @@ def _solve_origin_shift(
 
     # First try: direct lstsq
     p, _, _, _ = np.linalg.lstsq(A_full, b_full, rcond=None)
-    if _verify_origin_shift(p, constraints_A, constraints_b):
+    if _verify_origin_shift(p, constraints_A, constraints_b, centring):
         return p
 
     # Generate candidate p vectors from individual constraints with integer
@@ -551,7 +573,6 @@ def _solve_origin_shift(
     # lstsq inside a python loop, which dominated the profile.
     candidates_seen: set[tuple[int, ...]] = set()
     shifts_arr = np.array(list(iterproduct((-1, 0, 1), repeat=3)), dtype=float)
-    n_shifts = shifts_arr.shape[0]
 
     for A, b in zip(constraints_A, constraints_b, strict=False):
         rank = np.linalg.matrix_rank(A, tol=1e-6)
@@ -562,15 +583,15 @@ def _solve_origin_shift(
         except np.linalg.LinAlgError:
             continue
         # All 27 b_shifted at once -> all 27 candidate p's via one matmul.
-        b_shifted = b + shifts_arr  # (27, 3)
-        p_cands = b_shifted @ pinv_A.T  # (27, 3)
+        b_shifted = np.concatenate([b + c + shifts_arr for c in centring])
+        p_cands = b_shifted @ pinv_A.T
         keys = (np.round(p_cands * 24).astype(int))
-        for k in range(n_shifts):
+        for k in range(len(p_cands)):
             key = (int(keys[k, 0]), int(keys[k, 1]), int(keys[k, 2]))
             if key in candidates_seen:
                 continue
             candidates_seen.add(key)
-            if _verify_origin_shift(p_cands[k], constraints_A, constraints_b):
+            if _verify_origin_shift(p_cands[k], constraints_A, constraints_b, centring):
                 return p_cands[k]
 
     # Try pairs of constraints for under-determined single constraints. A_pair
@@ -587,9 +608,19 @@ def _solve_origin_shift(
             except np.linalg.LinAlgError:
                 continue
             # Build (729, 6) of stacked b_pairs.
-            bi = constraints_b[i] + pair_shifts[:, 0, :]  # (729, 3)
-            bj = constraints_b[j] + pair_shifts[:, 1, :]  # (729, 3)
-            b_pairs = np.concatenate([bi, bj], axis=1)  # (729, 6)
+            b_pairs = np.concatenate(
+                [
+                    np.concatenate(
+                        [
+                            constraints_b[i] + ci + pair_shifts[:, 0, :],
+                            constraints_b[j] + cj + pair_shifts[:, 1, :],
+                        ],
+                        axis=1,
+                    )
+                    for ci in centring
+                    for cj in centring
+                ]
+            )
             p_cands = b_pairs @ pinv_pair.T  # (729, 3)
             keys = np.round(p_cands * 24).astype(int)
             for k in range(p_cands.shape[0]):
@@ -597,7 +628,9 @@ def _solve_origin_shift(
                 if key in candidates_seen:
                     continue
                 candidates_seen.add(key)
-                if _verify_origin_shift(p_cands[k], constraints_A, constraints_b):
+                if _verify_origin_shift(
+                    p_cands[k], constraints_A, constraints_b, centring
+                ):
                     return p_cands[k]
 
     return None
@@ -607,13 +640,19 @@ def _verify_origin_shift(
     p: np.ndarray,
     constraints_A: list[np.ndarray],
     constraints_b: list[np.ndarray],
+    centring=None,
     atol: float = 1e-3,
 ) -> bool:
-    """Verify that p satisfies all constraints A_i @ p = b_i (mod 1)."""
+    """Verify that p satisfies all constraints A_i @ p = b_i modulo the
+    lattice, whose translations within the cell are `centring`."""
+    if centring is None:
+        centring = [np.zeros(3)]
     for A, b in zip(constraints_A, constraints_b, strict=False):
         residual = A @ p - b
-        residual = residual - np.round(residual)
-        if not np.allclose(residual, 0, atol=atol):
+        if not any(
+            np.allclose((residual + c + 0.5) % 1.0 - 0.5, 0, atol=atol)
+            for c in centring
+        ):
             return False
     return True
 
@@ -624,23 +663,54 @@ def _apply_basis_transform(
 ) -> list[tuple[np.ndarray, np.ndarray]] | None:
     """Apply basis transform P to operations. Returns None if invalid.
 
-    Transforms each (R, t) pair via R' = P R P^{-1}, t' = (P t) mod 1.
-    Returns None if any transformed rotation has non-integer entries
-    or entries outside {-1, 0, 1}.
+    Coordinates transform as x' = P x, so each (R, t) becomes
+    (P R P^{-1}, P t mod 1). The new basis vectors, the columns of P^{-1},
+    must be lattice vectors of the input (centring included), and lattice
+    points of the input that are fractional in the new basis become
+    centring translations there. Returns None if a basis vector is not a
+    lattice vector, or a transformed rotation is not integral with entries
+    in {-1, 0, 1}.
 
     Args:
         P: (3,3) basis transformation matrix
-        ops: List of (rotation, translation) pairs
+        ops: the full group as (rotation, translation) pairs
 
     Returns:
-        Transformed operations, or None if any rotation is invalid
+        Transformed operations, or None if the transform is invalid
     """
     try:
         P_inv = np.linalg.inv(P)
     except np.linalg.LinAlgError:
         return None
 
-    transformed = []
+    identity = np.eye(3)
+    lattice = [t % 1.0 for R, t in ops if np.allclose(R, identity)]
+
+    def in_lattice(v):
+        return any(
+            np.allclose((v - t + 0.5) % 1.0 - 0.5, 0, atol=1e-6) for t in lattice
+        )
+
+    if not all(in_lattice(P_inv[:, j]) for j in range(3)):
+        return None
+
+    # the input lattice modulo the new one: closure of its generators' images
+    generators = [P[:, j] % 1.0 for j in range(3)] + [(P @ t) % 1.0 for t in lattice]
+    centring = [np.zeros(3)]
+    frontier = [np.zeros(3)]
+    while frontier:
+        point = frontier.pop()
+        for g in generators:
+            q = (point + g) % 1.0
+            if not any(
+                np.allclose((q - c + 0.5) % 1.0 - 0.5, 0, atol=1e-6) for c in centring
+            ):
+                centring.append(q)
+                frontier.append(q)
+                if len(centring) > 192:
+                    return None
+
+    transformed = {}
     for R, t in ops:
         R_new = P @ R @ P_inv
         R_int = np.round(R_new)
@@ -648,10 +718,31 @@ def _apply_basis_transform(
             return None
         if np.any(np.abs(R_int) > 1.5):
             return None
-        t_new = (P @ t) % 1.0
-        transformed.append((R_int, t_new))
+        for c in centring:
+            t_new = (P @ t + c) % 1.0
+            t_new[np.isclose(t_new, 1.0, atol=1e-6)] = 0.0
+            key = (
+                tuple(R_int.astype(int).ravel()),
+                tuple(np.round(12 * t_new).astype(int) % 12),
+            )
+            transformed.setdefault(key, (R_int, t_new))
 
-    return transformed
+    return list(transformed.values())
+
+
+def _shortest_along_axes(P: np.ndarray, lattice) -> np.ndarray:
+    """P with each new basis vector (column of P^{-1}) shortened to the
+    shortest lattice vector in its direction, centring included."""
+    Q = np.linalg.inv(P)
+    for j in range(3):
+        for k in (6, 4, 3, 2):
+            v = Q[:, j] / k
+            if any(
+                np.allclose((v - t + 0.5) % 1.0 - 0.5, 0, atol=1e-6) for t in lattice
+            ):
+                Q[:, j] = v
+                break
+    return np.linalg.inv(Q)
 
 
 def _match_ops_to_known_settings(
@@ -718,7 +809,8 @@ def _identify_match(
         return (*match, None)
 
     # Tier 3+4: Hardcoded basis transforms
-    for P in _BASIS_TRANSFORMS:
+    # each in both directions: to a cell larger or smaller than the input's
+    for P in (Q for T in _BASIS_TRANSFORMS for Q in (T, np.linalg.inv(T))):
         transformed = _apply_basis_transform(P, sub_ops)
         if transformed is None:
             continue
@@ -730,8 +822,11 @@ def _identify_match(
     centering = _detect_centering(sub_ops)
     if centering is not None:
         reduced = _reduce_centered_ops(sub_ops, centering)
+        lattice = [t % 1.0 for R, t in sub_ops if np.allclose(R, np.eye(3))]
         for P in _compute_symmetry_adapted_transforms([R for R, _ in reduced]):
-            transformed = _apply_basis_transform(P, reduced)
+            transformed = _apply_basis_transform(
+                _shortest_along_axes(P, lattice), sub_ops
+            )
             if transformed is None:
                 continue
             match = _match_ops_to_known_settings(transformed)

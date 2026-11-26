@@ -24,6 +24,18 @@ if TYPE_CHECKING:  # only needed to spell the return types
 LOG = logging.getLogger(__name__)
 
 
+def _with_scaled_z(cif_data, volume_ratio):
+    """A copy of CIF data for a cell `volume_ratio` times the size, with the
+    formula units per cell scaled to match."""
+    from copy import copy
+
+    scaled = copy(cif_data)
+    for name in cif_data:
+        if name.lower().lstrip("_").replace(".", "_") == "cell_formula_units_z":
+            scaled[name] = round(float(cif_data[name]) * volume_ratio)
+    return scaled
+
+
 class Crystal:
     """
     Storage class for a molecular crystal structure.
@@ -1451,12 +1463,9 @@ class Crystal:
                 tolerance=tolerance,
             )
             sub_symops = [self.symmetry_operations[i] for i in result.symop_indices]
-            sg_number = result.space_group_number or 1
-            try:
-                new_sg = SpaceGroup.from_symmetry_operations(sub_symops)
-            except ValueError:
-                new_sg = SpaceGroup(sg_number)
-                new_sg.symmetry_operations = sub_symops
+            new_sg = SpaceGroup.in_setting(
+                sub_symops, number=result.space_group_number or None
+            )
             new_crystal = Crystal(self.unit_cell, new_sg, new_asym)
             new_crystal.properties = {
                 "parent_space_group": self.space_group.symbol,
@@ -1543,33 +1552,16 @@ class Crystal:
                 "Could not identify a standard ITA setting for the "
                 "current symmetry operations"
             )
-
-        # No transform needed — already standard
-        if result.basis_transform is None and result.origin_shift is None:
-            new_sg = SpaceGroup(result.sg_number, choice=result.choice)
-            new_asym = AsymmetricUnit(
-                list(self.asymmetric_unit.elements),
-                self.asymmetric_unit.positions.copy(),
-                labels=list(self.asymmetric_unit.labels),
+        # the identification maps coordinates x -> P x + origin_shift
+        P = np.eye(3) if result.basis_transform is None else result.basis_transform
+        standard = SpaceGroup(result.sg_number, choice=result.choice)
+        crystal = self._in_basis([np.linalg.inv(P).T], origin_shift=result.origin_shift)
+        if crystal.space_group != standard:
+            raise ValueError(
+                f"{standard.symbol} identified, but the transformed operations "
+                "are not its standard setting"
             )
-            return Crystal(self.unit_cell, new_sg, new_asym)
-
-        # Origin shift only (no basis transform) — most common case
-        if result.basis_transform is None:
-            positions = self.asymmetric_unit.positions - result.origin_shift
-            positions = positions % 1.0
-            new_sg = SpaceGroup(result.sg_number, choice=result.choice)
-            new_asym = AsymmetricUnit(
-                list(self.asymmetric_unit.elements),
-                positions,
-                labels=list(self.asymmetric_unit.labels),
-            )
-            new_crystal = Crystal(self.unit_cell, new_sg, new_asym)
-            new_crystal.properties = dict(self.properties)
-            return new_crystal
-
-        # Basis transform present — need to rebuild the asymmetric unit
-        return self._to_standard_setting_with_basis_transform(result)
+        return crystal
 
     def detect_symmetry(self, tolerance: float = 0.01) -> Crystal:
         """Detect the full symmetry of this crystal from atomic positions.
@@ -1622,128 +1614,6 @@ class Crystal:
         )
         return Crystal(self.unit_cell, sg, asym)
 
-    def _to_standard_setting_with_basis_transform(self, result) -> Crystal:
-        """Handle to_standard_setting when a basis transform is needed.
-
-        When the cell changes, the asymmetric unit must be reconstructed
-        from the full unit cell content, because:
-        1. The new cell may have different volume (det(P) != 1)
-        2. Atoms on special positions in the old cell may be on general
-           positions in the new cell, and vice versa
-
-        The approach:
-        1. Build the new cell from P @ old_direct
-        2. Correctly transform symops using row-vector convention
-        3. Identify standard setting for those symops (origin shift only)
-        4. Tile old UC atoms into the new cell
-        5. Find the asymmetric unit under the standard symops
-        """
-        from itertools import product as iproduct
-
-        from scipy.spatial import cKDTree as KDTree
-
-        from chmpy.core.element import Element
-
-        from .subgroup import (
-            _deduplicate_asymmetric_unit,
-            identify_standard_setting,
-        )
-        from .symmetry_operation import SymmetryOperation
-
-        P = result.basis_transform
-        P_inv = np.linalg.inv(P)
-        det_P_raw = abs(np.linalg.det(P))
-        det_P = max(1, round(det_P_raw))  # For tiling range: at least 1
-
-        # Build new unit cell
-        new_direct = P @ self.unit_cell.direct
-        new_uc = UnitCell(new_direct)
-
-        # Correctly transform symops using row-vector convention:
-        # R_new = P @ R_old @ P_inv (same for both conventions)
-        # t_new = t_old @ P_inv (row-vector convention)
-        correct_symops = []
-        for s in self.symmetry_operations:
-            R_new = P @ s.rotation @ P_inv
-            t_new = s.translation @ P_inv
-            correct_symops.append(
-                SymmetryOperation(np.round(R_new).astype(float), t_new)
-            )
-
-        # Deduplicate transformed symops: centering translations become
-        # lattice vectors under the primitive transform, producing
-        # duplicate ops that differ only by integer translations.
-        unique_symops = []
-        seen_codes = set()
-        for s in correct_symops:
-            t_wrapped = s.translation % 1.0
-            s_wrapped = SymmetryOperation(s.rotation, t_wrapped)
-            code = s_wrapped.integer_code
-            if code not in seen_codes:
-                seen_codes.add(code)
-                unique_symops.append(s_wrapped)
-        correct_symops = unique_symops
-
-        # Identify standard setting for the correctly-transformed symops
-        # (should only need origin shift, no further basis transform)
-        result2 = identify_standard_setting(correct_symops)
-        if result2 is None:
-            raise ValueError(
-                "Could not identify standard setting after basis transform"
-            )
-
-        std_sg = SpaceGroup(result2.sg_number, choice=result2.choice)
-
-        # Generate all unit cell atoms from the current crystal
-        uc_dict = self.unit_cell_atoms()
-        old_frac = uc_dict["frac_pos"]
-        old_elems = uc_dict["element"]
-
-        # Tile old UC atoms into the new (possibly larger/smaller) cell
-        all_frac = []
-        all_elems = []
-        for shift in iproduct(range(-1, det_P + 1), repeat=3):
-            shifted = old_frac + np.array(shift, dtype=float)
-            cart = self.unit_cell.to_cartesian(shifted)
-            frac_new = new_uc.to_fractional(cart)
-            for i in range(len(frac_new)):
-                f = frac_new[i]
-                if np.all(f >= -1e-6) and np.all(f < 1.0 - 1e-6):
-                    all_frac.append(f % 1.0)
-                    all_elems.append(int(old_elems[i]))
-
-        all_frac = np.array(all_frac)
-        all_elems = np.array(all_elems)
-
-        # Remove positional duplicates
-        tree = KDTree(all_frac)
-        dist = tree.sparse_distance_matrix(tree, max_distance=0.01)
-        mask = np.ones(len(all_frac), dtype=bool)
-        for (i, j), _ in dist.items():
-            if i < j and all_elems[i] == all_elems[j]:
-                mask[j] = False
-        uc_frac = all_frac[mask]
-        uc_elems = all_elems[mask]
-
-        # Apply origin shift if needed
-        if result2.origin_shift is not None:
-            uc_frac = (uc_frac - result2.origin_shift) % 1.0
-
-        # Find asymmetric unit under standard symops
-        elem_list = [Element.from_atomic_number(e) for e in uc_elems]
-        full_asym = AsymmetricUnit(elem_list, uc_frac)
-        unique_idx, _ = _deduplicate_asymmetric_unit(
-            full_asym, std_sg.symmetry_operations
-        )
-
-        final_elems = [elem_list[i] for i in unique_idx]
-        final_pos = uc_frac[unique_idx]
-        new_asym = AsymmetricUnit(final_elems, final_pos)
-
-        new_crystal = Crystal(new_uc, std_sg, new_asym)
-        new_crystal.properties = dict(self.properties)
-        return new_crystal
-
     def choose_trigonal_lattice(self, choice="H"):
         """
         Change the choice of lattice for this crystal to either
@@ -1768,6 +1638,115 @@ class Crystal:
         self.asymmetric_unit.positions = self.to_fractional(cart_asym_pos)
         self.space_group = SpaceGroup(
             self.space_group.international_tables_number, choice=choice
+        )
+
+    def niggli_reduced(self) -> Crystal:
+        """This crystal in the Niggli reduced cell of its lattice.
+
+        The lattice includes any centring, so a centred crystal comes back in
+        a primitive cell. The space group keeps all of its operations,
+        rewritten in the new basis, which may be a setting that is not
+        tabulated (see `SpaceGroup.in_setting`). The asymmetric unit is the
+        same sites at the same Cartesian positions, moved together by a
+        lattice vector to sit in the cell.
+
+        The change of basis P is in `properties["basis_transform"]`: the new
+        lattice vectors are P @ old, and a fractional coordinate x becomes
+        x @ inv(P).
+
+        Returns:
+            Crystal: the same structure in the reduced cell
+        """
+        from .lattice_reduction import niggli_reduce
+
+        Q = self._primitive_basis()
+        reduced = niggli_reduce(Q @ self.unit_cell.direct)
+        return self._in_basis([reduced.transform @ Q])
+
+    def selling_reduced(self) -> Crystal:
+        """This crystal in a Selling (Delaunay) reduced cell of its lattice.
+
+        As `niggli_reduced`, with the basis taken from the Selling reduced
+        superbase b1..b4: the shortest three of them in which every symmetry
+        operation can still be written.
+
+        Returns:
+            Crystal: the same structure in the reduced cell
+        """
+        from itertools import combinations
+
+        from .lattice_reduction import selling_reduce
+
+        Q = self._primitive_basis()
+        primitive = Q @ self.unit_cell.direct
+        reduced = selling_reduce(primitive)
+        superbase = np.vstack([reduced.transform, -reduced.transform.sum(axis=0)])
+        lengths = np.linalg.norm(superbase @ primitive, axis=1)
+        triples = sorted(
+            combinations(range(4), 3), key=lambda t: lengths[list(t)].sum()
+        )
+        candidates = []
+        for triple in triples:
+            T = superbase[sorted(triple, key=lambda i: lengths[i])]
+            if np.linalg.det(T) < 0:
+                T = -T
+            candidates.append(T @ Q)
+        return self._in_basis(candidates)
+
+    def _primitive_basis(self) -> np.ndarray:
+        """Q with Q @ direct a basis of the lattice, centring included."""
+        from fractions import Fraction
+
+        from .integer_lattice import lattice_basis
+
+        centring = [
+            s.translation
+            for s in self.symmetry_operations
+            if np.allclose(s.rotation, np.eye(3)) and not s.is_identity()
+        ]
+        if not centring:
+            return np.eye(3)
+        generators = np.eye(3, dtype=int).tolist() + [
+            [Fraction(round(12 * x), 12) for x in t] for t in centring
+        ]
+        return np.array(lattice_basis(generators), dtype=float)
+
+    def _in_basis(self, candidates, origin_shift=None) -> Crystal:
+        """This crystal in the first of the candidate bases (rows P @ direct,
+        coordinates x @ inv(P) + origin_shift) in which every symmetry
+        operation can be written."""
+        from copy import deepcopy
+
+        for P in candidates:
+            try:
+                space_group = self.space_group.transformed(P, origin_shift)
+                break
+            except ValueError as e:
+                error = e
+        else:
+            raise error
+
+        P_inv = np.linalg.inv(P)
+        asym = self.asymmetric_unit
+        positions = asym.positions @ P_inv
+        if origin_shift is not None:
+            positions = positions + origin_shift
+        positions -= np.floor(positions.mean(axis=0))
+        new_asym = AsymmetricUnit(
+            list(asym.elements),
+            positions,
+            labels=asym.labels.copy(),
+            **deepcopy(asym.properties),
+        )
+        properties = dict(self.properties)
+        cif_data = properties.get("cif_data")
+        if cif_data is not None:
+            properties["cif_data"] = _with_scaled_z(cif_data, abs(np.linalg.det(P)))
+        properties["basis_transform"] = P
+        if origin_shift is not None:
+            properties["origin_shift"] = np.asarray(origin_shift)
+        return Crystal(
+            UnitCell(P @ self.unit_cell.direct), space_group, new_asym, **properties
         )
 
     def as_P1(self) -> Crystal:

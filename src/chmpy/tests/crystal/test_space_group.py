@@ -255,3 +255,74 @@ class SpaceGroupTestCase(unittest.TestCase):
                 ),
                 sg,
             )
+
+
+C2C_PRIMITIVE = [[0.5, -0.5, 0], [0.5, 0.5, 0], [0, 0, 1]]
+
+
+class SettingTestCase(unittest.TestCase):
+    def test_tabulated_operations_give_the_tabulated_setting(self):
+        sg = SpaceGroup(14)
+        same = SpaceGroup.in_setting(sg.symmetry_operations)
+        self.assertTrue(same.tabulated)
+        self.assertEqual(same, sg)
+
+    def test_change_of_basis_to_a_tabulated_setting(self):
+        # swapping a and c, with c negated to stay right-handed: P21/c -> P21/a
+        P = [[0, 0, 1], [0, 1, 0], [-1, 0, 0]]
+        sg = SpaceGroup(14).transformed(P)
+        self.assertTrue(sg.tabulated)
+        self.assertEqual(sg.full_symbol, "P12_1/a1")
+
+    def test_centred_cell_to_primitive(self):
+        # C2/c with a' = (a - b)/2, b' = (a + b)/2: primitive, and not tabulated
+        sg = SpaceGroup(15).transformed(C2C_PRIMITIVE)
+        self.assertFalse(sg.tabulated)
+        self.assertEqual(sg.international_tables_number, 15)
+        self.assertEqual(len(sg), 4)
+        self.assertEqual(sg.centering, "primitive")
+        self.assertEqual(sg.latt, 1)
+        self.assertNotEqual(sg, SpaceGroup(15))
+        with self.assertRaises(ValueError):
+            _ = sg.hall_symbol
+        with self.assertRaises(ValueError):
+            sg.crystal17_spacegroup_symbol()
+
+    def test_untabulated_setting_is_identified(self):
+        # R3 with its 3-fold along [-1, 1, 1]
+        ops = SpaceGroup(146, choice="R").transformed(np.diag([-1, 1, 1]))
+        self.assertFalse(ops.tabulated)
+        sg = SpaceGroup.in_setting(ops.symmetry_operations)
+        self.assertEqual(sg.international_tables_number, 146)
+
+    def test_centred_type_identified_in_a_primitive_cell(self):
+        # C2/c, not P2/c: the primitive cell's lattice is the centred one
+        ops = SpaceGroup(15).transformed(C2C_PRIMITIVE).symmetry_operations
+        self.assertEqual(SpaceGroup.in_setting(ops).international_tables_number, 15)
+
+    def test_rhombohedral_lattice_type(self):
+        hexagonal = SpaceGroup(148, choice="H")
+        P = np.array([[2, 1, 1], [-1, 1, 1], [-1, -2, 1]]) / 3
+        sg = hexagonal.transformed(P)
+        self.assertEqual(len(sg), 6)
+        self.assertEqual(sg.lattice_type, "rhombohedral")
+
+    def test_basis_vectors_must_be_lattice_vectors(self):
+        with self.assertRaises(ValueError):
+            SpaceGroup(14).transformed(np.diag([0.5, 1, 1]))
+
+    def test_primitive_cell_back_to_conventional(self):
+        primitive = SpaceGroup(15).transformed(C2C_PRIMITIVE)
+        back = primitive.transformed(np.linalg.inv(C2C_PRIMITIVE))
+        self.assertTrue(back.tabulated)
+        self.assertEqual(back, SpaceGroup(15))
+
+    def test_supercell_gains_translations(self):
+        sg = SpaceGroup(14).transformed(np.diag([2, 1, 1]))
+        self.assertEqual(len(sg), 8)
+        self.assertEqual(sg.centering, "unconventional")
+
+    def test_origin_shift(self):
+        # P-1 with its inversion centre moved to (1/4, 0, 0)
+        sg = SpaceGroup(2).transformed(np.eye(3), origin_shift=[0.25, 0, 0])
+        self.assertIn("1/2-x,-y,-z", {str(s) for s in sg.symmetry_operations})

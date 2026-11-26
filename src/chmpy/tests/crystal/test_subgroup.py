@@ -626,11 +626,32 @@ class TestToStandardSetting(unittest.TestCase):
         our_codes = {s.integer_code for s in std.symmetry_operations}
         self.assertEqual(std_codes, our_codes)
 
+    def test_origin_shift_keeps_the_structure(self):
+        """P-1 with its inversion centre at (1/12, 0, 0): moving the centre
+        to the origin must move the atoms with it."""
+        ops = [
+            SymmetryOperation.from_string_code("x,y,z"),
+            SymmetryOperation.from_string_code("1/6-x,-y,-z"),
+        ]
+        asym = AsymmetricUnit([Element["C"]], [[0.11, 0.23, 0.37]])
+        cell = UnitCell.triclinic(5.1, 6.3, 7.7, 81.0, 97.0, 104.0, unit="degrees")
+        crystal = Crystal(cell, SpaceGroup.in_setting(ops), asym)
+        std = crystal.to_standard_setting()
+        self.assertEqual(std.space_group, SpaceGroup(2))
+
+        def separation(c):
+            "minimum image distance between the atom and its inversion image"
+            frac = c.unit_cell_atoms()["frac_pos"]
+            d = frac[1] - frac[0]
+            return np.linalg.norm(c.to_cartesian(d - np.round(d)))
+
+        self.assertAlmostEqual(separation(crystal), separation(std), places=6)
+
     def test_preserves_cartesian_positions(self):
         """to_standard_setting should preserve physical structure.
 
         An origin shift moves all atoms by p in fractional coords.
-        After shifting the "after" unit cell atoms back by p, they
+        After shifting the "after" unit cell atoms back by -p, they
         should coincide (mod lattice) with the "before" atoms.
         """
         urea = _make_urea_crystal()
@@ -648,7 +669,7 @@ class TestToStandardSetting(unittest.TestCase):
         self.assertEqual(len(uc_before["element"]), len(uc_after["element"]))
 
         # Undo the origin shift on the "after" fractional positions
-        frac_after_shifted = (uc_after["frac_pos"] + p) % 1.0
+        frac_after_shifted = (uc_after["frac_pos"] - p) % 1.0
         frac_before = uc_before["frac_pos"]
 
         matched = set()
