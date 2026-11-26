@@ -300,6 +300,12 @@ class SettingTestCase(unittest.TestCase):
         ops = SpaceGroup(15).transformed(C2C_PRIMITIVE).symmetry_operations
         self.assertEqual(SpaceGroup.in_setting(ops).international_tables_number, 15)
 
+    def test_rhombohedral_identified_in_a_reduced_cell(self):
+        # R-3 on a reduced primitive basis: one axis, no mirrors
+        P = [[0, 0, -1], [-1 / 3, 1 / 3, 1 / 3], [2 / 3, 1 / 3, 1 / 3]]
+        ops = SpaceGroup(148, choice="H").transformed(P).symmetry_operations
+        self.assertEqual(SpaceGroup.in_setting(ops).international_tables_number, 148)
+
     def test_rhombohedral_lattice_type(self):
         hexagonal = SpaceGroup(148, choice="H")
         P = np.array([[2, 1, 1], [-1, 1, 1], [-1, -2, 1]]) / 3

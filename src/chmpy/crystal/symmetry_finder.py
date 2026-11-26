@@ -11,30 +11,31 @@ vectors using a hierarchical, numpy-vectorized algorithm:
 """
 
 import logging
+from dataclasses import dataclass
+from fractions import Fraction
+from itertools import product
 
 import numpy as np
 
-from .space_group import SG_FROM_NUMBER
-from .symmetry_operation import SymmetryOperation, decode_symm_int
+from .integer_lattice import lattice_basis
+from .lattice_reduction import niggli_reduce
+from .symmetry_operation import SymmetryOperation
 
 LOG = logging.getLogger(__name__)
 
 
 def _build_rotation_table() -> np.ndarray:
-    """Extract all unique crystallographic rotation matrices from space group data.
+    """Every integer matrix with entries in {-1, 0, 1} and determinant +-1.
+
+    In a Niggli reduced basis every symmetry operation's rotation is one of
+    these, whatever the setting.
 
     Returns:
-        (K, 3, 3) integer array of unique rotation matrices
+        (K, 3, 3) integer array of candidate rotation matrices
     """
-    unique = {}
-    for settings in SG_FROM_NUMBER.values():
-        for sg in settings:
-            for code in sg.symops:
-                rot_code = code % 19683
-                if rot_code not in unique:
-                    R, _ = decode_symm_int(rot_code)
-                    unique[rot_code] = np.round(R).astype(int)
-    return np.array(list(unique.values()))
+    entries = np.array(list(product((-1, 0, 1), repeat=9))).reshape(-1, 3, 3)
+    det = np.round(np.linalg.det(entries))
+    return entries[np.abs(det) == 1]
 
 
 _CRYSTALLOGRAPHIC_ROTATIONS = _build_rotation_table()
@@ -47,7 +48,7 @@ def _metric_compatible_rotations(G: np.ndarray, atol: float = 1e-4) -> np.ndarra
 
     Args:
         G: (3, 3) metric tensor
-        atol: absolute tolerance for comparison
+        atol: absolute tolerance on the metric, in squared Angstroms
 
     Returns:
         (K, 3, 3) float array of compatible rotations
@@ -135,8 +136,9 @@ def find_symmetry_operations(unit_cell, positions, elements, atol=0.01):
     G = unit_cell.metric_tensor
     A = unit_cell.direct
 
-    # Stage 1: metric tensor filter
-    compatible_rots = _metric_compatible_rotations(G, atol=1e-4)
+    # Stage 1: metric tensor filter, as loose as the position tolerance
+    longest = np.sqrt(np.max(np.diag(G)))
+    compatible_rots = _metric_compatible_rotations(G, atol=2 * atol * longest + 1e-6)
     LOG.debug(
         "Metric tensor filter: %d / %d rotations compatible",
         len(compatible_rots), len(_CRYSTALLOGRAPHIC_ROTATIONS),
@@ -196,3 +198,140 @@ def find_asymmetric_unit_indices(positions, elements, symops, A, atol=0.01):
         representatives.append(members[0])
 
     return representatives
+
+
+@dataclass
+class FoundSymmetry:
+    """A structure's symmetry, in a reduced basis of its primitive lattice.
+
+    Attributes:
+        transform: (3, 3) P, the basis being P @ direct (rows)
+        origin_shift: (3,) added to fractional coordinates in that basis,
+            which puts every translation on the 1/24 grid
+        operations: the symmetry operations in that basis
+        positions: (M, 3) fractional coordinates of the primitive cell's atoms
+        indices: (M,) which input atom each of those is
+    """
+
+    transform: np.ndarray
+    origin_shift: np.ndarray
+    operations: list
+    positions: np.ndarray
+    indices: np.ndarray
+
+
+def _primitive_basis(translations, atol_frac):
+    """Q with Q @ direct a basis of the lattice the pure translations add to."""
+    generators = np.eye(3, dtype=int).tolist()
+    for t in translations:
+        t = (np.asarray(t) + 0.5) % 1 - 0.5
+        if np.abs(t).max() < atol_frac:
+            continue
+        fractions = [Fraction(float(x)).limit_denominator(96) for x in t]
+        if np.abs(np.array(fractions, dtype=float) - t).max() > atol_frac:
+            raise ValueError(f"Pure translation {t} is not rational")
+        generators.append(fractions)
+    return np.array(lattice_basis(generators), dtype=float)
+
+
+def _nullspace(M, tol=1e-8):
+    _, s, vt = np.linalg.svd(M)
+    rank = int(np.sum(s > tol))
+    return vt[rank:].T
+
+
+def _rational_origin(operations):
+    """An origin shift s putting every translation on the 1/24 grid.
+
+    Each translation t splits into an intrinsic part w (the screw or glide
+    component, the same for any origin) and a location part t - w, which
+    the shift changes by (I - R) s. The origin is placed on each
+    operation's fixed axis or plane in turn, most constrained first, within
+    the freedom the earlier ones leave.
+    """
+    identity = np.eye(3)
+    shift = np.zeros(3)
+    free = identity
+    ordered = sorted(
+        operations, key=lambda op: -np.linalg.matrix_rank(identity - op.rotation)
+    )
+    for op in ordered:
+        R, t = op.rotation, op.translation
+        order = next(
+            n
+            for n in range(1, 7)
+            if np.allclose(np.linalg.matrix_power(R, n), identity)
+        )
+        w = sum(np.linalg.matrix_power(R, k) @ t for k in range(order)) / order
+        w = np.round(24 * w) / 24  # a lattice vector over the order
+        A = (identity - R) @ free
+        if np.abs(A).max() < 1e-12:
+            continue
+        rhs = -(t - w) - (identity - R) @ shift
+        # the location is only defined modulo the lattice: take the nearest
+        # solution to the current origin
+        y, *_ = np.linalg.lstsq(A, rhs, rcond=None)
+        shift = shift + free @ y
+        free = free @ _nullspace(A)
+        if free.shape[1] == 0:
+            break
+    return shift
+
+
+def find_symmetry(unit_cell, positions, elements, atol=0.01):
+    """The symmetry of a structure given as all the atoms in a cell.
+
+    The cell may be any cell of the lattice (a supercell, a centred cell,
+    an arbitrary basis): the pure translations give the primitive lattice,
+    whose Niggli reduced basis is searched for operations.
+
+    Args:
+        unit_cell: UnitCell holding the atoms
+        positions: (N, 3) fractional coordinates of all its atoms
+        elements: (N,) integer atomic numbers
+        atol: Cartesian tolerance in Angstroms
+
+    Returns:
+        FoundSymmetry, or None if the operations' translations cannot be
+        made rational
+    """
+    A = unit_cell.direct
+    positions = np.asarray(positions) % 1.0
+    elements = np.asarray(elements)
+    atol_frac = atol / np.min(np.linalg.norm(A, axis=1))
+
+    pure = _find_translations(np.eye(3), positions, elements, atol, A)
+    Q = _primitive_basis(pure, atol_frac)
+    reduced = niggli_reduce(Q @ A)
+    P = reduced.transform @ Q
+    cell = type(unit_cell)(P @ A)
+
+    # one copy of each atom in the primitive cell
+    frac = (positions @ np.linalg.inv(P)) % 1.0
+    keep = []
+    for i in range(len(frac)):
+        d = frac[keep] - frac[i]
+        d -= np.round(d)
+        if not keep or np.min(np.linalg.norm(d @ cell.direct, axis=1)) > atol:
+            keep.append(i)
+    keep = np.array(keep)
+    frac, kept_elements = frac[keep], elements[keep]
+
+    operations = find_symmetry_operations(cell, frac, kept_elements, atol=atol)
+    shift = _rational_origin(operations)
+    frac = (frac + shift) % 1.0
+    exact = []
+    for op in operations:
+        t = op.translation + (np.eye(3) - op.rotation) @ shift
+        t24 = np.round(24 * t)
+        if np.linalg.norm((t - t24 / 24) @ cell.direct) > atol:
+            return None
+        exact.append(SymmetryOperation(np.round(op.rotation), (t24 % 24) / 24))
+    if not all(
+        _verify_operation(
+            op.rotation, op.translation, frac, kept_elements, atol, cell.direct
+        )
+        for op in exact
+    ):
+        return None
+    return FoundSymmetry(P, shift, exact, frac, keep)

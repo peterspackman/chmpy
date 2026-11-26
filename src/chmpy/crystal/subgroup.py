@@ -27,7 +27,6 @@ from .space_group_table import SpaceGroupTable
 from .symmetry_operation import (
     SymmetryOperation,
     decode_symm_int,
-    encode_symm_int,
 )
 
 if TYPE_CHECKING:
@@ -187,23 +186,22 @@ def _compute_symmetry_adapted_transforms(
             all_vecs.append(cross.astype(int))
 
     # A pure rotation group (e.g. C3) gives only its axis v: the hexagonal
-    # axes are w and R w for a lattice vector w perpendicular to v.
+    # axes are w and R w for lattice vectors w perpendicular to v.
     if len(all_vecs) < 3:
         for R in rotations:
             R_int = np.round(R).astype(int)
             if np.trace(R_int) not in (-1, 0, 1) or (R_int == I3).all():
                 continue
-            axes = _integer_null_space(R_int - I3)
-            if len(axes) != 1:
+            if len(_integer_null_space(R_int - I3)) != 1:
                 continue
+            # the image of R - I is the plane perpendicular to the axis
             for e in I3:
-                w = np.cross(axes[0], e)
+                w = (R_int - I3) @ e
                 if w.any():
                     w = w // np.gcd.reduce(w[w != 0])
                     for v in (w, R_int @ w):
                         if not any(_is_parallel(v, x) for x in all_vecs):
                             all_vecs.append(v)
-                    break
             break
 
     # Otherwise supplement with standard basis vectors.
@@ -215,47 +213,34 @@ def _compute_symmetry_adapted_transforms(
     if len(all_vecs) < 3:
         return []
 
-    # Stack all rotations into a single (N_rot, 3, 3) tensor so that the
-    # Q-validation step can do P @ R_all @ Q via one numpy matmul instead
-    # of looping per rotation.
+    # Every ordered triple of vectors as the columns of Q, checked at once:
+    # all rotations conjugated into the basis must be integral with entries
+    # in {-1, 0, 1}. Flipping a column's sign conjugates by a diagonal +-1,
+    # which keeps both, so signs are expanded only for the triples that pass.
+    vectors = np.array(all_vecs, dtype=float)
+    triples = np.array(list(permutations(range(len(vectors)), 3)))
+    Q = vectors[triples].transpose(0, 2, 1)
+    Q = Q[np.abs(np.linalg.det(Q)) > 1e-8]
+    if len(Q) == 0:
+        return []
+    P = np.linalg.inv(Q)
     rotations_stack = np.stack(rotations).astype(float)
+    conjugated = P[:, None] @ rotations_stack[None] @ Q[:, None]
+    integral = np.round(conjugated)
+    valid = (np.abs(conjugated - integral).max(axis=(1, 2, 3)) <= 1e-6) & (
+        np.abs(integral).max(axis=(1, 2, 3)) <= 1.5
+    )
 
-    # Try all ordered triples (with sign flips) as columns of Q
+    signs = np.array(list(iterproduct([-1, 1], repeat=3)), dtype=float)
     valid_Ps = []
     seen = set()
-
-    for perm in permutations(range(len(all_vecs)), 3):
-        for signs in iterproduct([-1, 1], repeat=3):
-            Q = np.column_stack([
-                signs[0] * all_vecs[perm[0]],
-                signs[1] * all_vecs[perm[1]],
-                signs[2] * all_vecs[perm[2]],
-            ]).astype(float)
-
-            det_Q = np.linalg.det(Q)
-            if abs(det_Q) < 1e-8:
-                continue
-
-            # Deduplicate via a Q-based key first, so we skip the inv() and
-            # validation work on duplicates entirely.
-            q_key = tuple(np.round(Q * 24).astype(int).flatten())
+    for q, p in zip(Q[valid], P[valid], strict=True):
+        for sign in signs:
+            q_key = tuple(np.round(q * sign * 24).astype(int).ravel())
             if q_key in seen:
                 continue
             seen.add(q_key)
-
-            P = np.linalg.inv(Q)
-
-            # Verify in one batched matmul: all conjugated rotations must be
-            # integer with entries in {-1, 0, 1}.
-            R_new_all = P @ rotations_stack @ Q  # (N_rot, 3, 3)
-            R_int = np.round(R_new_all)
-            if np.abs(R_new_all - R_int).max() > 1e-6:
-                continue
-            if np.abs(R_int).max() > 1.5:
-                continue
-
-            valid_Ps.append(P)
-
+            valid_Ps.append(sign[:, None] * p)
     return valid_Ps
 
 
@@ -440,25 +425,16 @@ def compute_closure(generators: frozenset[int], sg_table: SpaceGroupTable) -> fr
     Returns:
         Frozenset of all symop indices in the closure
     """
-    closure = set(generators)
-    changed = True
-    while changed:
-        changed = False
-        new_elements = set()
-        for a in closure:
-            # Add inverse
-            inv_a = int(sg_table.inverse_table[a])
-            if inv_a not in closure:
-                new_elements.add(inv_a)
-            # Add all products with existing elements
-            for b in closure:
-                product = int(sg_table.mult_table[a, b])
-                if product not in closure and product not in new_elements:
-                    new_elements.add(product)
-        if new_elements:
-            closure.update(new_elements)
-            changed = True
-    return frozenset(closure)
+    members = np.zeros(len(sg_table.inverse_table), dtype=bool)
+    members[list(generators)] = True
+    while True:
+        indices = np.flatnonzero(members)
+        grown = members.copy()
+        grown[sg_table.mult_table[np.ix_(indices, indices)].ravel()] = True
+        grown[sg_table.inverse_table[indices]] = True
+        if grown.sum() == len(indices):
+            return frozenset(indices.tolist())
+        members = grown
 
 
 def _identify_point_group(rotations: list[np.ndarray]) -> str:
@@ -494,21 +470,34 @@ def _identify_point_group(rotations: list[np.ndarray]) -> str:
     return f"order-{n_ops}"
 
 
+#: every origin shift on the 1/24 grid, in 24ths
+_ORIGIN_GRID = np.array(list(iterproduct(range(24), repeat=3)), dtype=np.int64)
+
+
+def _translations_by_rotation(ops) -> dict | None:
+    """Translations in 24ths (mod 24) of each rotation, or None if one is
+    off the 1/24 grid."""
+    table: dict[tuple, set[int]] = {}
+    for R, t in ops:
+        t24 = 24 * np.asarray(t, dtype=float)
+        if not np.allclose(t24, np.round(t24), atol=1e-4):
+            return None
+        a, b, c = (int(x) % 24 for x in np.round(t24))
+        key = tuple(np.round(R).astype(int).ravel())
+        table.setdefault(key, set()).add(576 * a + 24 * b + c)
+    return table
+
+
 def _solve_origin_shift(
     sub_ops: list[tuple[np.ndarray, np.ndarray]],
     candidate_symop_codes: tuple[int, ...],
 ) -> np.ndarray | None:
-    """Solve for origin shift p that maps subgroup ops to candidate ops.
+    """Origin shift p taking the operations onto the candidate's.
 
-    For operations (R_i, t_i) and candidate (R_i, t_i'), solves for
-    origin shift p such that:
-        t_i - t_i' = (R_i - I) @ p  (mod 1) for all i
-    where, in a centred group, mod 1 is modulo the centring translations
-    too: each rotation's translations are only defined up to them.
-
-    Strategy: generate candidate p vectors from individual constraints
-    (trying integer shifts on b), then verify each candidate against
-    all constraints mod 1.
+    Each operation (R, t) becomes (R, t - (R - I) p), which must be an
+    operation of the candidate. Shifts are searched on the 1/24 grid, where
+    every tabulated setting's origin lies, narrowing the candidates one
+    rotation at a time.
 
     Args:
         sub_ops: List of (rotation, translation) for the subgroup
@@ -517,144 +506,34 @@ def _solve_origin_shift(
     Returns:
         (3,) origin shift vector, or None if no valid shift exists
     """
-    # Decode candidate operations
-    cand_ops = []
-    for code in candidate_symop_codes:
-        R, t = decode_symm_int(code)
-        cand_ops.append((R, t))
-
-    # Build rotation → translation maps
-    sub_rot_map: dict[tuple, np.ndarray] = {}
-    for R, t in sub_ops:
-        key = tuple(np.round(R).astype(int).flatten())
-        sub_rot_map[key] = t
-
-    cand_rot_map: dict[tuple, np.ndarray] = {}
-    for R, t in cand_ops:
-        key = tuple(np.round(R).astype(int).flatten())
-        cand_rot_map[key] = t
-
-    # Rotations must match as sets
-    if set(sub_rot_map.keys()) != set(cand_rot_map.keys()):
+    sub = _translations_by_rotation(sub_ops)
+    cand = _translations_by_rotation(
+        [decode_symm_int(code) for code in candidate_symop_codes]
+    )
+    if sub is None or cand is None or sub.keys() != cand.keys():
+        return None
+    if any(len(sub[k]) != len(cand[k]) for k in sub):
         return None
 
-    centring = [t for R, t in cand_ops if np.allclose(R, np.eye(3))]
+    identity = tuple(np.eye(3, dtype=int).ravel())
+    if sub[identity] != cand[identity]:
+        return None  # pure translations do not change with the origin
 
-    # Collect linear constraints: (R_i - I) @ p = delta_t_i (mod 1)
-    I3 = np.eye(3)
-    constraints_A = []
-    constraints_b = []
-
-    for rot_key in sub_rot_map:
-        R = np.array(rot_key).reshape(3, 3).astype(float)
-        if np.allclose(R, I3):
+    p = _ORIGIN_GRID
+    for key, translations in sub.items():
+        if key == identity:
             continue
-        delta_t = sub_rot_map[rot_key] - cand_rot_map[rot_key]
-        A = R - I3
-        constraints_A.append(A)
-        constraints_b.append(delta_t)
-
-    if not constraints_A:
-        return np.zeros(3)  # Only identity, trivially matches with zero shift
-
-    # Stack all constraints for verification
-    A_full = np.vstack(constraints_A)
-    b_full = np.concatenate(constraints_b)
-
-    # First try: direct lstsq
-    p, _, _, _ = np.linalg.lstsq(A_full, b_full, rcond=None)
-    if _verify_origin_shift(p, constraints_A, constraints_b, centring):
-        return p
-
-    # Generate candidate p vectors from individual constraints with integer
-    # corrections. For each constraint A_i @ p = b_i + n_i, we want every
-    # integer n_i in {-1, 0, 1}**3 — that's 27 candidates per constraint.
-    # We solve all 27 in one shot via the pseudo-inverse rather than calling
-    # lstsq inside a python loop, which dominated the profile.
-    candidates_seen: set[tuple[int, ...]] = set()
-    shifts_arr = np.array(list(iterproduct((-1, 0, 1), repeat=3)), dtype=float)
-
-    for A, b in zip(constraints_A, constraints_b, strict=False):
-        rank = np.linalg.matrix_rank(A, tol=1e-6)
-        if rank < 1:
-            continue
-        try:
-            pinv_A = np.linalg.pinv(A)
-        except np.linalg.LinAlgError:
-            continue
-        # All 27 b_shifted at once -> all 27 candidate p's via one matmul.
-        b_shifted = np.concatenate([b + c + shifts_arr for c in centring])
-        p_cands = b_shifted @ pinv_A.T
-        keys = (np.round(p_cands * 24).astype(int))
-        for k in range(len(p_cands)):
-            key = (int(keys[k, 0]), int(keys[k, 1]), int(keys[k, 2]))
-            if key in candidates_seen:
-                continue
-            candidates_seen.add(key)
-            if _verify_origin_shift(p_cands[k], constraints_A, constraints_b, centring):
-                return p_cands[k]
-
-    # Try pairs of constraints for under-determined single constraints. A_pair
-    # is constant across the 729 (ni, nj) integer-shift combos, so factor
-    # once via pinv and reuse for all 729 b_pair vectors in a single matmul.
-    pair_shifts = np.array(
-        [(ni, nj) for ni in shifts_arr for nj in shifts_arr]
-    )  # (729, 2, 3)
-    for i in range(len(constraints_A)):
-        for j in range(i + 1, len(constraints_A)):
-            A_pair = np.vstack([constraints_A[i], constraints_A[j]])
-            try:
-                pinv_pair = np.linalg.pinv(A_pair)
-            except np.linalg.LinAlgError:
-                continue
-            # Build (729, 6) of stacked b_pairs.
-            b_pairs = np.concatenate(
-                [
-                    np.concatenate(
-                        [
-                            constraints_b[i] + ci + pair_shifts[:, 0, :],
-                            constraints_b[j] + cj + pair_shifts[:, 1, :],
-                        ],
-                        axis=1,
-                    )
-                    for ci in centring
-                    for cj in centring
-                ]
-            )
-            p_cands = b_pairs @ pinv_pair.T  # (729, 3)
-            keys = np.round(p_cands * 24).astype(int)
-            for k in range(p_cands.shape[0]):
-                key = (int(keys[k, 0]), int(keys[k, 1]), int(keys[k, 2]))
-                if key in candidates_seen:
-                    continue
-                candidates_seen.add(key)
-                if _verify_origin_shift(
-                    p_cands[k], constraints_A, constraints_b, centring
-                ):
-                    return p_cands[k]
-
-    return None
-
-
-def _verify_origin_shift(
-    p: np.ndarray,
-    constraints_A: list[np.ndarray],
-    constraints_b: list[np.ndarray],
-    centring=None,
-    atol: float = 1e-3,
-) -> bool:
-    """Verify that p satisfies all constraints A_i @ p = b_i modulo the
-    lattice, whose translations within the cell are `centring`."""
-    if centring is None:
-        centring = [np.zeros(3)]
-    for A, b in zip(constraints_A, constraints_b, strict=False):
-        residual = A @ p - b
-        if not any(
-            np.allclose((residual + c + 0.5) % 1.0 - 0.5, 0, atol=atol)
-            for c in centring
-        ):
-            return False
-    return True
+        A = np.array(key).reshape(3, 3) - np.eye(3, dtype=int)
+        code = next(iter(translations))
+        t = np.array([code // 576, code // 24 % 24, code % 24])
+        # any one translation will do: the rest differ by centring vectors,
+        # which the candidate shares
+        shifted = (t - p @ A.T) % 24
+        encoded = 576 * shifted[:, 0] + 24 * shifted[:, 1] + shifted[:, 2]
+        p = p[np.isin(encoded, list(cand[key]))]
+        if len(p) == 0:
+            return None
+    return p[0] / 24.0
 
 
 def _apply_basis_transform(
@@ -683,66 +562,94 @@ def _apply_basis_transform(
     except np.linalg.LinAlgError:
         return None
 
-    identity = np.eye(3)
-    lattice = [t % 1.0 for R, t in ops if np.allclose(R, identity)]
+    def in_24ths(x):
+        "x * 24 as integers, or None if off the 1/24 grid"
+        x24 = 24 * np.asarray(x, dtype=float)
+        rounded = np.round(x24)
+        if np.abs(x24 - rounded).max() > 1e-4:
+            return None
+        return rounded.astype(np.int64)
 
-    def in_lattice(v):
-        return any(
-            np.allclose((v - t + 0.5) % 1.0 - 0.5, 0, atol=1e-6) for t in lattice
-        )
+    rotations = np.array([np.round(R) for R, _ in ops])
+    translations = in_24ths([t for _, t in ops])
+    columns = in_24ths(P_inv.T)
+    if translations is None or columns is None:
+        return None
+    identity = np.all(rotations == np.eye(3), axis=(1, 2))
+    lattice = {tuple(t) for t in translations[identity] % 24}
+    if not all(tuple(c) in lattice for c in columns % 24):
+        return None
 
-    if not all(in_lattice(P_inv[:, j]) for j in range(3)):
+    conjugated = P @ rotations @ P_inv
+    integral = np.round(conjugated)
+    if np.abs(conjugated - integral).max() > 1e-6 or np.abs(integral).max() > 1.5:
         return None
 
     # the input lattice modulo the new one: closure of its generators' images
-    generators = [P[:, j] % 1.0 for j in range(3)] + [(P @ t) % 1.0 for t in lattice]
-    centring = [np.zeros(3)]
-    frontier = [np.zeros(3)]
+    generators = in_24ths(np.vstack([P.T, (P @ translations[identity].T / 24).T]))
+    if generators is None:
+        return None
+    generators = {tuple(g) for g in generators % 24}
+    centring = {(0, 0, 0)}
+    frontier = [(0, 0, 0)]
     while frontier:
         point = frontier.pop()
         for g in generators:
-            q = (point + g) % 1.0
-            if not any(
-                np.allclose((q - c + 0.5) % 1.0 - 0.5, 0, atol=1e-6) for c in centring
-            ):
-                centring.append(q)
-                frontier.append(q)
-                if len(centring) > 192:
+            q = ((point[0] + g[0]) % 24, (point[1] + g[1]) % 24, (point[2] + g[2]) % 24)
+            if q not in centring:
+                if len(centring) >= 192:
                     return None
+                centring.add(q)
+                frontier.append(q)
 
+    new_translations = in_24ths((P @ (translations.T / 24)).T)
+    if new_translations is None:
+        return None
     transformed = {}
-    for R, t in ops:
-        R_new = P @ R @ P_inv
-        R_int = np.round(R_new)
-        if not np.allclose(R_new, R_int, atol=1e-6):
-            return None
-        if np.any(np.abs(R_int) > 1.5):
-            return None
+    for R, t in zip(integral, new_translations, strict=True):
+        rotation_key = tuple(R.astype(int).ravel())
         for c in centring:
-            t_new = (P @ t + c) % 1.0
-            t_new[np.isclose(t_new, 1.0, atol=1e-6)] = 0.0
-            key = (
-                tuple(R_int.astype(int).ravel()),
-                tuple(np.round(12 * t_new).astype(int) % 12),
-            )
-            transformed.setdefault(key, (R_int, t_new))
-
+            t_new = tuple((t[i] + c[i]) % 24 for i in range(3))
+            transformed.setdefault((rotation_key, t_new), (R, np.array(t_new) / 24.0))
     return list(transformed.values())
 
 
 def _shortest_along_axes(P: np.ndarray, lattice) -> np.ndarray:
     """P with each new basis vector (column of P^{-1}) shortened to the
     shortest lattice vector in its direction, centring included."""
+    points = {tuple(int(x) for x in np.round(24 * np.asarray(t)) % 24) for t in lattice}
     Q = np.linalg.inv(P)
     for j in range(3):
         for k in (6, 4, 3, 2):
-            v = Q[:, j] / k
-            if any(
-                np.allclose((v - t + 0.5) % 1.0 - 0.5, 0, atol=1e-6) for t in lattice
-            ):
-                Q[:, j] = v
+            v24 = 24 * Q[:, j] / k
+            rounded = np.round(v24)
+            if np.abs(v24 - rounded).max() > 1e-6:
+                continue
+            if tuple(int(x) for x in rounded % 24) in points:
+                Q[:, j] /= k
                 break
     return np.linalg.inv(Q)
+
+
+_TERNARY = 3 ** np.arange(8, -1, -1)
+_DUODECIMAL = 12 ** np.arange(2, -1, -1)
+
+
+def _encode_ops(ops) -> tuple[np.ndarray, np.ndarray]:
+    """Rotation and translation parts of `encode_symm_int` for all the
+    operations at once; the code is rotation + 19683 * translation."""
+    rotations = np.round(np.array([R for R, _ in ops], dtype=float)).astype(int) + 1
+    translations = np.round(12 * np.array([t for _, t in ops], dtype=float)).astype(int) % 12
+    return rotations.reshape(-1, 9) @ _TERNARY, translations @ _DUODECIMAL
+
+
+#: tabulated settings by their sorted rotation codes, in table order
+_SETTINGS_BY_ROTATIONS: dict[tuple[int, ...], list] = {}
+for _settings in SG_FROM_NUMBER.values():
+    for _setting in _settings:
+        _SETTINGS_BY_ROTATIONS.setdefault(
+            tuple(sorted(code % 19683 for code in _setting.symops)), []
+        ).append(_setting)
 
 
 def _match_ops_to_known_settings(
@@ -760,30 +667,21 @@ def _match_ops_to_known_settings(
     Returns:
         (sgdata, origin_shift) or None
     """
-    n_ops = len(ops)
-
     # Try exact integer code match
-    try:
-        codes = tuple(sorted(encode_symm_int(R, t) for R, t in ops))
-        sgdata = SG_FROM_SYMOPS.get(codes)
-        if sgdata is not None:
-            return (sgdata, None)
-    except (ValueError, IndexError):
-        pass
+    if any(np.abs(R).max() > 1.5 for R, _ in ops):
+        return None  # no tabulated setting has such a rotation
+    rotation_codes, translation_codes = _encode_ops(ops)
+    codes = tuple(sorted((rotation_codes + 19683 * translation_codes).tolist()))
+    sgdata = SG_FROM_SYMOPS.get(codes)
+    if sgdata is not None:
+        return (sgdata, None)
 
     # Try origin shift: match rotations, solve for shift vector
-    rot_codes = sorted(encode_symm_int(R, np.zeros(3)) for R, _ in ops)
-
-    for _sgnum_str, settings in SG_FROM_NUMBER.items():
-        for candidate in settings:
-            if len(candidate.symops) != n_ops:
-                continue
-            cand_rot_codes = sorted(code % 19683 for code in candidate.symops)
-            if cand_rot_codes != [c % 19683 for c in rot_codes]:
-                continue
-            p = _solve_origin_shift(ops, tuple(candidate.symops))
-            if p is not None:
-                return (candidate, p)
+    rot_codes = tuple(sorted(rotation_codes.tolist()))
+    for candidate in _SETTINGS_BY_ROTATIONS.get(rot_codes, ()):
+        p = _solve_origin_shift(ops, tuple(candidate.symops))
+        if p is not None:
+            return (candidate, p)
 
     return None
 
@@ -818,20 +716,20 @@ def _identify_match(
         if match is not None:
             return (*match, P)
 
-    # Tier 5: Centering reduction + eigenvector transforms
+    # Tier 5: bases from the rotation axes and mirror normals
     centering = _detect_centering(sub_ops)
-    if centering is not None:
-        reduced = _reduce_centered_ops(sub_ops, centering)
-        lattice = [t % 1.0 for R, t in sub_ops if np.allclose(R, np.eye(3))]
-        for P in _compute_symmetry_adapted_transforms([R for R, _ in reduced]):
-            transformed = _apply_basis_transform(
-                _shortest_along_axes(P, lattice), sub_ops
-            )
-            if transformed is None:
-                continue
-            match = _match_ops_to_known_settings(transformed)
-            if match is not None:
-                return (*match, P)
+    reduced = (
+        sub_ops if centering is None else _reduce_centered_ops(sub_ops, centering)
+    )
+    lattice = [t % 1.0 for R, t in sub_ops if np.allclose(R, np.eye(3))]
+    for P in _compute_symmetry_adapted_transforms([R for R, _ in reduced]):
+        P = _shortest_along_axes(P, lattice)
+        transformed = _apply_basis_transform(P, sub_ops)
+        if transformed is None:
+            continue
+        match = _match_ops_to_known_settings(transformed)
+        if match is not None:
+            return (*match, P)
 
     return None
 

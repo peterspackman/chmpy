@@ -24,9 +24,20 @@ LOG = logging.getLogger(__name__)
 class TestRotationTable(unittest.TestCase):
     """Tests for the crystallographic rotation table."""
 
-    def test_rotation_table_has_expected_count(self):
-        """Should have 64 unique crystallographic rotations."""
-        self.assertEqual(len(_CRYSTALLOGRAPHIC_ROTATIONS), 64)
+    def test_rotation_table_holds_every_tabulated_rotation(self):
+        """Every rotation of every tabulated setting is a candidate."""
+        from chmpy.crystal.space_group import SG_FROM_NUMBER
+        from chmpy.crystal.symmetry_operation import decode_symm_int
+
+        table = {tuple(R.ravel()) for R in _CRYSTALLOGRAPHIC_ROTATIONS}
+        tabulated = {
+            tuple(np.round(decode_symm_int(code % 19683)[0]).astype(int).ravel())
+            for settings in SG_FROM_NUMBER.values()
+            for sg in settings
+            for code in sg.symops
+        }
+        self.assertEqual(len(tabulated), 64)
+        self.assertTrue(tabulated <= table)
 
     def test_identity_present(self):
         """Identity rotation should be in the table."""
@@ -154,6 +165,47 @@ class TestFindSymmetryOperations(unittest.TestCase):
 
 class TestDetectSymmetry(unittest.TestCase):
     """Tests for Crystal.detect_symmetry() method."""
+
+    def p1_in_cell(self, crystal, T, origin=(0.0, 0.0, 0.0)):
+        """The crystal's atoms as P1 in the cell T @ direct, moved by origin."""
+        p1 = crystal.as_P1()
+        uc = p1.unit_cell_atoms()
+        cell = UnitCell(np.asarray(T) @ crystal.unit_cell.direct)
+        # every atom image inside the new cell
+        frac = []
+        elements = []
+        n = int(round(abs(np.linalg.det(T))))
+        for shift in np.ndindex(n, n, n) if n > 1 else [(0, 0, 0)]:
+            x = (uc["frac_pos"] + np.array(shift)) @ crystal.unit_cell.direct
+            frac.append(cell.to_fractional(x + origin) % 1.0)
+            elements.extend(uc["element"])
+        frac = np.vstack(frac)
+        keep = np.unique(np.round(frac, 6) % 1.0, axis=0, return_index=True)[1]
+        asym = AsymmetricUnit(
+            [Element.from_atomic_number(int(elements[i])) for i in keep], frac[keep]
+        )
+        return Crystal(cell, SpaceGroup(1), asym)
+
+    def test_detects_in_a_sheared_cell(self):
+        acetic = Crystal.load(TEST_FILES["acetic_acid.cif"])
+        sheared = self.p1_in_cell(acetic, [[1, 1, 0], [0, 1, 0], [1, 0, 1]])
+        found = sheared.detect_symmetry()
+        self.assertEqual(found.space_group.international_tables_number, 33)
+        self.assertEqual(len(found.asymmetric_unit), len(acetic.asymmetric_unit))
+
+    def test_detects_from_a_supercell_with_any_origin(self):
+        acetic = Crystal.load(TEST_FILES["acetic_acid.cif"])
+        supercell = self.p1_in_cell(acetic, np.diag([2, 1, 1]), origin=(0.37, 1.21, 0.05))
+        found = supercell.detect_symmetry()
+        self.assertEqual(found.space_group.international_tables_number, 33)
+        np.testing.assert_allclose(
+            found.unit_cell.volume(), acetic.unit_cell.volume(), rtol=1e-8
+        )
+
+    def test_detects_rhombohedral_from_p1(self):
+        r3c = Crystal.load(TEST_FILES["r3c_example.cif"])
+        found = r3c.as_P1().detect_symmetry()
+        self.assertEqual(found.space_group.international_tables_number, 161)
 
     def test_detect_symmetry_on_acetic_acid(self):
         """detect_symmetry on acetic acid should return same or self."""

@@ -1566,53 +1566,66 @@ class Crystal:
     def detect_symmetry(self, tolerance: float = 0.01) -> Crystal:
         """Detect the full symmetry of this crystal from atomic positions.
 
-        Returns a new Crystal with the detected (possibly higher) symmetry.
-        Uses native detection -- no spglib dependency.
+        Works in any cell of the lattice: the symmetry is found in a Niggli
+        reduced basis of the primitive lattice, and the result is put in the
+        standard setting when the space group can be identified there, or
+        else left in the reduced basis. Uses native detection -- no spglib
+        dependency.
 
         Args:
             tolerance: Cartesian distance tolerance in Angstroms.
 
         Returns:
-            Crystal with detected space group, or self if no higher symmetry found.
+            Crystal with the detected space group, or self if no higher
+            symmetry is found.
         """
-        from .subgroup import identify_standard_setting
-        from .symmetry_finder import (
-            find_asymmetric_unit_indices,
-            find_symmetry_operations,
-        )
+        from .symmetry_finder import find_asymmetric_unit_indices, find_symmetry
 
         uc_dict = self.unit_cell_atoms()
-        positions = uc_dict["frac_pos"]
-        elements = uc_dict["element"]
-
-        symops = find_symmetry_operations(
-            self.unit_cell, positions, elements, atol=tolerance
+        found = find_symmetry(
+            self.unit_cell, uc_dict["frac_pos"], uc_dict["element"], atol=tolerance
         )
-
-        if len(symops) <= len(self.symmetry_operations):
+        if found is None:
+            LOG.warning("Could not make the detected symmetry's translations rational")
             return self
 
-        result = identify_standard_setting(symops)
-        if result is None:
+        # operations per primitive cell, to compare with what was found
+        pure = sum(
+            1 for s in self.symmetry_operations if np.allclose(s.rotation, np.eye(3))
+        )
+        if len(found.operations) <= len(self.symmetry_operations) // pure:
+            return self
+
+        try:
+            space_group = SpaceGroup.in_setting(found.operations)
+        except ValueError:
             LOG.warning(
-                "Found %d symmetry operations but could not identify space group",
-                len(symops),
+                "Found %d symmetry operations but could not identify the space group",
+                len(found.operations),
             )
             return self
 
-        sg = SpaceGroup(result.sg_number, choice=result.choice)
-
-        # Build asymmetric unit from equivalence classes
+        cell = UnitCell(found.transform @ self.unit_cell.direct)
+        elements = uc_dict["element"][found.indices]
         asym_indices = find_asymmetric_unit_indices(
-            positions, elements, symops, self.unit_cell.direct, atol=tolerance
+            found.positions, elements, found.operations, cell.direct, atol=tolerance
         )
-
         asym = AsymmetricUnit(
             [Element.from_atomic_number(int(elements[i])) for i in asym_indices],
-            positions[asym_indices],
-            labels=uc_dict["label"][asym_indices],
+            found.positions[asym_indices],
+            labels=uc_dict["label"][found.indices][asym_indices],
         )
-        return Crystal(self.unit_cell, sg, asym)
+        crystal = Crystal(cell, space_group, asym)
+        if crystal.space_group.tabulated:
+            return crystal
+        try:
+            return crystal.to_standard_setting()
+        except ValueError:
+            LOG.info(
+                "%s left in a reduced cell: its setting is not identified",
+                space_group.symbol,
+            )
+            return crystal
 
     def choose_trigonal_lattice(self, choice="H"):
         """
